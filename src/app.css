@@ -60,7 +60,6 @@ a {
   background: var(--glass);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
   backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
-  border: 1px solid var(--glass-edge);
   box-shadow: var(--shadow-glass);
 }
 

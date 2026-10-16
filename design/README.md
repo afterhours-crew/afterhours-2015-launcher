@@ -10,9 +10,10 @@ The screens follow the "Garage 1a: full launcher" boards of the
 "Preservation Launcher" canvas. The rules that matter most, from the design
 system's brand book:
 
-- The garage backdrop is the brand. Glass for everything you navigate; the
-  launch bar, the car or server name and the Play button sit on the floor.
-- One orange button per screen: Play, Connect or Next. Nothing else is orange.
+- The garage backdrop is the brand. Glass for everything you navigate, with no
+  borders on panels; the launch bar, the car or server name and the Play button
+  sit on the floor.
+- One accent button per screen: Play, Connect or Next, in the game logo's blue (`play`). Nothing else uses it.
 - Color means event type or status, and a status is always a word plus a dot.
 - Interface text is Saira Semi Condensed, data is JetBrains Mono. Short and
   structural text is uppercase with tracking; sentences are sentence case;
