@@ -1,0 +1,117 @@
+/* Fonts are vendored through @fontsource so the launcher renders offline. */
+@import "@fontsource/saira-semi-condensed/400.css";
+@import "@fontsource/saira-semi-condensed/500.css";
+@import "@fontsource/saira-semi-condensed/700.css";
+@import "@fontsource/saira-semi-condensed/800.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "./lib/styles/tokens.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--floor);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.45;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+a {
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* Glass: fill, blur, edge and shadow in one class. */
+.ah-glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  box-shadow: var(--shadow-glass);
+}
+
+.ah-glass-dense {
+  background: var(--glass-dense);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .ah-glass {
+    background: var(--glass-solid);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ah-glass {
+    background: var(--glass-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* Text placed directly on the backdrop art. */
+.ah-on-art {
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+}
+
+.pill {
+  min-height: var(--control-height);
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-pill);
+  transition: background 160ms ease-out;
+}
+
+.pill:hover {
+  background: var(--hover);
+}
+
+.pill[aria-current="page"] {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.row-hover:hover {
+  background: var(--row-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
