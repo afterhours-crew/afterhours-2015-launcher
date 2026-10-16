@@ -19,6 +19,15 @@
   $effect(() => {
     session.load().then(() => {
       firstRun = !session.settings.first_run_done;
+      if (!inTauri) {
+        // Browser preview for styling work: no backend, so no wizard, and
+        // `?view=host` opens a screen directly.
+        firstRun = new URLSearchParams(location.search).get("view") === "firstrun";
+        const wanted = new URLSearchParams(location.search).get("view");
+        if (wanted && ["garage", "servers", "host", "mods", "settings"].includes(wanted)) {
+          view = wanted as View;
+        }
+      }
     });
   });
 
@@ -95,8 +104,11 @@
     flex-direction: column;
     overflow: hidden;
   }
-  .window > :global(*) {
+  /* The backdrop is the first child and stays absolute; everything after
+     it stacks above the art. */
+  .window > :global(:not(:first-child)) {
     position: relative;
+    z-index: 1;
   }
   .banner {
     margin: 12px var(--space-6) 0;
