@@ -15,7 +15,7 @@
     }
     list.push({
       from: "Afterhours",
-      text: "Development build. The Rust launcher's live run on the real game is still pending; servers and mods are previews.",
+      text: "Development build. The Rust launcher's live run on the real game is still pending.",
       time: "",
     });
     return list;

@@ -21,9 +21,7 @@
 
   const items: { id: View; label: string; dot?: string }[] = [
     { id: "garage", label: "Garage" },
-    { id: "servers", label: "Servers" },
     { id: "host", label: "Host" },
-    { id: "mods", label: "Mods", dot: "var(--status-mods)" },
     { id: "settings", label: "Settings" },
   ];
 </script>

@@ -9,7 +9,6 @@
   import FirstRun from "$lib/views/FirstRun.svelte";
   import Garage from "$lib/views/Garage.svelte";
   import Host from "$lib/views/Host.svelte";
-  import Preview from "$lib/views/Preview.svelte";
   import Settings from "$lib/views/Settings.svelte";
 
   const platform = detectPlatform(navigator.userAgent);
@@ -24,7 +23,7 @@
         // `?view=host` opens a screen directly.
         firstRun = new URLSearchParams(location.search).get("view") === "firstrun";
         const wanted = new URLSearchParams(location.search).get("view");
-        if (wanted && ["garage", "servers", "host", "mods", "settings"].includes(wanted)) {
+        if (wanted && ["garage", "host", "settings"].includes(wanted)) {
           view = wanted as View;
         }
       }
@@ -75,20 +74,8 @@
   {:else}
     {#if view === "garage"}
       <Garage />
-    {:else if view === "servers"}
-      <Preview
-        title="Servers"
-        text="The server browser arrives with multiplayer: a Linux or Windows host listing itself, drivers connecting over the network, crews. Today the server listens on this PC only."
-        issue="#60"
-      />
     {:else if view === "host"}
       <Host />
-    {:else if view === "mods"}
-      <Preview
-        title="Mods"
-        text="Mods and mod-locked servers are designed but not built. The server has no mod system yet."
-        issue="#60"
-      />
     {:else}
       <Settings />
     {/if}
