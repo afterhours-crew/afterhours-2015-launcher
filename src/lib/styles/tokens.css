@@ -1,0 +1,124 @@
+/* Generated from design/tokens.json by scripts/tokens.mjs. Do not edit. */
+:root {
+  /* color */
+  --floor: #121015;
+  --shade: rgba(14,12,17,0.55);
+  --shade-dim: rgba(14,12,17,0.35);
+  --glass: rgba(24,21,29,0.38);
+  --glass-dense: rgba(24,21,29,0.52);
+  --glass-solid: rgba(24,21,29,0.86);
+  --glass-edge: rgba(255,255,255,0.18);
+  --glass-highlight: rgba(255,255,255,0.14);
+  --hover: rgba(255,255,255,0.12);
+  --row-hover: rgba(255,255,255,0.07);
+  --selected: rgba(255,255,255,0.13);
+  --selected-edge: rgba(244,240,234,0.55);
+  --field: rgba(255,255,255,0.06);
+  --log: rgba(8,7,10,0.72);
+  --ink: #F4F0EA;
+  --ink-soft: #DCD5CD;
+  --ink-muted: #C9C1B9;
+  --ink-faint: #B8B0A8;
+  --on-ink: #121015;
+  --play: #FF7A1A;
+  --speed: #4DA3FF;
+  --style: #FF5FA8;
+  --build: #FFC233;
+  --crew: #3DD68C;
+  --outlaw: #A982FF;
+  --peach: #FF9A5C;
+  --status-ready: var(--crew);
+  --status-warn: var(--build);
+  --status-info: var(--speed);
+  --status-mods: var(--outlaw);
+  --warn-soft: rgba(255,194,51,0.16);
+  --warn-edge: rgba(255,194,51,0.45);
+  --warn-ink: #FFD772;
+  --mods-soft: rgba(169,130,255,0.22);
+  --mods-ink: #CDB8FF;
+  /* spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --header-top: 18px;
+  --launchbar-bottom: 26px;
+  /* radius */
+  --radius-thumb: 10px;
+  --radius-field: 12px;
+  --radius-row: 14px;
+  --radius-play: 16px;
+  --radius-card: 18px;
+  --radius-panel: 26px;
+  --radius-phone: 28px;
+  --radius-pill: 999px;
+  /* shadow */
+  --shadow-glass: inset 0 1px 0 rgba(255,255,255,0.14), 0 12px 40px rgba(0,0,0,0.35);
+  --shadow-float: inset 0 1px 0 rgba(255,255,255,0.14), 0 20px 60px rgba(0,0,0,0.45);
+  --shadow-avatar: 0 0 0 2px rgba(18,16,21,0.8);
+  /* blur */
+  --glass-blur: 18px;
+  --glass-blur-heavy: 22px;
+  /* size */
+  --play-height: 58px;
+  --play-min-width: 200px;
+  --control-height: 38px;
+  --field-height: 40px;
+  --avatar-sm: 24px;
+  --avatar-md: 34px;
+  --avatar-lg: 44px;
+  --window-min-width: 1100px;
+  /* type families */
+  --font-ui: "Saira Semi Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+/* The Garage home clock only. Tabular numerals, on the shaded backdrop with text-on-art. */
+.t-clock { font-family: var(--font-ui); font-size: 168px; line-height: 0.85; font-weight: 500; letter-spacing: -0.01em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+
+/* Launch-bar left value: the car, server or setup step. Uppercase, directly on the floor. */
+.t-car-name { font-family: var(--font-ui); font-size: 30px; line-height: 1.05; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; }
+
+/* First-run step headings. Uppercase. */
+.t-step-title { font-family: var(--font-ui); font-size: 34px; line-height: 1; font-weight: 800; text-transform: uppercase; }
+
+/* The title inside a view's main glass panel. Uppercase. */
+.t-view-title { font-family: var(--font-ui); font-size: 26px; line-height: 1.1; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+
+/* Section heading inside a glass panel, next to its 30px icon tile. Uppercase. */
+.t-panel-title { font-family: var(--font-ui); font-size: 16px; line-height: 1.2; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+
+/* The play button label. Uppercase. Drops to 20px for longer busy labels (Verifying 62%). */
+.t-play { font-family: var(--font-ui); font-size: 26px; line-height: 1; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+
+/* Nav pills. 800 on the current pill. Uppercase. */
+.t-nav { font-family: var(--font-ui); font-size: 14px; line-height: 1; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+
+/* Pill buttons and filters. 700 on outline and text buttons. Uppercase. */
+.t-button { font-family: var(--font-ui); font-size: 13px; line-height: 1; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* Field labels, column headers, eyebrow labels (12px, 0.16em on the floor). Uppercase. */
+.t-label { font-family: var(--font-ui); font-size: 11px; line-height: 1.2; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+
+/* Event-type tags and small chips. Uppercase, on-ink on the tag color. */
+.t-tag { font-family: var(--font-ui); font-size: 10px; line-height: 1.4; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* All running text. Sentence case. */
+.t-body { font-family: var(--font-ui); font-size: 15px; line-height: 22px; font-weight: 400; }
+
+/* Names: servers, drivers, mods, list-row titles. */
+.t-body-strong { font-family: var(--font-ui); font-size: 15px; line-height: 22px; font-weight: 700; }
+
+/* Hints under controls and the launch-bar state line. */
+.t-caption { font-family: var(--font-ui); font-size: 13px; line-height: 18px; font-weight: 400; }
+
+/* Addresses, ping, builds, paths, timestamps, counts. Never uppercase by CSS. */
+.t-data { font-family: var(--font-mono); font-size: 12px; line-height: 18px; font-weight: 400; }
+
+/* Secondary data: profile subline, message times, file sizes. */
+.t-data-small { font-family: var(--font-mono); font-size: 11px; line-height: 16px; font-weight: 400; }
+
+/* Event countdowns. */
+.t-countdown { font-family: var(--font-mono); font-size: 26px; line-height: 1.1; font-weight: 400; font-variant-numeric: tabular-nums; }
