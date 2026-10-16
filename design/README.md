@@ -13,7 +13,7 @@ system's brand book:
 - The garage backdrop is the brand. Glass for everything you navigate, with no
   borders on panels; the launch bar, the car or server name and the Play button
   sit on the floor.
-- One accent button per screen: Play, Connect or Next, in the game logo's blue (`play`). Nothing else uses it.
+- One accent button per screen: Play, Connect or Next, in the game logo's blue (`play`). Nothing else uses it. The Afterhours mark keeps its own orange (`brand`), which appears nowhere else.
 - Color means event type or status, and a status is always a word plus a dot.
 - Interface text is Saira Semi Condensed, data is JetBrains Mono. Short and
   structural text is uppercase with tracking; sentences are sentence case;
