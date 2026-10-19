@@ -342,7 +342,7 @@
     flex-direction: column;
     gap: 6px;
     padding: 12px 14px;
-    border-radius: 14px;
+    border-radius: var(--radius-row);
     background: var(--field);
   }
   .about-text {
@@ -390,7 +390,7 @@
   .lines {
     display: flex;
     flex-direction: column;
-    border-radius: 14px;
+    border-radius: var(--radius-row);
     background: var(--log);
     overflow: hidden;
     user-select: text;
@@ -462,7 +462,7 @@
   .raw {
     margin: 0;
     padding: 14px;
-    border-radius: 14px;
+    border-radius: var(--radius-row);
     background: var(--log);
     font-family: var(--font-mono);
     font-size: 11.5px;

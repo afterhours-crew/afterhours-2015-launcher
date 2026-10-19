@@ -274,7 +274,7 @@
     flex-direction: column;
     gap: 16px;
     padding: 28px;
-    border-radius: 30px;
+    border-radius: var(--radius-phone);
     box-shadow: var(--shadow-float);
   }
   .steps {

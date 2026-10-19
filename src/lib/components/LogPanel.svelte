@@ -55,7 +55,7 @@
     flex-direction: column;
     gap: 8px;
     padding: 16px;
-    border-radius: 22px;
+    border-radius: var(--radius-panel);
     background: var(--log);
   }
   .head {

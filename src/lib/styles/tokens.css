@@ -47,13 +47,13 @@
   --header-top: 18px;
   --launchbar-bottom: 26px;
   /* radius */
-  --radius-thumb: 10px;
-  --radius-field: 12px;
-  --radius-row: 14px;
+  --radius-thumb: 6px;
+  --radius-field: 8px;
+  --radius-row: 8px;
   --radius-play: 16px;
-  --radius-card: 18px;
-  --radius-panel: 26px;
-  --radius-phone: 28px;
+  --radius-card: 9px;
+  --radius-panel: 13px;
+  --radius-phone: 14px;
   --radius-pill: 999px;
   /* shadow */
   --shadow-glass: inset 0 1px 0 rgba(255,255,255,0.14), 0 12px 40px rgba(0,0,0,0.35);

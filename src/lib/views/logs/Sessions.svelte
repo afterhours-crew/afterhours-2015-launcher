@@ -535,7 +535,7 @@
   }
   .scroll {
     overflow-x: auto;
-    border-radius: 14px;
+    border-radius: var(--radius-row);
     background: var(--field);
   }
   table {

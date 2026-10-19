@@ -126,7 +126,7 @@
     gap: var(--space-4);
   }
   .cards :global(.card) {
-    border-radius: 24px;
+    border-radius: var(--radius-panel);
     padding: 20px;
     display: flex;
     flex-direction: column;

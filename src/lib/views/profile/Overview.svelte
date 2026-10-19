@@ -249,7 +249,7 @@
     gap: 18px;
   }
   .main :global(.card) {
-    border-radius: 24px;
+    border-radius: var(--radius-panel);
     padding: 20px;
     display: flex;
     flex-direction: column;
@@ -358,7 +358,7 @@
   }
   .tile {
     padding: 12px 14px;
-    border-radius: 14px;
+    border-radius: var(--radius-row);
     background: var(--field);
     display: flex;
     flex-direction: column;

@@ -278,7 +278,7 @@
   }
   .tile {
     padding: 10px 12px;
-    border-radius: 14px;
+    border-radius: var(--radius-row);
     background: var(--field);
     display: flex;
     flex-direction: column;
