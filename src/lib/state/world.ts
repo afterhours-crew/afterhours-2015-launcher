@@ -28,10 +28,13 @@ export interface Row {
   selected: string;
 }
 
-const label = (multiplier: number) => (multiplier === 0 ? "Off" : `${multiplier}x`);
+/** Off, Default (the game's own amount, 1x), then 2x to 5x. */
+const label = (multiplier: number) =>
+  multiplier === 0 ? "Off" : multiplier === 1 ? "Default" : `${multiplier}x`;
 
 /**
- * Traffic: Off is 0 % and Nx is N × 100 %. Steps above the server's maximum
+ * Traffic: Off is 0 %, Default is the game's own 100 % and Nx is N × 100 %.
+ * Steps above the server's maximum
  * show as coming in a future update, and become pickable by themselves when
  * the server allows them. A saved amount off the scale ("150 %") is an
  * extra, selected choice until a step is picked.

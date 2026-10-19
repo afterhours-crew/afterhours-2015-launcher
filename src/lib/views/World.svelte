@@ -67,7 +67,7 @@
             ><span class="t-body-strong">Traffic</span>
             <InfoButton
               label="About traffic"
-              text="How many cars your server spawns around you, as a multiple of the game's own amount. More than 1x costs game performance."
+              text="How many cars your server spawns around you, as a multiple of the game's own amount (Default). More than Default costs game performance."
             /></span
           >
           {#if traffic}

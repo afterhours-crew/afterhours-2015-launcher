@@ -27,7 +27,7 @@ describe("traffic", () => {
     expect(trafficRow(report())).toEqual({
       options: [
         { value: "0", label: "Off" },
-        { value: "100", label: "1x" },
+        { value: "100", label: "Default" },
         { value: "200", label: "2x" },
         { value: "300", label: "3x" },
         { value: "400", label: "4x", upcoming: true },
@@ -40,7 +40,7 @@ describe("traffic", () => {
 
   it("makes 4x and 5x pickable by themselves when the server allows them", () => {
     const row = trafficRow(report({ max_traffic_percent: 500 }));
-    expect(row.options.map((o) => o.label)).toEqual(["Off", "1x", "2x", "3x", "4x", "5x"]);
+    expect(row.options.map((o) => o.label)).toEqual(["Off", "Default", "2x", "3x", "4x", "5x"]);
     expect(row.options.some((o) => o.upcoming)).toBe(false);
     expect(trafficUpcoming(report({ max_traffic_percent: 500 }))).toBe(false);
     const partly = trafficRow(report({ max_traffic_percent: 450 }));
