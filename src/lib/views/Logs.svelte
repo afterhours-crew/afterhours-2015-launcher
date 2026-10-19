@@ -33,6 +33,7 @@
       <div class="console" data-enter>
         <LogPanel
           lines={session.console}
+          received={session.received}
           empty={running
             ? "Waiting for output…"
             : "Nothing yet. Press Play and the session's output shows up here."}

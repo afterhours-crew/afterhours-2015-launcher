@@ -100,3 +100,12 @@ export function toastIn(_node: Element) {
     css: (t: number) => `opacity: ${t}; transform: translateY(${(1 - t) * -8}px)`,
   };
 }
+
+/** A floating control rises 8px into place and sinks away (`transition:`). */
+export function slideUp(_node: Element) {
+  return {
+    duration: reducedMotion() ? 0 : MOTION.base,
+    easing: cubicOut,
+    css: (t: number) => `opacity: ${t}; transform: translateY(${(1 - t) * 8}px)`,
+  };
+}

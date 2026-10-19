@@ -4,7 +4,7 @@
 import { api, inTauri, onSessionEvents, statusFromResult, type Unlisten } from "$lib/api/tauri";
 import type { AppInfo, OutputLine, SessionAction, Settings, Status } from "$lib/api/types";
 import { emptySettings } from "$lib/api/types";
-import { sampleAppInfo, sampleMode } from "./preview";
+import { sampleAppInfo, sampleFeed, sampleMode } from "./preview";
 
 export const MAX_CONSOLE_LINES = 400;
 
@@ -17,7 +17,10 @@ export class Session {
   info = $state<AppInfo | null>(null);
   status = $state<Status | null>(null);
   running = $state(false);
+  /** The newest lines, at most MAX_CONSOLE_LINES. */
   console = $state<OutputLine[]>([]);
+  /** Lines received since the console was last cleared, trimmed ones included. */
+  received = $state(0);
   error = $state<string | null>(null);
   loaded = $state(false);
   /** The window refused to close because its session still runs. */
@@ -42,6 +45,8 @@ export class Session {
         // As the desktop window reports it: the launcher's folder is the game folder.
         const inFolder = this.info.game_in_launcher_folder;
         if (inFolder) this.settings = { ...this.settings, game_dir: inFolder };
+        // `?sample&feed`: server lines keep arriving, for the live log panels.
+        void sampleFeed((line) => this.receive(line));
       }
       this.loaded = true;
       return;
@@ -59,7 +64,7 @@ export class Session {
       this.loaded = true;
     }
     this.unlisten ??= await onSessionEvents({
-      output: (line) => this.push(line),
+      output: (line) => this.receive(line),
       status: (result) => {
         this.status = statusFromResult(result);
       },
@@ -93,6 +98,7 @@ export class Session {
   async start(action: SessionAction): Promise<void> {
     this.error = null;
     this.console = [];
+    this.received = 0;
     try {
       await api.startSession(action);
       this.running = true;
@@ -113,7 +119,9 @@ export class Session {
     }
   }
 
-  private push(line: OutputLine): void {
+  /** Add one console line, dropping the oldest past the bound. */
+  receive(line: OutputLine): void {
+    this.received += 1;
     const next = [...this.console, line];
     this.console =
       next.length > MAX_CONSOLE_LINES ? next.slice(next.length - MAX_CONSOLE_LINES) : next;

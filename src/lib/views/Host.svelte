@@ -37,6 +37,7 @@
     <LogPanel
       title="Server log"
       lines={session.console}
+      received={session.received}
       empty={running
         ? "Waiting for output…"
         : "Nothing yet. Serve starts your server here, and its output shows up as it runs."}
@@ -91,10 +92,14 @@
     overflow: auto;
     align-items: stretch;
   }
+  /* The server log runs the full height of the view and scrolls inside
+     itself; the page around it does not scroll for it. */
   .console {
     flex: 999 1 520px;
+    align-self: stretch;
     min-width: 0;
     min-height: 320px;
+    max-height: 100%;
     display: flex;
     flex-direction: column;
     gap: 8px;

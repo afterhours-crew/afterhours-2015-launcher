@@ -320,7 +320,9 @@
           <h2 class="t-panel-title">Live console</h2>
           <span class="caption">The session started from this window.</span>
         </div>
-        <div class="console"><LogPanel lines={live.console} empty="" /></div>
+        <div class="console">
+          <LogPanel lines={live.console} received={live.received} empty="" />
+        </div>
       </section>
     {/if}
   </Glass>
