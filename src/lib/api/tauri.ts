@@ -40,6 +40,8 @@ export const api = {
   stopSession: () => invoke<CliResult>("stop_session"),
   /** `play --json`: start the game in the running `serve` session. */
   playGame: () => invoke<CliResult>("play_game"),
+  /** `car-images --json`: decode each car's pictures into the data folder. */
+  carImages: () => invoke<CliResult>("car_images"),
   recorded: () => invoke<Recorded>("recorded"),
   openFolder: (which: Folder) => invoke<void>("open_folder", { which }),
   sessionActivity: () => invoke<Activity>("session_activity"),

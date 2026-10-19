@@ -4,7 +4,7 @@
  * Optional features a build provides. Screens whose capability is absent
  * should say the feature is not available yet rather than fail.
  */
-export type Capability = "profile" | "sessions" | "events" | "play";
+export type Capability = "profile" | "sessions" | "events" | "play" | "car-images";
 
 /**
  * `version --json`.

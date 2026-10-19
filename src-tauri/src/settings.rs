@@ -126,7 +126,10 @@ pub fn save_settings(
     let stored = to_store(settings, &current, &state.game_folder(&current));
     write(&file(&app)?, &stored)?;
     *current = stored;
-    Ok(effective(&current, &state.game_folder(&current)))
+    let saved = effective(&current, &state.game_folder(&current));
+    // A new data folder brings its own pictures folder.
+    crate::images::allow(&app, &saved);
+    Ok(saved)
 }
 
 #[cfg(test)]

@@ -15,6 +15,11 @@ export interface Profile {
    */
   active: boolean;
   bank: Bank | null;
+  /**
+   * The directory of the decoded car images; `null` until `car-images`
+   * has run for the current content.
+   */
+  car_images: string | null;
   car_summary: CarSummary | null;
   /**
    * Every owned car: the active car, garage slots 1-4 in order, then the
@@ -83,6 +88,11 @@ export interface Car {
   definition: string;
   id: string;
   /**
+   * The car's in-game images, decoded by `car-images`; `null` before that
+   * or when the car has none.
+   */
+  image: CarImages | null;
+  /**
    * Records installed on the car: reachable from it through installed
    * item links, nested parts included. An installed wrap from the
    * account's library counts.
@@ -115,6 +125,29 @@ export interface Car {
    */
   spare_parts: number;
   vehicle: Vehicle | null;
+}
+/**
+ * A car's cached images; a size is `null` when the car names none or it
+ * could not be decoded.
+ */
+export interface CarImages {
+  large: CarImage | null;
+  medium: CarImage | null;
+}
+/**
+ * One cached image for `profile`.
+ */
+export interface CarImage {
+  height: number;
+  /**
+   * Absolute path of the PNG file.
+   */
+  path: string;
+  /**
+   * The source texture's `RenderFormat` name, such as `BC1_UNORM`.
+   */
+  source_format: string;
+  width: number;
 }
 /**
  * A car's three names in one language. A name is `null` when its string ID
@@ -187,6 +220,11 @@ export interface Item {
    */
   definition: string;
   id: string;
+  /**
+   * The car's in-game images, decoded by `car-images`; `null` before that
+   * or when the car has none.
+   */
+  image: CarImages | null;
   /**
    * The game's localized name of a car, read from the installation:
    * `names.long`. `null` for other items or when it did not resolve.

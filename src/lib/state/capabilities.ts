@@ -6,12 +6,14 @@
 import type { ServerInfo } from "$lib/api/types";
 
 /**
- * Capabilities screens wait for. `profile`, `sessions`, `events` and
- * `play` (start the game in a running `serve` session) are contract v1's;
+ * Capabilities screens wait for. `profile`, `sessions`, `events`, `play`
+ * (start the game in a running `serve` session) and `car-images` (decode
+ * each car's in-game pictures) are contract v1's;
  * `world-settings` (track 3, traffic density) and `map` (track 7, the live
  * map feed) are expected names no server reports yet.
  */
-export type Capability = "profile" | "sessions" | "events" | "play" | "world-settings" | "map";
+export type Capability =
+  "profile" | "sessions" | "events" | "play" | "car-images" | "world-settings" | "map";
 
 export function hasCapability(
   server: Pick<ServerInfo, "capabilities"> | null | undefined,
@@ -29,6 +31,8 @@ export const FEATURES = {
   profile: "profile",
   cars: "profile",
   "save-data": "profile",
+  /** Each car's in-game picture on Cars and Profile. */
+  "car-images": "car-images",
   logs: "sessions",
   traffic: "world-settings",
   rivals: "world-settings",

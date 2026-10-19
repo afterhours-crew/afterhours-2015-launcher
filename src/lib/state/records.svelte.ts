@@ -7,9 +7,10 @@
 // The browser preview reads made-up records instead in its sample mode
 // (./preview.ts).
 
-import { api } from "$lib/api/tauri";
+import { api, inTauri } from "$lib/api/tauri";
 import type { CliResult, Profile, ProfileList, SessionFileText, SessionList } from "$lib/api/types";
 import { hasCapability } from "./capabilities";
+import { needsCarImages } from "./carimages";
 import { loadSample, sampleMode } from "./preview";
 import { session } from "./session.svelte";
 
@@ -103,6 +104,10 @@ export class Records {
   picked = $state<string | null>(null);
   pickedProfile = $state<Load<Profile>>({ kind: "idle" });
   sessions = $state<Load<SessionList>>({ kind: "idle" });
+  /** `car-images` is running in the background. */
+  imagesRunning = $state(false);
+  /** The game folder `car-images` last ran for; a session's end clears it. */
+  private imagesTried: string | null = null;
 
   private source: Promise<Source> | null = null;
 
@@ -146,6 +151,36 @@ export class Records {
       (l) => (this.profile = l),
       current(this.profile),
     );
+    void this.ensureCarImages();
+  }
+
+  /**
+   * Decode the cars' pictures in the background when the server can and
+   * the profile has none (after the first run, or when the content
+   * changed), then read the profile again. Nothing waits on it: the
+   * screens show a placeholder tile until the pictures arrive. Once per game
+   * folder until a session ends, so a refusal is not retried in a loop.
+   */
+  async ensureCarImages(): Promise<void> {
+    if (!inTauri || sampleMode || this.imagesRunning) return;
+    const enabled = hasCapability(session.info?.server, "car-images");
+    if (!needsCarImages(current(this.profile), enabled)) return;
+    const folder = session.settings.game_dir ?? "";
+    if (this.imagesTried === folder) return;
+    this.imagesTried = folder;
+    this.imagesRunning = true;
+    try {
+      const result = await api.carImages();
+      if (result.kind === "ok") {
+        this.imagesRunning = false;
+        await this.loadProfile();
+      }
+    } catch {
+      // A missing or refusing server keeps the placeholders; Logs and the
+      // server's own records say why.
+    } finally {
+      this.imagesRunning = false;
+    }
   }
 
   async loadProfiles(): Promise<void> {
@@ -195,6 +230,8 @@ export class Records {
 
   /** After a session ends the save and the session list have changed. */
   async refreshAfterSession(): Promise<void> {
+    // A session may have prepared new content: pictures can be tried again.
+    this.imagesTried = null;
     await Promise.all([this.loadProfile(), this.loadSessions()]);
   }
 }

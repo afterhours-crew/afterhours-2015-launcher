@@ -1,6 +1,7 @@
 <script lang="ts">
   import { staggerIn } from "$lib/motion";
   import type { Profile } from "$lib/api/types";
+  import CarImage from "$lib/components/CarImage.svelte";
   import EmptyLine from "$lib/components/EmptyLine.svelte";
   import Glass from "$lib/components/Glass.svelte";
   import InfoButton from "$lib/components/InfoButton.svelte";
@@ -18,7 +19,10 @@
     type CarGroup,
     type CarSort,
   } from "$lib/state/cars";
+  import { featureReady } from "$lib/state/capabilities";
+  import { carImagePath } from "$lib/state/carimages";
   import { formatCount, formatMoney } from "$lib/state/format";
+  import { session } from "$lib/state/session.svelte";
 
   // Cars (H2): every owned car, garage and warehouse, from the profile's
   // `cars`. Identical warehouse cars share a row ("× 4"). Names are the
@@ -32,6 +36,8 @@
   let selectedKey = $state<string | null>(null);
 
   let cars = $derived(profile.cars ?? []);
+  // Pictures need the server's `car-images`; without it the column is not shown.
+  let pictures = $derived(featureReady(session.info?.server, "car-images"));
   let rows = $derived(groupCars(sortCars(filterCars(cars, filter, query), sort)));
   let all = $derived(groupCars(sortCars(cars, "slot")));
   let selected = $derived<CarGroup | null>(
@@ -77,8 +83,9 @@
         />
       </div>
 
-      <div class="table" role="group" aria-label="Car list">
+      <div class="table" class:pictures role="group" aria-label="Car list">
         <div class="grid header">
+          {#if pictures}<span aria-hidden="true"></span>{/if}
           {#each columns as column (column.label)}
             {#if column.sort}
               {@const by = column.sort}
@@ -102,6 +109,17 @@
             aria-pressed={selected?.key === row.key}
             onclick={() => (selectedKey = row.key)}
           >
+            {#if pictures}
+              <!-- Identical cars share a row, so they share its picture. -->
+              <CarImage
+                path={carImagePath(row.car.image, "medium", pictures, profile.car_images)}
+                alt={carName(row.car)}
+                ratio="72 / 40"
+                width="72px"
+                icon={18}
+                radius="var(--radius-thumb)"
+              />
+            {/if}
             <span class="name"
               ><span class="t-body-strong">{carName(row.car)}</span>{#if row.count > 1}<span
                   class="t-caption then"
@@ -132,6 +150,14 @@
     {@const car = selected.car}
     <aside>
       <Glass radius="phone" label="Selected car" class="panel">
+        {#if pictures}
+          <CarImage
+            path={carImagePath(car.image, "large", pictures, profile.car_images)}
+            alt={carName(car)}
+            ratio="16 / 9"
+            icon={32}
+          />
+        {/if}
         <span class="title">
           <span class="t-caption"
             >{whereLong(car)}{#if selected.count > 1}<span class="then"
@@ -235,6 +261,12 @@
     gap: 14px;
     align-items: center;
     padding: 0 12px;
+  }
+  .pictures .grid {
+    grid-template-columns: 72px minmax(0, 1fr) 100px 60px 100px;
+  }
+  .pictures .pick.grid {
+    min-height: 56px;
   }
   .header {
     padding-bottom: 4px;

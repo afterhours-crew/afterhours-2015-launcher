@@ -7,6 +7,8 @@ export type { Preflight } from "./generated/check";
 export type { VersionReport } from "./generated/version";
 export type {
   Car,
+  CarImage,
+  CarImages,
   CarLocation,
   CarSummary,
   Cell,

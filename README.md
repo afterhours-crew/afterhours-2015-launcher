@@ -113,21 +113,49 @@ saves before an update that changes the bundled server, never offer a
 downgrade, and stay quiet offline. The rules are in
 [docs/ROADMAP.md](docs/ROADMAP.md#updater-rules).
 
+Car pictures come from the server too. When `version --json` lists
+`car-images` and the profile reports no picture set (`car_images` is
+`null`, after the first run or when the content changed), the window runs
+`car-images --json` in the background (`images.rs`) and reads the profile
+again; until then, and for any car without a picture, the screens show a
+graphite tile with a car icon. Which picture shows is
+`src/lib/state/carimages.ts`.
+
 The types for the server's JSON are generated from the JSON Schemas in
 `schemas/` (`pnpm types`), and CI runs the pinned executable's JSON commands
 against those schemas (`pnpm contract`).
 
+## Security
+
+- **Content Security Policy** (`tauri.conf.json`): scripts, styles and
+  fonts come only from the app itself; images from the app, `data:` and the
+  asset protocol. The window loads nothing from the network; the updater's
+  check runs in Rust.
+- **Asset protocol, one folder.** Car pictures are the only files the window
+  reads from disk directly, through Tauri's asset protocol
+  (`convertFileSrc`). Its static scope is empty. At start-up, after the
+  settings change and after `car-images` runs, `images.rs` allows exactly
+  `<data folder>/artifacts/content/car-images` of the data folder in use
+  (`%LOCALAPPDATA%\Afterhours2015` unless Settings names another), and
+  nothing else: saves, logs, the game folder and the rest of the content
+  cache stay unreadable through it. The window also refuses a picture path
+  the profile names outside its `car_images` folder (`insideDir`, tested).
+- **Everything else goes through commands**: the server's JSON commands
+  with deadlines and output bounds, and the log viewer's one allow-listed
+  file of one session folder (`reads.rs`), bounded and without following
+  links.
+
 ## Repository layout
 
-| Path                 | What                                                                                                                                                                                                                   |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server-pin.json`    | the bundled server: release tag and SHA-256s                                                                                                                                                                           |
-| `schemas/`           | JSON Schemas of the server's `--json` output                                                                                                                                                                           |
-| `src/`               | Svelte app: `App.svelte`, `lib/api` (Tauri commands, generated types), `lib/state` (routes, update rules, view models, stores), `lib/components`, `lib/views`                                                          |
-| `src-tauri/`         | Rust: `pin.rs`, `server.rs` (which executable), `cli.rs` (runs it, streams events), `data.rs` (session records, save backups), `reads.rs` (profile, sessions, session files), `updates.rs`, `settings.rs`, `detect.rs` |
-| `scripts/`           | `server-pin.mjs` (fetch, verify, bump), `gen-types.mjs`, `contract.mjs`, `versions.mjs`, `updater-manifest.mjs`, `tokens.mjs`                                                                                          |
-| `design/`            | `tokens.json` from the design system, the design rules, the app icon source                                                                                                                                            |
-| `.github/workflows/` | `ci.yml`, `pin-bump.yml` (daily server check), `release.yml` (`v*` tags)                                                                                                                                               |
+| Path                 | What                                                                                                                                                                                                                                                            |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server-pin.json`    | the bundled server: release tag and SHA-256s                                                                                                                                                                                                                    |
+| `schemas/`           | JSON Schemas of the server's `--json` output                                                                                                                                                                                                                    |
+| `src/`               | Svelte app: `App.svelte`, `lib/api` (Tauri commands, generated types), `lib/state` (routes, update rules, view models, stores), `lib/components`, `lib/views`                                                                                                   |
+| `src-tauri/`         | Rust: `pin.rs`, `server.rs` (which executable), `cli.rs` (runs it, streams events), `data.rs` (session records, save backups), `reads.rs` (profile, sessions, session files), `images.rs` (car pictures, asset scope), `updates.rs`, `settings.rs`, `detect.rs` |
+| `scripts/`           | `server-pin.mjs` (fetch, verify, bump), `gen-types.mjs`, `contract.mjs`, `versions.mjs`, `updater-manifest.mjs`, `tokens.mjs`                                                                                                                                   |
+| `design/`            | `tokens.json` from the design system, the design rules, the app icon source                                                                                                                                                                                     |
+| `.github/workflows/` | `ci.yml`, `pin-bump.yml` (daily server check), `release.yml` (`v*` tags)                                                                                                                                                                                        |
 
 ## Checks
 
@@ -149,4 +177,6 @@ third-party notices are installed beside it in `afterhours-server/`. Font:
 DM Sans (`@fontsource/dm-sans` 5.3.0) under the SIL Open Font License 1.1,
 vendored through fontsource. Icons: [Tabler Icons](https://tabler.io/icons)
 (`@tabler/icons-svelte` 3.49.0, MIT), compiled into the app, so they work
-offline.
+offline. Tauri's `protocol-asset` feature adds `http-range` 0.1.6 (MIT) for
+range requests on asset URLs. Car pictures are decoded from the player's own
+installation into their data folder; none is shipped or committed here.

@@ -12,9 +12,10 @@
 //
 // Cases for `stop`, `version`, `sessions` and `profile --list` run when a
 // schema of that name exists, so a pin bump that brings the contract v1
-// schemas exercises them without edits here. The `play` case runs when the
-// server reports capability `play`; it uses an empty data folder, so there
-// is no serve session to start a game in. `status` is checked against
+// schemas exercises them without edits here. The `play` and `car-images`
+// cases run when the server reports that capability; they use an empty data
+// folder, so there is no serve session to start a game in and no prepared
+// content to read pictures from. `status` is checked against
 // the schema of the contract the server speaks: v1's
 // `{"version":1,"session":...}` (status.schema.json) when it answers
 // `version --json`, else v0.3.0's `{"state":"none"}` or bare status
@@ -243,6 +244,16 @@ const cases = [
     name: "play --json with no serve session exits 4",
     capability: "play",
     run: () => refusal(["play", "--json", "--data-dir", dataDir("play-empty")], 4),
+  },
+  {
+    name: "car-images --json without prepared content exits 4 and writes nothing",
+    capability: "car-images",
+    run: () => {
+      const dir = dataDir("car-images-empty");
+      const line = refusal(["car-images", "--json", "--data-dir", dir, "--game-dir", fakeGame], 4);
+      if (readdirSync(dir).length !== 0) throw new Error("car-images wrote into the data folder");
+      return line;
+    },
   },
   {
     name: "check --json refuses a folder without the game",

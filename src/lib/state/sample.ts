@@ -26,7 +26,7 @@ export const SAMPLE_VERSION: VersionReport = {
   os: "windows",
   game_launch: true,
   records: { profile: 1, "profile-list": 1, sessions: 1, status: 1, version: 1 },
-  capabilities: ["profile", "sessions", "events", "play"],
+  capabilities: ["profile", "sessions", "events", "play", "car-images"],
 };
 
 /**
@@ -49,6 +49,24 @@ export function sampleHosting(game: boolean): Status {
 }
 
 const ACCOUNT = "0f1e2d3c4b5a69788796a5b4c3d2e1f0";
+
+/** Where `car-images` writes the decoded pictures, for the current content. */
+export const SAMPLE_CAR_IMAGES =
+  "C:\\Users\\Driver\\AppData\\Local\\Afterhours2015\\artifacts\\content\\car-images\\5a3b1e0c";
+
+/** Made-up image records: the preview draws a sample tile for each path. */
+function images(id: string, sizes: ("medium" | "large")[]): Car["image"] {
+  const one = (size: "medium" | "large") =>
+    sizes.includes(size)
+      ? {
+          path: `${SAMPLE_CAR_IMAGES}\\${id}-${size}.png`,
+          width: size === "medium" ? 256 : 512,
+          height: size === "medium" ? 256 : 512,
+          source_format: "BC1_UNORM",
+        }
+      : null;
+  return sizes.length === 0 ? null : { medium: one("medium"), large: one("large") };
+}
 const SAVE_PATH = `C:\\Users\\Driver\\AppData\\Local\\Afterhours2015\\artifacts\\account\\${ACCOUNT}.sqlite`;
 
 /** A car with its localized `name` (null when it did not resolve) and blueprint `label`. */
@@ -61,9 +79,11 @@ function car(
   installed: number,
   spare: number,
   price: number,
+  sizes: ("medium" | "large")[] = ["medium", "large"],
 ): Car {
   return {
     id,
+    image: images(id, sizes),
     definition: id.padStart(32, "a").slice(0, 32),
     name,
     names: name ? { long: name, medium: name, short: name.replace(/ \(\d{4}\)$/, "") } : null,
@@ -108,9 +128,12 @@ export const SAMPLE_CARS: Car[] = [
     2,
     11_500,
   ),
-  car("1000013", "SAMPLE Hatch (2006)", "Sample Hatch 2006", "warehouse", null, 4, 0, 3_200),
-  // A definition the vehicle content does not list: no name, no blueprint.
-  car("1000014", null, null, "warehouse", null, 0, 0, 0),
+  // Only a medium picture decoded: the panel shows it enlarged.
+  car("1000013", "SAMPLE Hatch (2006)", "Sample Hatch 2006", "warehouse", null, 4, 0, 3_200, [
+    "medium",
+  ]),
+  // A definition the vehicle content does not list: no name, no blueprint, no picture.
+  car("1000014", null, null, "warehouse", null, 0, 0, 0, []),
 ];
 
 export const SAMPLE_PROFILE: Profile = {
@@ -191,6 +214,7 @@ export const SAMPLE_PROFILE: Profile = {
               name: owned.name,
               names: owned.names,
               vehicle: owned.vehicle,
+              image: owned.image,
             }
           : null,
       };
@@ -202,6 +226,7 @@ export const SAMPLE_PROFILE: Profile = {
       name: SAMPLE_CARS[0]!.name,
       names: SAMPLE_CARS[0]!.names,
       vehicle: SAMPLE_CARS[0]!.vehicle,
+      image: SAMPLE_CARS[0]!.image,
     },
   },
   cars: SAMPLE_CARS,
@@ -240,6 +265,7 @@ export const SAMPLE_PROFILE: Profile = {
     directory: "C:\\Users\\Driver\\AppData\\Local\\Afterhours2015\\artifacts\\content\\sample",
     chosen_by: "current-session",
   },
+  car_images: SAMPLE_CAR_IMAGES,
   localization: {
     locale: "en_US",
     locale_from: "registry",

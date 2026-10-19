@@ -17,12 +17,14 @@
 //! turns its output into events, [`settings`] stores the few things the
 //! window remembers, [`data`] reads the data directory's session records and
 //! copies saves aside, [`updates`] serves the updater's checks, [`reads`]
-//! runs the read-only commands behind the profile and logs screens, and
-//! [`detect`] guesses where the game is installed.
+//! runs the read-only commands behind the profile and logs screens,
+//! [`images`] runs `car-images` and scopes the asset protocol to its
+//! folder, and [`detect`] guesses where the game is installed.
 
 pub mod cli;
 pub mod data;
 pub mod detect;
+pub mod images;
 pub mod pin;
 pub mod reads;
 pub mod server;
@@ -75,6 +77,8 @@ pub fn run() {
                 session: Mutex::new(None),
                 launcher_dir: detect::launcher_dir(),
             });
+            let state = app.state::<AppState>();
+            images::allow(app.handle(), &state.settings());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -100,6 +104,7 @@ pub fn run() {
             cli::start_session,
             cli::stop_session,
             cli::play_game,
+            images::car_images,
             data::recorded,
             data::open_folder,
             updates::session_activity,

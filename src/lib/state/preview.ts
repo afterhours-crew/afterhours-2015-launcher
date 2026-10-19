@@ -62,6 +62,25 @@ export async function sampleStatus(): Promise<Status | null> {
   return sampleHosting(hosting === "game");
 }
 
+/**
+ * `?sample`: a made-up picture for a sample car's image path, drawn as an
+ * SVG (a coloured floor and a plain car shape, labelled "Sample"), so the
+ * Cars and Profile pictures can be looked at without game files. A path
+ * ending in `-broken.png` returns a URL that fails to load, to show the
+ * placeholder. Development builds only.
+ */
+export const sampleImageSrc = import.meta.env.DEV
+  ? (path: string): string => {
+      if (path.endsWith("-broken.png")) return "data:image/png;base64,broken";
+      const hues = [205, 330, 45, 150, 265, 20];
+      let hash = 0;
+      for (const c of path) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
+      const hue = hues[hash % hues.length];
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="hsl(${hue} 35% 22%)"/><stop offset="1" stop-color="hsl(${hue} 25% 10%)"/></linearGradient></defs><rect width="512" height="512" fill="url(#g)"/><path d="M86 300 L130 238 Q150 212 190 210 L318 210 Q352 212 376 236 L426 290 L426 330 L86 330 Z" fill="hsl(${hue} 70% 58%)"/><circle cx="160" cy="332" r="34" fill="#151518"/><circle cx="356" cy="332" r="34" fill="#151518"/><text x="256" y="420" font-family="sans-serif" font-size="40" text-anchor="middle" fill="rgba(255,255,255,0.55)">Sample</text></svg>`;
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    }
+  : null;
+
 /** A passing check, so the preview's first run reaches its last step. */
 export async function sampleCheck(): Promise<CliResult> {
   if (!loadSample) throw new Error("Sample records exist in development builds only.");

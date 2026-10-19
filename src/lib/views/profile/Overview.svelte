@@ -5,6 +5,7 @@
   import { staggerDelay } from "$lib/state/motion";
   import type { Profile } from "$lib/api/types";
   import Avatar from "$lib/components/Avatar.svelte";
+  import CarImage from "$lib/components/CarImage.svelte";
   import EmptyLine from "$lib/components/EmptyLine.svelte";
   import Glass from "$lib/components/Glass.svelte";
   import IconCar from "@tabler/icons-svelte/icons/car";
@@ -15,7 +16,9 @@
   import PanelHeading from "$lib/components/PanelHeading.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
   import ShowMore from "$lib/components/ShowMore.svelte";
-  import { garageList } from "$lib/state/cars";
+  import { featureReady } from "$lib/state/capabilities";
+  import { carImagePath } from "$lib/state/carimages";
+  import { carName, garageList } from "$lib/state/cars";
   import {
     collectionRows,
     driverCard,
@@ -46,6 +49,8 @@
   );
   let cars = $derived(profile.cars ? garageList(profile.cars) : null);
   let held = $derived(collectionRows(profile.counts));
+  let pictures = $derived(featureReady(session.info?.server, "car-images"));
+  let active = $derived(profile.cars?.find((c) => c.location === "active") ?? null);
 </script>
 
 <div class="layout" use:staggerIn>
@@ -197,6 +202,14 @@
               >{formatCount(profile.cars.length)}</span
             >{/if}{/snippet}
       </PanelHeading>
+      {#if pictures && active}
+        <CarImage
+          path={carImagePath(active.image, "large", pictures, profile.car_images)}
+          alt={carName(active)}
+          ratio="16 / 9"
+          icon={32}
+        />
+      {/if}
       {#if cars}
         <div class="rows">
           {#each cars.garage as car (car.slot)}
