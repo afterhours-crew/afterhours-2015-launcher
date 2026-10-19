@@ -27,13 +27,16 @@ describe("features", () => {
     expect(ready(null)).toEqual([]);
   });
 
-  it("open Profile, Cars, Save data, car pictures and Logs with contract v1", () => {
+  it("open Profile, Cars, Save data, car pictures, Logs and World with contract v1", () => {
     expect(ready({ capabilities: SAMPLE_VERSION.capabilities })).toEqual([
       "car-images",
       "cars",
       "logs",
       "profile",
+      "rivals",
       "save-data",
+      "traffic",
+      "world-presets",
     ]);
   });
 

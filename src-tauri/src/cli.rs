@@ -4,7 +4,7 @@
 
 //! Running the bundled `Afterhours.exe` and reporting what it says.
 //!
-//! Short commands (`check`, `status`, `stop`, `play`, `--version`) run to
+//! Short commands (`check`, `status`, `stop`, `play`, `settings`, `--version`) run to
 //! completion within a deadline, and with `--json` their one JSON object is
 //! returned to the window. A session (`setup`, `serve`, `start`) is a
 //! long-running child: its console lines are forwarded as `session-output`
@@ -292,6 +292,49 @@ pub async fn play_game(state: State<'_, crate::AppState>) -> Result<CliResult, S
         .map_err(|e| e.to_string())?
 }
 
+/// Arguments for `settings --json`: read when both are `None`, else save
+/// the given amounts for later sessions. `rivals` is a count or
+/// `original`; anything else is refused before the server runs.
+pub fn settings_args(
+    settings: &Settings,
+    traffic: Option<u16>,
+    rivals: Option<&str>,
+) -> Result<Vec<String>, String> {
+    let mut args = global_args(settings);
+    args.push("settings".into());
+    if let Some(percent) = traffic {
+        args.push("--traffic".into());
+        args.push(percent.to_string());
+    }
+    if let Some(rivals) = rivals {
+        if rivals != "original" && rivals.parse::<u16>().is_err() {
+            return Err(format!(
+                "Rivals must be a count or \"original\", not {rivals:?}."
+            ));
+        }
+        args.push("--rivals".into());
+        args.push(rivals.to_owned());
+    }
+    Ok(args)
+}
+
+/// `settings --json`: the saved traffic and rival amounts, or save new
+/// ones. Saving is refused (exit 1) while a session holds the data
+/// directory, because a running session keeps the values it started with.
+#[tauri::command]
+pub async fn world_settings(
+    state: State<'_, crate::AppState>,
+    traffic: Option<u16>,
+    rivals: Option<String>,
+) -> Result<CliResult, String> {
+    let settings = settings_of(&state);
+    let server = server::current()?;
+    let args = settings_args(&settings, traffic, rivals.as_deref())?;
+    tauri::async_runtime::spawn_blocking(move || run_json(&server.path, &args, STATUS_TIMEOUT))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// Start `setup`, `serve` or `start` and stream its output as events.
 #[tauri::command]
 pub fn start_session(
@@ -400,6 +443,32 @@ pub fn start_session(
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
+    #[test]
+    fn settings_reads_without_options_and_saves_with_them() {
+        let settings = Settings {
+            data_dir: Some(PathBuf::from("D:/Afterhours")),
+            ..Settings::default()
+        };
+        assert_eq!(
+            settings_args(&settings, None, None).unwrap(),
+            ["--json", "--data-dir", "D:/Afterhours", "settings"]
+        );
+        assert_eq!(
+            settings_args(&settings, Some(200), None).unwrap()[4..],
+            ["--traffic", "200"]
+        );
+        assert_eq!(
+            settings_args(&settings, None, Some("original")).unwrap()[4..],
+            ["--rivals", "original"]
+        );
+        assert_eq!(
+            settings_args(&settings, Some(0), Some("0")).unwrap()[4..],
+            ["--traffic", "0", "--rivals", "0"]
+        );
+        assert!(settings_args(&settings, None, Some("lots")).is_err());
+        assert!(settings_args(&settings, None, Some("-1")).is_err());
+    }
 
     #[test]
     fn supervisor_lines_are_parsed_and_everything_else_is_text() {

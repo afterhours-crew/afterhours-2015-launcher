@@ -104,6 +104,7 @@ pub fn run() {
             cli::start_session,
             cli::stop_session,
             cli::play_game,
+            cli::world_settings,
             images::car_images,
             data::recorded,
             data::open_folder,

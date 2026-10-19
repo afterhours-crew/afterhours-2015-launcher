@@ -8,9 +8,18 @@
 // (./preview.ts).
 
 import { api, inTauri } from "$lib/api/tauri";
-import type { CliResult, Profile, ProfileList, SessionFileText, SessionList } from "$lib/api/types";
+import type {
+  CliResult,
+  Profile,
+  ProfileList,
+  SessionFileText,
+  SessionList,
+  SettingsReport,
+} from "$lib/api/types";
 import { hasCapability } from "./capabilities";
 import { needsCarImages } from "./carimages";
+import { isLive } from "./launchbar";
+import { applyChoice, saveArgs } from "./world";
 import { loadSample, sampleMode } from "./preview";
 import { session } from "./session.svelte";
 
@@ -27,18 +36,50 @@ export function current<T>(load: Load<T>): T | null {
   return null;
 }
 
+/** A change for `settings`: nothing reads, a field saves. */
+interface WorldChange {
+  traffic?: number;
+  rivals?: string;
+}
+
 interface Source {
   profile(accountId: string | null): Promise<CliResult>;
   profileList(): Promise<CliResult>;
   sessions(): Promise<CliResult>;
   sessionFile(id: string, name: string): Promise<SessionFileText>;
+  settings(change: WorldChange): Promise<CliResult>;
 }
 
 async function sampleSource(): Promise<Source> {
   if (!loadSample) throw new Error("Sample records exist in development builds only.");
   const sample = await loadSample();
   const ok = (value: unknown): CliResult => ({ kind: "ok", value });
+  const query = new URLSearchParams(window.location.search);
+  // `&offscale`: values saved outside the scale (traffic 150 %, at most 2
+  // rivals); `&savefail`: every save is refused, to see the revert.
+  let world: SettingsReport = query.has("offscale")
+    ? { ...sample.SAMPLE_SETTINGS, traffic_percent: 150, rival_limit: 2 }
+    : sample.SAMPLE_SETTINGS;
   return {
+    settings: async (change) => {
+      if (change.traffic === undefined && change.rivals === undefined) return ok(world);
+      if (query.has("savefail") || isLive(session.status?.state)) {
+        return {
+          kind: "error",
+          exit: 1,
+          message: "A session is using this data folder; its values apply until it ends.",
+        };
+      }
+      world = {
+        ...world,
+        ...(change.traffic !== undefined ? { traffic_percent: change.traffic } : {}),
+        ...(change.rivals !== undefined
+          ? { rival_limit: change.rivals === "original" ? null : Number(change.rivals) }
+          : {}),
+        saved: true,
+      };
+      return ok(world);
+    },
     profile: async (accountId) => {
       const entry = sample.SAMPLE_PROFILE_LIST.accounts.find((a) => a.account_id === accountId);
       if (!accountId || entry?.active) return ok(sample.SAMPLE_PROFILE);
@@ -89,6 +130,7 @@ const live: Source = {
   profileList: () => api.profileList(),
   sessions: () => api.sessions(),
   sessionFile: (id, name) => api.sessionFile(id, name),
+  settings: (change) => api.worldSettings(change.traffic ?? null, change.rivals ?? null),
 };
 
 function message(e: unknown): string {
@@ -104,6 +146,8 @@ export class Records {
   picked = $state<string | null>(null);
   pickedProfile = $state<Load<Profile>>({ kind: "idle" });
   sessions = $state<Load<SessionList>>({ kind: "idle" });
+  /** Traffic and rivals, from `settings --json`. */
+  world = $state<Load<SettingsReport>>({ kind: "idle" });
   /** `car-images` is running in the background. */
   imagesRunning = $state(false);
   /** The game folder `car-images` last ran for; a session's end clears it. */
@@ -122,6 +166,10 @@ export class Records {
 
   get canSessions(): boolean {
     return hasCapability(session.info?.server, "sessions");
+  }
+
+  get canWorld(): boolean {
+    return hasCapability(session.info?.server, "world-settings");
   }
 
   private async read<T>(
@@ -192,6 +240,42 @@ export class Records {
     );
   }
 
+  /** Read the saved traffic and rival amounts; reading never creates the file. */
+  async loadWorld(): Promise<void> {
+    await this.read<SettingsReport>(
+      this.canWorld,
+      (s) => s.settings({}),
+      (l) => (this.world = l),
+      current(this.world),
+    );
+  }
+
+  /**
+   * Save a picked step: shown at once, put back with the server's message
+   * when it refuses (a running session holds the data folder). Returns
+   * that message, or `null` when saved or nothing was to save.
+   */
+  async saveWorld(row: "traffic" | "rivals", value: string): Promise<string | null> {
+    const before = current(this.world);
+    const args = saveArgs(row, value);
+    if (!before || !args || !this.canWorld) return null;
+    this.world = { kind: "ready", value: applyChoice(before, row, value) };
+    const change: WorldChange =
+      row === "traffic" ? { traffic: Number(args[1]) } : { rivals: args[1]! };
+    try {
+      const result = await (await this.from()).settings(change);
+      if (result.kind === "ok") {
+        this.world = { kind: "ready", value: result.value as SettingsReport };
+        return null;
+      }
+      this.world = { kind: "ready", value: before };
+      return result.message;
+    } catch (e) {
+      this.world = { kind: "ready", value: before };
+      return message(e);
+    }
+  }
+
   /** Show one save on Save data; `null` or the active one is the profile. */
   async pick(accountId: string | null): Promise<void> {
     const active = current(this.profile);
@@ -232,6 +316,7 @@ export class Records {
   async refreshAfterSession(): Promise<void> {
     // A session may have prepared new content: pictures can be tried again.
     this.imagesTried = null;
+    void this.loadWorld();
     await Promise.all([this.loadProfile(), this.loadSessions()]);
   }
 }

@@ -12,10 +12,10 @@
 //
 // Cases for `stop`, `version`, `sessions` and `profile --list` run when a
 // schema of that name exists, so a pin bump that brings the contract v1
-// schemas exercises them without edits here. The `play` and `car-images`
-// cases run when the server reports that capability; they use an empty data
-// folder, so there is no serve session to start a game in and no prepared
-// content to read pictures from. `status` is checked against
+// schemas exercises them without edits here. The `play`, `car-images` and
+// `settings` cases run when the server reports that capability; they use an
+// empty data folder, so there is no serve session to start a game in, no
+// prepared content to read pictures from, and only a scratch settings file. `status` is checked against
 // the schema of the contract the server speaks: v1's
 // `{"version":1,"session":...}` (status.schema.json) when it answers
 // `version --json`, else v0.3.0's `{"state":"none"}` or bare status
@@ -46,6 +46,7 @@ const schemaDir = at >= 0 ? resolve(process.argv[at + 1] ?? "") : join(root, "sc
 // strings; the 64-bit formats only check for a non-negative integer here.
 const INTEGER_FORMATS = {
   int32: (n) => Number.isInteger(n) && n >= -(2 ** 31) && n < 2 ** 31,
+  uint16: (n) => Number.isInteger(n) && n >= 0 && n < 2 ** 16,
   uint32: (n) => Number.isInteger(n) && n >= 0 && n < 2 ** 32,
   int64: (n) => Number.isInteger(n),
   uint64: (n) => Number.isInteger(n) && n >= 0,
@@ -253,6 +254,39 @@ const cases = [
       const line = refusal(["car-images", "--json", "--data-dir", dir, "--game-dir", fakeGame], 4);
       if (readdirSync(dir).length !== 0) throw new Error("car-images wrote into the data folder");
       return line;
+    },
+  },
+  {
+    name: "settings --json reads the original amounts and creates nothing",
+    capability: "world-settings",
+    schema: "settings",
+    run: () => {
+      const dir = dataDir("settings-read");
+      const value = runJson(["settings", "--json", "--data-dir", dir], "settings");
+      if (value.saved) throw new Error("reading saved the file");
+      if (value.traffic_percent !== 100 || value.rival_limit !== null) {
+        throw new Error(`not the original amounts: ${JSON.stringify(value)}`);
+      }
+      if (readdirSync(dir).length !== 0) throw new Error("reading wrote into the data folder");
+      return `traffic ${value.traffic_percent} %, rivals original, max ${value.max_traffic_percent} %`;
+    },
+  },
+  {
+    name: "settings --json saves traffic and rivals for later sessions",
+    capability: "world-settings",
+    schema: "settings",
+    run: () => {
+      const dir = dataDir("settings-save");
+      const saved = runJson(
+        ["settings", "--json", "--data-dir", dir, "--traffic", "200", "--rivals", "0"],
+        "settings",
+      );
+      if (!saved.saved) throw new Error("saving reported saved: false");
+      const read = runJson(["settings", "--json", "--data-dir", dir], "settings");
+      if (read.traffic_percent !== 200 || read.rival_limit !== 0) {
+        throw new Error(`read back ${JSON.stringify(read)}`);
+      }
+      return "traffic 200 %, rivals 0, read back";
     },
   },
   {

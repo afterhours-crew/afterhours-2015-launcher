@@ -42,6 +42,9 @@ export const api = {
   playGame: () => invoke<CliResult>("play_game"),
   /** `car-images --json`: decode each car's pictures into the data folder. */
   carImages: () => invoke<CliResult>("car_images"),
+  /** `settings --json`: read the traffic and rival amounts, or save one of them. */
+  worldSettings: (traffic: number | null = null, rivals: string | null = null) =>
+    invoke<CliResult>("world_settings", { traffic, rivals }),
   recorded: () => invoke<Recorded>("recorded"),
   openFolder: (which: Folder) => invoke<void>("open_folder", { which }),
   sessionActivity: () => invoke<Activity>("session_activity"),

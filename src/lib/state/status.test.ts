@@ -49,7 +49,7 @@ const legacy = { none: { state: "none" }, some: legacyRecord };
 function validator(name: string) {
   const url = new URL(`../../../schemas/${name}.schema.json`, import.meta.url);
   const ajv = new Ajv({ allErrors: true, allowUnionTypes: true, strict: false });
-  for (const format of ["int32", "uint32", "int64", "uint64", "uint"]) {
+  for (const format of ["int32", "uint16", "uint32", "int64", "uint64", "uint"]) {
     ajv.addFormat(format, { type: "number", validate: (n: number) => Number.isInteger(n) });
   }
   return ajv.compile(JSON.parse(readFileSync(url, "utf8")));

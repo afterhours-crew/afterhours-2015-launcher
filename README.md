@@ -12,9 +12,10 @@ them.
 the release workflows and the screens are in place. Each screen reads the
 bundled server through its JSON commands; what that server does not report
 is hidden, and the view gives one note that it arrives with a server update.
-With v0.3.0, which reports no capabilities, that is Profile, Cars, Save data
-and the Logs dashboard; World settings, Cops and the Map wait for server
-work. No release has been published yet. See
+With v0.3.0, which reports no capabilities, that is Profile, Cars, car
+pictures, Save data, the Logs dashboard and World's traffic and rivals
+(`world-settings`, on afterhours-2015's launcher branches); Cops and the Map
+wait for server work. No release has been published yet. See
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Run it
@@ -112,6 +113,14 @@ The updater (`tauri-plugin-updater`) checks this repository's
 saves before an update that changes the bundled server, never offer a
 downgrade, and stay quiet offline. The rules are in
 [docs/ROADMAP.md](docs/ROADMAP.md#updater-rules).
+
+World's traffic and rivals are the server's `settings --json`
+(`world-settings`): multipliers of the game's own amounts, read when World
+opens and after a session ends, and saved on click for the next session
+(`--traffic <percent>`, `--rivals 0|original`). A running session keeps the
+values it started with, so the controls rest while one runs and the server
+refuses a save. The scale and what a saved value shows as are
+`src/lib/state/world.ts`.
 
 Car pictures come from the server too. When `version --json` lists
 `car-images` and the profile reports no picture set (`car_images` is

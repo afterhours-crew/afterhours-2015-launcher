@@ -12,6 +12,7 @@ import type {
   ProfileList,
   SessionFileText,
   SessionList,
+  SettingsReport,
   Status,
   VersionReport,
 } from "$lib/api/types";
@@ -26,7 +27,18 @@ export const SAMPLE_VERSION: VersionReport = {
   os: "windows",
   game_launch: true,
   records: { profile: 1, "profile-list": 1, sessions: 1, status: 1, version: 1 },
-  capabilities: ["profile", "sessions", "events", "play", "car-images"],
+  capabilities: ["profile", "sessions", "events", "play", "car-images", "world-settings"],
+};
+
+/** `settings --json` before anything was saved: original traffic and rivals. */
+export const SAMPLE_SETTINGS: SettingsReport = {
+  version: 1,
+  traffic_percent: 100,
+  rival_limit: null,
+  max_traffic_percent: 300,
+  max_rivals: 128,
+  file: "C:\\Users\\Driver\\AppData\\Local\\Afterhours2015\\settings.json",
+  saved: false,
 };
 
 /**

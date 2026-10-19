@@ -6,6 +6,7 @@ import {
   SAMPLE_PROFILE,
   SAMPLE_PROFILE_LIST,
   SAMPLE_SESSIONS,
+  SAMPLE_SETTINGS,
   SAMPLE_VERSION,
   sampleFile,
   sampleHosting,
@@ -16,7 +17,7 @@ import {
 function validator(name: string) {
   const url = new URL(`../../../schemas/${name}.schema.json`, import.meta.url);
   const ajv = new Ajv({ allErrors: true, allowUnionTypes: true, strict: false });
-  for (const format of ["int32", "uint32", "int64", "uint64", "uint"]) {
+  for (const format of ["int32", "uint16", "uint32", "int64", "uint64", "uint"]) {
     ajv.addFormat(format, { type: "number", validate: (n: number) => Number.isInteger(n) });
   }
   return ajv.compile(JSON.parse(readFileSync(url, "utf8")));
@@ -26,6 +27,7 @@ describe("sample records", () => {
   it.each([
     ["check", SAMPLE_PREFLIGHT],
     ["version", SAMPLE_VERSION],
+    ["settings", SAMPLE_SETTINGS],
     ["profile", SAMPLE_PROFILE],
     ["profile-list", SAMPLE_PROFILE_LIST],
     ["sessions", SAMPLE_SESSIONS],
