@@ -1,11 +1,7 @@
 // Generated from schemas/status.schema.json by scripts/gen-types.mjs. Do not edit; run `pnpm types`.
 
 /**
- * What `status --json` prints: {"state":"none"} before any session, otherwise the current session's status record. Vendored from afterhours-2015 v0.3.0 (crates/launcher/src/records.rs and commands/status.rs) until the server publishes its own schemas.
- */
-export type StatusReport = NoSession | Status;
-/**
- * Session states in the order a successful session passes through them. `interrupted` is derived on read: a live state whose supervisor no longer holds the data directory lock.
+ * Session states, in the order a successful session passes through them.
  */
 export type State =
   | "preparing"
@@ -17,19 +13,43 @@ export type State =
   | "failed"
   | "interrupted";
 
-export interface NoSession {
-  state: "none";
+/**
+ * `status --json`.
+ */
+export interface StatusReport {
+  /**
+   * The current session's latest status, or `null` when no session was
+   * ever started in this data directory. A live state whose supervisor
+   * is gone is reported as `interrupted`.
+   */
+  session: Status | null;
+  version: 1;
 }
 /**
- * artifacts/launcher/<id>/status.json: the supervisor's latest state.
+ * `artifacts/launcher/<id>/status.json`: the supervisor's latest state.
+ * Also the final record of `setup`, `serve` and `start` with `--json`.
  */
 export interface Status {
-  version: 1;
-  id: string;
-  utc: string;
-  state: State;
-  message: string;
-  worker_pid: number;
   game_pid: number | null;
+  /**
+   * Session ID: 32 lowercase hexadecimal characters.
+   */
+  id: string;
+  /**
+   * What the session is doing or why it ended, for a person to read.
+   */
+  message: string;
   server_pid: number | null;
+  state: State;
+  /**
+   * When this state was recorded, UTC. Records written by the old
+   * PowerShell launcher use a longer ISO 8601 form with an offset.
+   */
+  utc: string;
+  version: 1;
+  /**
+   * Supervisor process ID when recorded. Process IDs may be reused after
+   * the process exits; verify identity before acting on one.
+   */
+  worker_pid: number;
 }

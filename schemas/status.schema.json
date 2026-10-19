@@ -1,44 +1,91 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "StatusReport",
-  "description": "What `status --json` prints: {\"state\":\"none\"} before any session, otherwise the current session's status record. Vendored from afterhours-2015 v0.3.0 (crates/launcher/src/records.rs and commands/status.rs) until the server publishes its own schemas.",
-  "oneOf": [{ "$ref": "#/definitions/NoSession" }, { "$ref": "#/definitions/Status" }],
   "definitions": {
-    "NoSession": {
-      "title": "NoSession",
-      "type": "object",
-      "properties": { "state": { "const": "none" } },
-      "required": ["state"],
-      "additionalProperties": false
-    },
     "State": {
-      "title": "State",
-      "description": "Session states in the order a successful session passes through them. `interrupted` is derived on read: a live state whose supervisor no longer holds the data directory lock.",
-      "type": "string",
-      "enum": [
-        "preparing",
-        "starting",
-        "activation",
-        "ready",
-        "stopping",
-        "finished",
-        "failed",
-        "interrupted"
+      "description": "Session states, in the order a successful session passes through them.",
+      "oneOf": [
+        {
+          "const": "preparing",
+          "description": "Reading the installation, preparing content and the account.",
+          "type": "string"
+        },
+        {
+          "const": "starting",
+          "description": "The server is ready and the game is starting (`start` only).",
+          "type": "string"
+        },
+        {
+          "const": "activation",
+          "description": "The installed EA activation helper shows a window; no timeout.",
+          "type": "string"
+        },
+        {
+          "const": "ready",
+          "description": "Routing applied (`start`) or the server is listening (`serve`).",
+          "type": "string"
+        },
+        {
+          "const": "stopping",
+          "description": "A stop was requested; closing the game, then the server.",
+          "type": "string"
+        },
+        {
+          "const": "finished",
+          "description": "The session ended normally.",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "The session ended with an error; `message` says why.",
+          "type": "string"
+        },
+        {
+          "const": "interrupted",
+          "description": "Derived on read, never written: a live state whose supervisor is gone.",
+          "type": "string"
+        }
       ]
     },
     "Status": {
-      "title": "Status",
-      "description": "artifacts/launcher/<id>/status.json: the supervisor's latest state.",
-      "type": "object",
+      "description": "`artifacts/launcher/<id>/status.json`: the supervisor's latest state.\nAlso the final record of `setup`, `serve` and `start` with `--json`.",
       "properties": {
-        "version": { "type": "integer", "const": 1 },
-        "id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
-        "utc": { "type": "string" },
-        "state": { "$ref": "#/definitions/State" },
-        "message": { "type": "string" },
-        "worker_pid": { "type": "integer", "minimum": 0 },
-        "game_pid": { "type": ["integer", "null"], "minimum": 0 },
-        "server_pid": { "type": ["integer", "null"], "minimum": 0 }
+        "game_pid": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "id": {
+          "description": "Session ID: 32 lowercase hexadecimal characters.",
+          "type": "string"
+        },
+        "message": {
+          "description": "What the session is doing or why it ended, for a person to read.",
+          "type": "string"
+        },
+        "server_pid": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "state": {
+          "$ref": "#/definitions/State"
+        },
+        "utc": {
+          "description": "When this state was recorded, UTC. Records written by the old\nPowerShell launcher use a longer ISO 8601 form with an offset.",
+          "type": "string"
+        },
+        "version": {
+          "const": 1,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "worker_pid": {
+          "description": "Supervisor process ID when recorded. Process IDs may be reused after\nthe process exits; verify identity before acting on one.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
       },
       "required": [
         "version",
@@ -50,7 +97,30 @@
         "game_pid",
         "server_pid"
       ],
-      "additionalProperties": false
+      "type": "object"
     }
-  }
+  },
+  "description": "`status --json`.",
+  "properties": {
+    "session": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Status"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The current session's latest status, or `null` when no session was\never started in this data directory. A live state whose supervisor\nis gone is reported as `interrupted`."
+    },
+    "version": {
+      "const": 1,
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": ["version", "session"],
+  "title": "StatusReport",
+  "type": "object"
 }

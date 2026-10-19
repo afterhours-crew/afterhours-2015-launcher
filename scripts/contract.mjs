@@ -12,9 +12,11 @@
 //
 // Cases for `stop`, `version`, `sessions` and `profile --list` run when a
 // schema of that name exists, so a pin bump that brings the contract v1
-// schemas exercises them without edits here. `status` is read in both
-// shapes: v0.3.0's `{"state":"none"}` or bare status, and v1's
-// `{"version":1,"session":...}`.
+// schemas exercises them without edits here. `status` is checked against
+// the schema of the contract the server speaks: v1's
+// `{"version":1,"session":...}` (status.schema.json) when it answers
+// `version --json`, else v0.3.0's `{"state":"none"}` or bare status
+// (status-legacy.schema.json).
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -138,6 +140,28 @@ function refusal(args, expectedCode) {
   return out.stderr.split(/\r?\n/).pop();
 }
 
+// The server's contract decides which status schema applies. A contract v1
+// server answers `version --json` and prints {"version":1,"session":...};
+// v0.3.0 has no `version` command and prints {"state":"none"} or the bare
+// status, checked against status-legacy.schema.json while that is vendored.
+// A pin bump replaces schemas/ with the release's, whose status.schema.json
+// is v1's, and drops the legacy one.
+const speaksV1 = run(["version", "--json"]).code === 0;
+const STATUS = !speaksV1 && validators.has("status-legacy") ? "status-legacy" : "status";
+
+/** `status --json`, validated against the schema of the server's contract and its shape. */
+function statusJson(args) {
+  const value = runJson(args, STATUS);
+  const v1Shape = "session" in value;
+  if (v1Shape !== speaksV1) {
+    const contract = speaksV1 ? "contract v1" : "v0.3.0";
+    throw new Error(
+      `a ${contract} server printed the other status shape: ${JSON.stringify(value)}`,
+    );
+  }
+  return value;
+}
+
 const fakeGame = join(scratch, "not-a-game");
 mkdirSync(fakeGame, { recursive: true });
 
@@ -157,19 +181,19 @@ const cases = [
   },
   {
     name: "status --json before any session",
-    schema: "status",
+    schema: STATUS,
     run: () => {
-      const value = runJson(["status", "--json", "--data-dir", dataDir("empty")], "status");
+      const value = statusJson(["status", "--json", "--data-dir", dataDir("empty")]);
       if (sessionOf(value) !== null) throw new Error(`reports a session: ${JSON.stringify(value)}`);
       return JSON.stringify(value);
     },
   },
   {
     name: "status --json of a finished session",
-    schema: "status",
+    schema: STATUS,
     run: () => {
       const dir = dataDir("finished", { state: "finished" });
-      const session = sessionOf(runJson(["--json", "--data-dir", dir, "status"], "status"));
+      const session = sessionOf(statusJson(["--json", "--data-dir", dir, "status"]));
       if (session?.state !== "finished" || session.id !== ID)
         throw new Error(JSON.stringify(session));
       return `state ${session.state}`;
@@ -177,20 +201,20 @@ const cases = [
   },
   {
     name: "status --json derives interrupted when the lock is missing",
-    schema: "status",
+    schema: STATUS,
     run: () => {
       const dir = dataDir("no-lock", { state: "ready" });
-      const session = sessionOf(runJson(["status", "--json", "--data-dir", dir], "status"));
+      const session = sessionOf(statusJson(["status", "--json", "--data-dir", dir]));
       if (session?.state !== "interrupted") throw new Error(`state ${session?.state}`);
       return `state ${session.state}`;
     },
   },
   {
     name: "status --json derives interrupted when nobody holds the lock",
-    schema: "status",
+    schema: STATUS,
     run: () => {
       const dir = dataDir("free-lock", { state: "starting", lockFile: true });
-      const session = sessionOf(runJson(["status", "--json", "--data-dir", dir], "status"));
+      const session = sessionOf(statusJson(["status", "--json", "--data-dir", dir]));
       if (session?.state !== "interrupted") throw new Error(`state ${session?.state}`);
       return `state ${session.state}`;
     },
@@ -272,13 +296,13 @@ const cases = [
 // a release's own schemas, or a build given through AFTERHOURS_EXE, every
 // case whose schema exists runs.
 const V1_ONLY = new Set(["version", "sessions", "profile-list"]);
-const aheadOfServer =
-  pin.schemas === "vendored" && !override && run(["version", "--json"]).code !== 0;
+const aheadOfServer = pin.schemas === "vendored" && !override && !speaksV1;
 
 let failed = 0;
 let ran = 0;
 console.log(`Contract check: ${exe}${override ? " (AFTERHOURS_EXE)" : ` (${pin.tag})`}`);
 console.log(`Schemas: ${schemaDir}`);
+console.log(`Status contract: ${speaksV1 ? "v1" : "v0.3.0"} (${STATUS}.schema.json)`);
 for (const testCase of cases) {
   if (testCase.optional && !validators.has(testCase.schema)) {
     console.log(`  skip  ${testCase.name}  (no ${testCase.schema} schema)`);
@@ -300,9 +324,10 @@ for (const testCase of cases) {
 const exercised = new Set(cases.map((c) => c.schema).filter(Boolean));
 for (const schema of validators.keys()) {
   if (!exercised.has(schema)) {
-    console.log(
-      `  note  ${schema}.schema.json is not exercised here (needs the game or a session).`,
-    );
+    const why = schema.startsWith("status")
+      ? "it is the other status contract"
+      : "needs the game or a session";
+    console.log(`  note  ${schema}.schema.json is not exercised here (${why}).`);
   }
 }
 rmSync(scratch, { recursive: true, force: true });
