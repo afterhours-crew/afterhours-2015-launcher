@@ -53,8 +53,9 @@ export function detectPlatform(userAgent: string): Platform {
 export function launchBarModel(input: LaunchBarInput): LaunchBarModel {
   const serveOnly = input.platform !== "windows";
   const idleAction = serveOnly ? "serve" : "start";
-  const title = serveOnly ? "This PC" : "Need for Speed (2015)";
-  const eyebrow = serveOnly ? "Hosting" : "Last driven";
+  // The bar names the server, never a car (owner decision, 2026-10-19).
+  const title = "This PC";
+  const eyebrow = "Your server";
   const state = input.status?.state;
 
   if (isLive(state) && input.status) {

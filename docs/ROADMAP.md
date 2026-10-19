@@ -8,16 +8,19 @@ design canvas.
 
 ## Tracks
 
-| Track | What                                                                                                                                                                     | Where                                             | State                                                         |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------- |
-| 1a    | Profile: `profile --json` reads one save without changing it (identity, REP, bank, garage slots, stats)                                                                  | afterhours-2015                                   | Done on a local branch, awaiting validation                   |
-| 1b    | CLI contract v1: JSON Schemas generated from the server's Rust types, `version --json` capabilities, `sessions --json`, the supervise event stream (afterhours-2015 #86) | afterhours-2015                                   | In progress (`feature/launcher-contract`)                     |
-| 1c    | Launcher foundation: shell and routing, bundled server, NSIS installer, updater, release and pin-bump workflows, generated types, this roadmap                           | this repository                                   | This branch (`feature/launcher-foundation`)                   |
-| 2     | Screens: Garage, Profile, World, Host, Logs and Settings built from the designs                                                                                          | this repository                                   | Next, on top of 1c; the views are placeholders until then     |
-| 3     | Traffic density: a server setting, then the World screen's control                                                                                                       | afterhours-2015, then here                        | Planned; waits until the milestone work on traffic AI is idle |
-| 4     | Account edits: `account set` for name, bank and REP                                                                                                                      | afterhours-2015, then Profile                     | Planned                                                       |
-| 5     | Overlay: the in-game companion window                                                                                                                                    | both; needs a live control endpoint in the server | Planned                                                       |
-| 6     | v0.1 tester preview: the first published launcher release                                                                                                                | this repository                                   | Planned; uses the release machinery from 1c                   |
+| Track | What                                                                                                                                                                     | Where                                             | State                                                                     |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------- |
+| 1a    | Profile: `profile --json` reads one save without changing it (identity, REP, bank, garage slots, stats)                                                                  | afterhours-2015                                   | Done on a local branch, awaiting validation                               |
+| 1b    | CLI contract v1: JSON Schemas generated from the server's Rust types, `version --json` capabilities, `sessions --json`, the supervise event stream (afterhours-2015 #86) | afterhours-2015                                   | Done on a local branch (`feature/launcher-contract`), awaiting validation |
+| 1c    | Launcher foundation: shell and routing, bundled server, NSIS installer, updater, release and pin-bump workflows, generated types, this roadmap                           | this repository                                   | This branch (`feature/launcher-foundation`)                               |
+| 2     | Screens: Garage, Profile, World, Map, Host, Logs and Settings built from the designs, plus a Cars screen listing every owned car (garage and warehouse) from the profile | this repository                                   | Next, on top of 1c; the views are placeholders until then                 |
+| 3     | Traffic density: a server setting, then the World screen's control                                                                                                       | afterhours-2015, then here                        | Planned; waits until the milestone work on traffic AI is idle             |
+| 4     | Account edits: `account set` for name, bank and REP                                                                                                                      | afterhours-2015, then Profile                     | Planned                                                                   |
+| 5     | Overlay: the in-game companion window                                                                                                                                    | both; needs a live control endpoint in the server | Planned                                                                   |
+| 6     | v0.1 tester preview: the first published launcher release                                                                                                                | this repository                                   | Planned; uses the release machinery from 1c                               |
+| 7     | Live map: a read-only observer feed from the server (players, traffic and rival motion, spawns and clears) and a road map built from the tester's own installation       | afterhours-2015, then the Map screen              | Planned; waits for the current server milestone, like 3                   |
+
+The launch bar names the server, never a "last driven" car.
 
 **Cops need research.** The server runs no police today. Nothing about cops is
 offered until research shows how the game expects them; the World screen
@@ -35,8 +38,9 @@ lists them as "Coming later".
   Schemas generated from its Rust types with each release, and
   `version --json` reports its capabilities (track 1b). The launcher
   generates its TypeScript types from the pinned release's schemas
-  (`pnpm types`). Until those exist, minimal schemas for `status` and `check`
-  are vendored in `schemas/` (see `schemas/README.md`).
+  (`pnpm types`), which 1b attaches as `Afterhours-contract.zip`. Until a
+  release carries them, minimal schemas for `status` and `check` are
+  vendored in `schemas/` (see `schemas/README.md`).
 - **Lockstep until the first release.** Until the launcher's first published
   release, the CLI's JSON may change freely, moving together with the pin.
   After it, breaking changes bump the record `version`, because installed
@@ -113,6 +117,8 @@ the first release (track 6):
 - SmartScreen's warnings for an installer without Authenticode signing.
 - Sessions started from the installed (windowless) app: the server runs with
   `CREATE_NO_WINDOW` and its output piped to the window.
-- The window refuses to close while its session runs, because the server
-  writes progress to pipes the window owns. A server that tolerates a closed
-  pipe, or the event stream (afterhours-2015 #86), removes that limit.
+- The window refuses to close while its session runs, because the v0.3.0
+  server writes progress to pipes the window owns and would stop on a broken
+  pipe. Track 1b's `--events` mode silences the console and survives a
+  broken pipe; once the pin reaches a release with it, sessions should run
+  with `--events` and the window may close freely.

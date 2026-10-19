@@ -35,11 +35,12 @@ describe("routes", () => {
     }
   });
 
-  it("lists the six views in the designed order", () => {
+  it("lists the views in the designed order", () => {
     expect(NAV.map((n) => n.label)).toEqual([
       "Garage",
       "Profile",
       "World",
+      "Map",
       "Host",
       "Logs",
       "Settings",

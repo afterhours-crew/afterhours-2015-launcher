@@ -1,7 +1,7 @@
 // The window's screens and their addresses. Hash routes (`#/settings/about`)
 // keep links working in the desktop window and in the browser preview.
 
-export const VIEWS = ["garage", "profile", "world", "host", "logs", "settings"] as const;
+export const VIEWS = ["garage", "profile", "world", "map", "host", "logs", "settings"] as const;
 export type View = (typeof VIEWS)[number];
 
 export const SETTINGS_SECTIONS = ["general", "updates", "about"] as const;
@@ -19,6 +19,7 @@ export const NAV: { id: View; label: string }[] = [
   { id: "garage", label: "Garage" },
   { id: "profile", label: "Profile" },
   { id: "world", label: "World" },
+  { id: "map", label: "Map" },
   { id: "host", label: "Host" },
   { id: "logs", label: "Logs" },
   { id: "settings", label: "Settings" },

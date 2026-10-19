@@ -47,9 +47,20 @@ fn window_session(state: &State<'_, crate::AppState>) -> bool {
         .unwrap_or(false)
 }
 
+/// The session state in `status --json`: `none` when there is no session.
+/// v0.3.0 prints `{"state":"none"}` or the status itself; contract v1
+/// prints `{"version":1,"session":<status or null>}`.
+pub fn session_state(value: &serde_json::Value) -> Option<&str> {
+    match value.get("session") {
+        Some(serde_json::Value::Null) => Some("none"),
+        Some(session) => session["state"].as_str(),
+        None => value["state"].as_str(),
+    }
+}
+
 fn probe(settings: &crate::settings::Settings) -> StatusProbe {
     match cli::status(settings) {
-        Ok(cli::CliResult::Ok { value }) => match value["state"].as_str() {
+        Ok(cli::CliResult::Ok { value }) => match session_state(&value) {
             Some(state) => StatusProbe::Ok {
                 state: state.to_owned(),
             },
@@ -167,6 +178,28 @@ mod tests {
 
     fn config() -> serde_json::Value {
         serde_json::from_str(CONFIG).unwrap()
+    }
+
+    #[test]
+    fn the_session_state_is_read_from_either_status_shape() {
+        use serde_json::json;
+        let state = |v: serde_json::Value| super::session_state(&v).map(str::to_owned);
+        // v0.3.0
+        assert_eq!(state(json!({"state": "none"})).as_deref(), Some("none"));
+        assert_eq!(
+            state(json!({"version": 1, "id": "a", "state": "ready"})).as_deref(),
+            Some("ready")
+        );
+        // Contract v1
+        assert_eq!(
+            state(json!({"version": 1, "session": null})).as_deref(),
+            Some("none")
+        );
+        assert_eq!(
+            state(json!({"version": 1, "session": {"state": "stopping"}})).as_deref(),
+            Some("stopping")
+        );
+        assert_eq!(state(json!({"version": 1})), None);
     }
 
     #[test]

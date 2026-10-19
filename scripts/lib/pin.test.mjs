@@ -81,13 +81,18 @@ describe("release checksums", () => {
     const sums = new Map([
       ["status.schema.json", "a".repeat(64)],
       ["launcher-schemas.zip", "b".repeat(64)],
+      ["Afterhours-contract.zip", "c".repeat(64)],
+      ["Afterhours-windows-x64.zip", "d".repeat(64)],
     ]);
     const assets = [
       { name: "status.schema.json", browser_download_url: "u1" },
       { name: "launcher-schemas.zip", browser_download_url: "u2" },
-      { name: "Afterhours-windows-x64.zip", browser_download_url: "u3" },
+      { name: "Afterhours-contract.zip", browser_download_url: "u3" },
+      { name: "Afterhours-windows-x64.zip", browser_download_url: "u4" },
+      { name: "build-info.json", browser_download_url: "u5" },
     ];
     expect(schemaAssets(assets, sums).map((a) => [a.name, a.archive])).toEqual([
+      ["Afterhours-contract.zip", true],
       ["launcher-schemas.zip", true],
       ["status.schema.json", false],
     ]);

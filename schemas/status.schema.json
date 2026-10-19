@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "StatusOutput",
+  "title": "StatusReport",
   "description": "What `status --json` prints: {\"state\":\"none\"} before any session, otherwise the current session's status record. Vendored from afterhours-2015 v0.3.0 (crates/launcher/src/records.rs and commands/status.rs) until the server publishes its own schemas.",
   "oneOf": [{ "$ref": "#/definitions/NoSession" }, { "$ref": "#/definitions/Status" }],
   "definitions": {
@@ -11,8 +11,8 @@
       "required": ["state"],
       "additionalProperties": false
     },
-    "SessionState": {
-      "title": "SessionState",
+    "State": {
+      "title": "State",
       "description": "Session states in the order a successful session passes through them. `interrupted` is derived on read: a live state whose supervisor no longer holds the data directory lock.",
       "type": "string",
       "enum": [
@@ -34,7 +34,7 @@
         "version": { "type": "integer", "const": 1 },
         "id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
         "utc": { "type": "string" },
-        "state": { "$ref": "#/definitions/SessionState" },
+        "state": { "$ref": "#/definitions/State" },
         "message": { "type": "string" },
         "worker_pid": { "type": "integer", "minimum": 0 },
         "game_pid": { "type": ["integer", "null"], "minimum": 0 },

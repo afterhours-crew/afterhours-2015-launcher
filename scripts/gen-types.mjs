@@ -7,6 +7,9 @@
 // json-schema-to-typescript at the exact version in package.json, and the
 // output is formatted with this repository's Prettier settings, so CI can
 // regenerate and diff. Never edit the generated files.
+//
+//   node scripts/gen-types.mjs [--schemas <dir>] [--out <dir>]
+//                              other folders, to try a server branch's schemas
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,8 +17,12 @@ import { compile } from "json-schema-to-typescript";
 import * as prettier from "prettier";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const schemasDir = join(root, "schemas");
-const outDir = join(root, "src", "lib", "api", "generated");
+const option = (name) => {
+  const at = process.argv.indexOf(name);
+  return at >= 0 && process.argv[at + 1] ? resolve(process.argv[at + 1]) : null;
+};
+const schemasDir = option("--schemas") ?? join(root, "schemas");
+const outDir = option("--out") ?? join(root, "src", "lib", "api", "generated");
 
 const schemas = readdirSync(schemasDir)
   .filter((name) => name.endsWith(".schema.json"))

@@ -31,6 +31,8 @@ describe("launch bar", () => {
     const mac = launchBarModel({ ...base, platform: "other" });
     expect(mac.play).toMatchObject({ label: "Serve", action: "serve", disabled: false });
     expect(mac.title).toBe("This PC");
+    expect(win.eyebrow).toBe("Your server");
+    expect(win.title).toBe("This PC");
   });
 
   it("says why Play is disabled instead of just disabling it", () => {

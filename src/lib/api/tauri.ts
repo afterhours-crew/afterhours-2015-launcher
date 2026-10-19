@@ -92,12 +92,18 @@ export async function onSessionEvents(handlers: {
   return () => stops.forEach((stop) => stop());
 }
 
-/** `status --json` prints `{"state":"none"}` when no session exists. */
+/**
+ * The session in `status --json`. v0.3.0 prints `{"state":"none"}` or the
+ * status itself; contract v1 prints `{"version":1,"session":Status|null}`.
+ * Both are read so a pin bump does not silently lose the session.
+ */
 export function statusFromResult(result: CliResult): Status | null {
   if (result.kind !== "ok") return null;
-  const value = result.value as { state?: string; id?: string };
-  if (!value || value.state === "none" || typeof value.id !== "string") return null;
-  return value as Status;
+  const value = result.value as Record<string, unknown> | null;
+  if (!value || typeof value !== "object") return null;
+  const session = "session" in value ? value.session : value.state === "none" ? null : value;
+  if (!session || typeof session !== "object") return null;
+  return typeof (session as { id?: unknown }).id === "string" ? (session as Status) : null;
 }
 
 export function preflightFromResult(result: CliResult): Preflight | null {

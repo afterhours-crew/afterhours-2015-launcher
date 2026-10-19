@@ -54,9 +54,9 @@ non-prerelease release newer than `server-pin.json`, it:
 
 1. downloads `SHA256SUMS.txt` and `Afterhours-windows-x64.zip`, checks the ZIP
    against the sums and `Afterhours.exe` against the ZIP's `build-info.json`;
-2. takes the release's `*.schema.json` assets (each must be listed in
-   `SHA256SUMS.txt`) into `schemas/` and regenerates
-   `src/lib/api/generated`;
+2. takes the release's schemas (`Afterhours-contract.zip` or
+   `*.schema.json` assets, each listed in `SHA256SUMS.txt`) into `schemas/`
+   and regenerates `src/lib/api/generated`;
 3. pushes `pin/afterhours-<tag>`, opens a pull request and dispatches CI on it.
 
 Pull requests opened with the workflow token do not start CI by themselves,

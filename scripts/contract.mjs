@@ -1,14 +1,20 @@
 // Runs the pinned Afterhours.exe's JSON commands against temporary data
 // folders and validates what they print against schemas/.
 //
-//   node scripts/contract.mjs            the placed sidecar (pnpm sidecar), checked against the pin
-//   AFTERHOURS_EXE=<path> node scripts/contract.mjs
-//                                         another build, for working on the contract itself
+//   node scripts/contract.mjs                the placed sidecar (pnpm sidecar), checked against the pin
+//   AFTERHOURS_EXE=<path> node scripts/contract.mjs [--schemas <dir>]
+//                                            another build and its schemas, for work on the contract
 //
 // No game is needed or touched: every case uses a fresh temporary data
 // folder, and `check` gets an empty stand-in game folder it must refuse.
 // Session records are seeded in the server's documented formats so `status`
 // reports real records, including the `interrupted` state it derives.
+//
+// Cases for `stop`, `version`, `sessions` and `profile --list` run when a
+// schema of that name exists, so a pin bump that brings the contract v1
+// schemas exercises them without edits here. `status` is read in both
+// shapes: v0.3.0's `{"state":"none"}` or bare status, and v1's
+// `{"version":1,"session":...}`.
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -27,6 +33,8 @@ if (!override && sha256(readFileSync(exe)) !== pin.executable_sha256) {
   console.error(`${exe} does not match ${PIN_FILE}. Run pnpm sidecar.`);
   process.exit(1);
 }
+const at = process.argv.indexOf("--schemas");
+const schemaDir = at >= 0 ? resolve(process.argv[at + 1] ?? "") : join(root, "schemas");
 
 function validatorFor(schema) {
   const dialect = String(schema.$schema ?? "");
@@ -35,7 +43,6 @@ function validatorFor(schema) {
   return new Class(options).compile(schema);
 }
 
-const schemaDir = join(root, "schemas");
 const validators = new Map(
   readdirSync(schemaDir)
     .filter((name) => name.endsWith(".schema.json"))
@@ -84,18 +91,36 @@ function run(args) {
   return { code: result.status, stdout: result.stdout.trim(), stderr: result.stderr.trim() };
 }
 
-function parse(stdout) {
+/** Run a `--json` command that must succeed, and validate its object. */
+function runJson(args, schema) {
+  const out = run(args);
+  if (out.code !== 0) throw new Error(`exit ${out.code}: ${out.stderr.split(/\r?\n/).pop()}`);
+  let value;
   try {
-    return JSON.parse(stdout);
+    value = JSON.parse(out.stdout);
   } catch {
-    throw new Error(`stdout is not one JSON object: ${stdout.slice(0, 200)}`);
+    throw new Error(`stdout is not one JSON object: ${out.stdout.slice(0, 200)}`);
   }
+  const check = validators.get(schema);
+  if (!check) throw new Error(`${schemaDir}/${schema}.schema.json is missing.`);
+  if (!check(value)) throw new Error(`${schema} schema: ${JSON.stringify(check.errors)}`);
+  return value;
 }
 
-function validate(schema, value) {
-  const check = validators.get(schema);
-  if (!check) throw new Error(`schemas/${schema}.schema.json is missing.`);
-  if (!check(value)) throw new Error(`${schema} schema: ${JSON.stringify(check.errors)}`);
+/** The session in `status --json`, in either shape; `null` for none. */
+function sessionOf(value) {
+  if ("session" in value) return value.session;
+  return value.state === "none" ? null : value;
+}
+
+function refusal(args, expectedCode) {
+  const out = run(args);
+  if (out.code !== expectedCode) {
+    throw new Error(`exit ${out.code}, expected ${expectedCode}: ${out.stderr}`);
+  }
+  if (out.stdout) throw new Error(`printed ${out.stdout} on refusal`);
+  if (!out.stderr) throw new Error("refused without a message");
+  return out.stderr.split(/\r?\n/).pop();
 }
 
 const fakeGame = join(scratch, "not-a-game");
@@ -107,10 +132,11 @@ const cases = [
     run: () => {
       const out = run(["--version"]);
       if (out.code !== 0) throw new Error(`exit ${out.code}: ${out.stderr}`);
-      const match = /^Afterhours \S+ \((\S+) \/ ([0-9a-f]{40})\)$/.exec(out.stdout);
+      const match = /^Afterhours (\S+) \((\S+) \/ (.+)\)$/.exec(out.stdout);
       if (!match) throw new Error(`unexpected version line: ${out.stdout}`);
-      if (!override && match[1] !== pin.tag)
-        throw new Error(`reports ${match[1]}, pinned ${pin.tag}`);
+      if (!override && (match[2] !== pin.tag || !/^[0-9a-f]{40}$/.test(match[3]))) {
+        throw new Error(`reports ${match[2]} / ${match[3]}, pinned ${pin.tag}`);
+      }
       return out.stdout;
     },
   },
@@ -118,12 +144,9 @@ const cases = [
     name: "status --json before any session",
     schema: "status",
     run: () => {
-      const out = run(["status", "--json", "--data-dir", dataDir("empty")]);
-      if (out.code !== 0) throw new Error(`exit ${out.code}: ${out.stderr}`);
-      const value = parse(out.stdout);
-      validate("status", value);
-      if (value.state !== "none") throw new Error(`state ${value.state}, expected none`);
-      return out.stdout;
+      const value = runJson(["status", "--json", "--data-dir", dataDir("empty")], "status");
+      if (sessionOf(value) !== null) throw new Error(`reports a session: ${JSON.stringify(value)}`);
+      return JSON.stringify(value);
     },
   },
   {
@@ -131,24 +154,20 @@ const cases = [
     schema: "status",
     run: () => {
       const dir = dataDir("finished", { state: "finished" });
-      const out = run(["--json", "--data-dir", dir, "status"]);
-      if (out.code !== 0) throw new Error(`exit ${out.code}: ${out.stderr}`);
-      const value = parse(out.stdout);
-      validate("status", value);
-      if (value.state !== "finished" || value.id !== ID) throw new Error(out.stdout);
-      return `state ${value.state}`;
+      const session = sessionOf(runJson(["--json", "--data-dir", dir, "status"], "status"));
+      if (session?.state !== "finished" || session.id !== ID)
+        throw new Error(JSON.stringify(session));
+      return `state ${session.state}`;
     },
   },
   {
     name: "status --json derives interrupted when the lock is missing",
     schema: "status",
     run: () => {
-      const out = run(["status", "--json", "--data-dir", dataDir("no-lock", { state: "ready" })]);
-      if (out.code !== 0) throw new Error(`exit ${out.code}: ${out.stderr}`);
-      const value = parse(out.stdout);
-      validate("status", value);
-      if (value.state !== "interrupted") throw new Error(`state ${value.state}`);
-      return `state ${value.state}`;
+      const dir = dataDir("no-lock", { state: "ready" });
+      const session = sessionOf(runJson(["status", "--json", "--data-dir", dir], "status"));
+      if (session?.state !== "interrupted") throw new Error(`state ${session?.state}`);
+      return `state ${session.state}`;
     },
   },
   {
@@ -156,40 +175,91 @@ const cases = [
     schema: "status",
     run: () => {
       const dir = dataDir("free-lock", { state: "starting", lockFile: true });
-      const out = run(["status", "--json", "--data-dir", dir]);
-      if (out.code !== 0) throw new Error(`exit ${out.code}: ${out.stderr}`);
-      const value = parse(out.stdout);
-      validate("status", value);
-      if (value.state !== "interrupted") throw new Error(`state ${value.state}`);
-      return `state ${value.state}`;
+      const session = sessionOf(runJson(["status", "--json", "--data-dir", dir], "status"));
+      if (session?.state !== "interrupted") throw new Error(`state ${session?.state}`);
+      return `state ${session.state}`;
     },
   },
   {
     name: "stop --json with nothing to stop exits 4",
+    run: () => refusal(["stop", "--json", "--data-dir", dataDir("stop-empty")], 4),
+  },
+  {
+    name: "stop --json of a finished session",
+    schema: "stop",
+    optional: true,
     run: () => {
-      const out = run(["stop", "--json", "--data-dir", dataDir("stop-empty")]);
-      if (out.code !== 4) throw new Error(`exit ${out.code}, expected 4: ${out.stderr}`);
-      if (out.stdout) throw new Error(`printed ${out.stdout} on refusal`);
-      return out.stderr.split(/\r?\n/).pop();
+      const dir = dataDir("stop-finished", { state: "finished" });
+      const value = runJson(["stop", "--json", "--data-dir", dir], "stop");
+      if (value.outcome !== "already-over") throw new Error(`outcome ${value.outcome}`);
+      return `outcome ${value.outcome}`;
     },
   },
   {
     name: "check --json refuses a folder without the game",
     run: () => {
       const dir = dataDir("check");
-      const out = run(["check", "--json", "--data-dir", dir, "--game-dir", fakeGame]);
-      if (out.code !== 1) throw new Error(`exit ${out.code}, expected 1: ${out.stderr}`);
-      if (out.stdout) throw new Error(`printed ${out.stdout} on refusal`);
-      if (!out.stderr) throw new Error("refused without a message");
+      const line = refusal(["check", "--json", "--data-dir", dir, "--game-dir", fakeGame], 1);
       if (readdirSync(dir).length !== 0) throw new Error("check wrote into the data folder");
-      return out.stderr.split(/\r?\n/).pop();
+      return line;
+    },
+  },
+  {
+    name: "version --json reports the release",
+    schema: "version",
+    optional: true,
+    run: () => {
+      const value = runJson(["version", "--json"], "version");
+      if (!override && value.release !== pin.tag) {
+        throw new Error(`reports ${value.release}, pinned ${pin.tag}`);
+      }
+      return `${value.release}, capabilities ${JSON.stringify(value.capabilities)}`;
+    },
+  },
+  {
+    name: "sessions --json lists none, then the seeded session",
+    schema: "sessions",
+    optional: true,
+    run: () => {
+      const empty = runJson(
+        ["sessions", "--json", "--data-dir", dataDir("sessions-empty")],
+        "sessions",
+      );
+      if (empty.sessions.length !== 0) throw new Error("lists sessions in an empty folder");
+      const dir = dataDir("sessions-seeded", { state: "finished" });
+      writeFileSync(
+        join(dir, "artifacts", "launcher", ID, "request.json"),
+        JSON.stringify({ version: 1, id: ID, action: "serve" }),
+      );
+      const seeded = runJson(["sessions", "--json", "--data-dir", dir], "sessions");
+      return `${seeded.sessions.length} seeded session(s) listed`;
+    },
+  },
+  {
+    name: "profile --list --json in a folder without saves",
+    schema: "profile-list",
+    optional: true,
+    run: () => {
+      const value = runJson(
+        ["profile", "--list", "--json", "--data-dir", dataDir("profiles")],
+        "profile-list",
+      );
+      if (value.accounts.length !== 0) throw new Error("lists accounts in an empty folder");
+      return "no accounts";
     },
   },
 ];
 
 let failed = 0;
+let ran = 0;
 console.log(`Contract check: ${exe}${override ? " (AFTERHOURS_EXE)" : ` (${pin.tag})`}`);
+console.log(`Schemas: ${schemaDir}`);
 for (const testCase of cases) {
+  if (testCase.optional && !validators.has(testCase.schema)) {
+    console.log(`  skip  ${testCase.name}  (no ${testCase.schema} schema)`);
+    continue;
+  }
+  ran += 1;
   try {
     const detail = testCase.run();
     console.log(`  pass  ${testCase.name}  ${detail ?? ""}`);
@@ -202,13 +272,13 @@ const exercised = new Set(cases.map((c) => c.schema).filter(Boolean));
 for (const schema of validators.keys()) {
   if (!exercised.has(schema)) {
     console.log(
-      `  note  schemas/${schema}.schema.json is not exercised: its output needs the game.`,
+      `  note  ${schema}.schema.json is not exercised here (needs the game or a session).`,
     );
   }
 }
 rmSync(scratch, { recursive: true, force: true });
 if (failed > 0) {
-  console.log(`${failed} of ${cases.length} cases failed.`);
+  console.log(`${failed} of ${ran} cases failed.`);
   process.exit(1);
 }
-console.log(`All ${cases.length} cases passed.`);
+console.log(`All ${ran} cases passed.`);

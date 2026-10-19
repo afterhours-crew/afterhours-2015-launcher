@@ -109,12 +109,13 @@ export function assetUrl(pin, name = pin.asset) {
 }
 
 /**
- * Schema files a release attaches: `*.schema.json` assets, or `*schemas*.zip`
- * archives of them. Each must be listed in SHA256SUMS.txt.
+ * Schema files a release attaches: `*.schema.json` assets, or archives of
+ * them (`Afterhours-contract.zip` with `schema/*.schema.json`, or
+ * `*schemas*.zip`). Each must be listed in SHA256SUMS.txt.
  */
 export function schemaAssets(assets, sums) {
   const chosen = assets
-    .filter((a) => /\.schema\.json$/i.test(a.name) || /schemas.*\.zip$/i.test(a.name))
+    .filter((a) => /\.schema\.json$/i.test(a.name) || /(contract|schemas).*\.zip$/i.test(a.name))
     .map((a) => {
       if (!FILE_NAME.test(a.name)) throw new Error(`Release asset ${a.name} has an unusable name.`);
       const expected = sums.get(a.name);

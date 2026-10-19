@@ -14,6 +14,7 @@
   import Garage from "$lib/views/Garage.svelte";
   import Host from "$lib/views/Host.svelte";
   import Logs from "$lib/views/Logs.svelte";
+  import MapView from "$lib/views/Map.svelte";
   import Profile from "$lib/views/Profile.svelte";
   import Settings from "$lib/views/Settings.svelte";
   import World from "$lib/views/World.svelte";
@@ -104,6 +105,8 @@
       <Profile />
     {:else if view === "world"}
       <World />
+    {:else if view === "map"}
+      <MapView />
     {:else if view === "host"}
       <Host />
     {:else if view === "logs"}
