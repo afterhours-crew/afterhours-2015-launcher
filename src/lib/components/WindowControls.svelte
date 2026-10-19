@@ -21,8 +21,8 @@
 
 <style>
   .control {
-    width: 34px;
-    height: 34px;
+    width: 38px;
+    height: 38px;
     display: flex;
     align-items: center;
     justify-content: center;

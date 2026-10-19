@@ -1,5 +1,5 @@
 // The window's screens and their addresses. Hash routes (`#/profile/cars`,
-// `#/settings/about`) keep links working in the desktop window and in the
+// `#/logs/viewer`, `#/settings/about`) keep links working in the desktop window and in the
 // browser preview.
 
 export const VIEWS = ["garage", "profile", "world", "map", "host", "logs", "settings"] as const;
@@ -8,16 +8,18 @@ export type View = (typeof VIEWS)[number];
 /** Views with sub-views; the first one is where the view opens. */
 export const SECTIONS = {
   profile: ["overview", "cars", "save-data", "edit-driver"],
+  logs: ["sessions", "viewer"],
   settings: ["general", "updates", "about"],
 } as const;
 export type ProfileSection = (typeof SECTIONS.profile)[number];
+export type LogsSection = (typeof SECTIONS.logs)[number];
 export type SettingsSection = (typeof SECTIONS.settings)[number];
-export type Section = ProfileSection | SettingsSection;
+export type Section = ProfileSection | LogsSection | SettingsSection;
 type Sectioned = keyof typeof SECTIONS;
 
 export interface Route {
   view: View;
-  /** Profile and Settings only. */
+  /** Profile, Logs and Settings only. */
   section: Section | null;
   /** `#/first-run`: show the first run wizard (browser preview and tests). */
   firstRun: boolean;
@@ -38,6 +40,8 @@ export const SECTION_LABELS: Record<Section, string> = {
   cars: "Cars",
   "save-data": "Save data",
   "edit-driver": "Edit driver",
+  sessions: "Sessions",
+  viewer: "Log viewer",
   general: "General",
   updates: "Updates",
   about: "About",

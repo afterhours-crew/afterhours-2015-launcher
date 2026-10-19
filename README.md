@@ -8,10 +8,13 @@ itself from this repository's GitHub releases. Nothing about the game, the
 server or the safety rules lives here; this app is the Play button in front of
 them.
 
-**Foundation stage.** The shell, the bundled server, the installer, the
-updater and the release workflows are in place; the screens other than
-Settings are placeholders until they are built from the designs. No release
-has been published yet. See [docs/ROADMAP.md](docs/ROADMAP.md).
+**Preview stage.** The shell, the bundled server, the installer, the updater,
+the release workflows and the screens are in place. Each screen reads the
+bundled server through its JSON commands and shows "Coming later" for what
+that server does not report: with v0.3.0, which reports no capabilities,
+that is Profile, Cars, Save data and the Logs dashboard; World settings, Cops
+and the Map wait for server work. No release has been published yet. See
+[docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Run it
 
@@ -25,6 +28,12 @@ has been published yet. See [docs/ROADMAP.md](docs/ROADMAP.md).
    pnpm sidecar
    pnpm tauri dev
    ```
+
+   `pnpm dev` alone opens the window in a browser for styling work. Nothing
+   runs there; add `?sample` to the address (`http://localhost:1420/?sample`)
+   to look at the screens with the made-up records in
+   `src/lib/state/sample.ts`. A banner says so, and production builds leave
+   that code out.
 
    `pnpm sidecar` downloads the server release pinned in `server-pin.json`,
    checks its SHA-256 and places `Afterhours.exe` in `src-tauri/binaries/`.
@@ -49,7 +58,11 @@ window (Svelte)  --invoke-->  src-tauri (Rust)  --spawn-->  Afterhours.exe  --sp
 
 The Rust side runs the bundled server and reports what it says. `check`,
 `status` and `stop` run with `--json` within a deadline and their object
-comes back to the window. A session is the server's own `setup`, `serve` or
+comes back to the window, and so do the read-only `profile`,
+`profile --list` and `sessions` behind Profile and Logs, asked for only when
+`version --json` lists their capability. The log viewer reads one named file
+of one session folder (`reads.rs`), bounded at the server's 4 MB log limit
+and without following links. A session is the server's own `setup`, `serve` or
 `start` command running as a windowless child; its console lines arrive as
 `session-output` events, `status --json` is polled into `session-status`
 events, and its exit into `session-exit`. The supervisor is a separate
@@ -69,15 +82,15 @@ against those schemas (`pnpm contract`).
 
 ## Repository layout
 
-| Path                 | What                                                                                                                                                                    |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server-pin.json`    | the bundled server: release tag and SHA-256s                                                                                                                            |
-| `schemas/`           | JSON Schemas of the server's `--json` output                                                                                                                            |
-| `src/`               | Svelte app: `App.svelte`, `lib/api` (Tauri commands, generated types), `lib/state` (routes, update rules, view models, stores), `lib/components`, `lib/views`           |
-| `src-tauri/`         | Rust: `pin.rs`, `server.rs` (which executable), `cli.rs` (runs it, streams events), `data.rs` (session records, save backups), `updates.rs`, `settings.rs`, `detect.rs` |
-| `scripts/`           | `server-pin.mjs` (fetch, verify, bump), `gen-types.mjs`, `contract.mjs`, `versions.mjs`, `updater-manifest.mjs`, `tokens.mjs`                                           |
-| `design/`            | `tokens.json` from the design system, the design rules, the app icon source                                                                                             |
-| `.github/workflows/` | `ci.yml`, `pin-bump.yml` (daily server check), `release.yml` (`v*` tags)                                                                                                |
+| Path                 | What                                                                                                                                                                                                                   |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server-pin.json`    | the bundled server: release tag and SHA-256s                                                                                                                                                                           |
+| `schemas/`           | JSON Schemas of the server's `--json` output                                                                                                                                                                           |
+| `src/`               | Svelte app: `App.svelte`, `lib/api` (Tauri commands, generated types), `lib/state` (routes, update rules, view models, stores), `lib/components`, `lib/views`                                                          |
+| `src-tauri/`         | Rust: `pin.rs`, `server.rs` (which executable), `cli.rs` (runs it, streams events), `data.rs` (session records, save backups), `reads.rs` (profile, sessions, session files), `updates.rs`, `settings.rs`, `detect.rs` |
+| `scripts/`           | `server-pin.mjs` (fetch, verify, bump), `gen-types.mjs`, `contract.mjs`, `versions.mjs`, `updater-manifest.mjs`, `tokens.mjs`                                                                                          |
+| `design/`            | `tokens.json` from the design system, the design rules, the app icon source                                                                                                                                            |
+| `.github/workflows/` | `ci.yml`, `pin-bump.yml` (daily server check), `release.yml` (`v*` tags)                                                                                                                                               |
 
 ## Checks
 

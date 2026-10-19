@@ -16,13 +16,15 @@
 //! [`pin`] and [`server`] decide which executable runs, [`cli`] runs it and
 //! turns its output into events, [`settings`] stores the few things the
 //! window remembers, [`data`] reads the data directory's session records and
-//! copies saves aside, [`updates`] serves the updater's checks, and
+//! copies saves aside, [`updates`] serves the updater's checks, [`reads`]
+//! runs the read-only commands behind the profile and logs screens, and
 //! [`detect`] guesses where the game is installed.
 
 pub mod cli;
 pub mod data;
 pub mod detect;
 pub mod pin;
+pub mod reads;
 pub mod server;
 pub mod settings;
 pub mod updates;
@@ -78,6 +80,11 @@ pub fn run() {
             updates::session_activity,
             updates::backup_saves,
             updates::app_info,
+            reads::profile,
+            reads::profile_list,
+            reads::sessions,
+            reads::session_file,
+            reads::open_session_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Afterhours launcher");

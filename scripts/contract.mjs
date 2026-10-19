@@ -36,11 +36,26 @@ if (!override && sha256(readFileSync(exe)) !== pin.executable_sha256) {
 const at = process.argv.indexOf("--schemas");
 const schemaDir = at >= 0 ? resolve(process.argv[at + 1] ?? "") : join(root, "schemas");
 
+// The integer formats schemars writes for the server's Rust types. JSON
+// numbers lose precision above 2^53, which is why the server prints IDs as
+// strings; the 64-bit formats only check for a non-negative integer here.
+const INTEGER_FORMATS = {
+  int32: (n) => Number.isInteger(n) && n >= -(2 ** 31) && n < 2 ** 31,
+  uint32: (n) => Number.isInteger(n) && n >= 0 && n < 2 ** 32,
+  int64: (n) => Number.isInteger(n),
+  uint64: (n) => Number.isInteger(n) && n >= 0,
+  uint: (n) => Number.isInteger(n) && n >= 0,
+};
+
 function validatorFor(schema) {
   const dialect = String(schema.$schema ?? "");
   const options = { allErrors: true, allowUnionTypes: true, strict: false };
   const Class = dialect.includes("2020-12") ? Ajv2020 : dialect.includes("2019-09") ? Ajv2019 : Ajv;
-  return new Class(options).compile(schema);
+  const ajv = new Class(options);
+  for (const [name, validate] of Object.entries(INTEGER_FORMATS)) {
+    ajv.addFormat(name, { type: "number", validate });
+  }
+  return ajv.compile(schema);
 }
 
 const validators = new Map(
@@ -250,6 +265,16 @@ const cases = [
   },
 ];
 
+// Vendored schemas may run ahead of the pinned server: the contract v1
+// schemas the screens are built against are vendored before a release
+// carries them. Then a server without `version --json` (v0.3.0) skips the
+// v1 cases, exactly as the app shows those screens as "Coming later". With
+// a release's own schemas, or a build given through AFTERHOURS_EXE, every
+// case whose schema exists runs.
+const V1_ONLY = new Set(["version", "sessions", "profile-list"]);
+const aheadOfServer =
+  pin.schemas === "vendored" && !override && run(["version", "--json"]).code !== 0;
+
 let failed = 0;
 let ran = 0;
 console.log(`Contract check: ${exe}${override ? " (AFTERHOURS_EXE)" : ` (${pin.tag})`}`);
@@ -257,6 +282,10 @@ console.log(`Schemas: ${schemaDir}`);
 for (const testCase of cases) {
   if (testCase.optional && !validators.has(testCase.schema)) {
     console.log(`  skip  ${testCase.name}  (no ${testCase.schema} schema)`);
+    continue;
+  }
+  if (testCase.optional && aheadOfServer && V1_ONLY.has(testCase.schema)) {
+    console.log(`  skip  ${testCase.name}  (${pin.tag} predates contract v1)`);
     continue;
   }
   ran += 1;

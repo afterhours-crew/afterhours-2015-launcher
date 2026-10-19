@@ -15,12 +15,15 @@ describe("routes", () => {
     expect(parseRoute("#/profile/cars").section).toBe("cars");
     expect(parseRoute("#/profile/save-data").section).toBe("save-data");
     expect(parseRoute("#/profile/edit-driver").section).toBe("edit-driver");
+    expect(parseRoute("#/logs/viewer").section).toBe("viewer");
   });
 
   it("opens a view with sub-views on its first one", () => {
     expect(parseRoute("#/settings").section).toBe("general");
     expect(parseRoute("#/settings/nope").section).toBe("general");
     expect(parseRoute("#/profile").section).toBe("overview");
+    expect(parseRoute("#/logs").section).toBe("sessions");
+    expect(parseRoute("#/logs/cars").section).toBe("sessions");
     // A section of another view does not carry over.
     expect(parseRoute("#/profile/updates").section).toBe("overview");
     expect(parseRoute("#/map/cars").section).toBeNull();
@@ -37,7 +40,8 @@ describe("routes", () => {
     for (const hash of [
       "#/garage",
       "#/map",
-      "#/logs",
+      "#/logs/sessions",
+      "#/logs/viewer",
       "#/profile/overview",
       "#/profile/cars",
       "#/settings/general",

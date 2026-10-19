@@ -4,25 +4,46 @@
   import Field from "$lib/components/Field.svelte";
   import Note from "$lib/components/Note.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
+  import Segmented from "$lib/components/Segmented.svelte";
+  import Soon from "$lib/components/Soon.svelte";
   import { firstRunChecks, initials, type Platform } from "$lib/state/launchbar";
+  import { sampleCheck, sampleMode } from "$lib/state/preview";
   import { session } from "$lib/state/session.svelte";
 
-  // Four steps, as designed. The server is bundled with the launcher, so
+  // Three steps, as designed (B2 is the last). The server is bundled with the launcher, so
   // there is nothing to locate besides the game.
   let { platform, onDone }: { platform: Platform; onDone: () => void } = $props();
 
-  const steps = ["Game", "Files", "Driver", "Done"] as const;
+  const steps = ["Game", "Files", "Driver"] as const;
   let step = $state(0);
   let gameDir = $state(session.settings.game_dir ?? "");
   let detected = $state<string[]>([]);
-  let name = $state(session.settings.player_name ?? "Driver_01");
+  let name = $state(session.settings.player_name ?? "Driver");
   let avatar = $state(session.settings.avatar ?? "style");
   let preflight = $state<Preflight | null>(null);
   let checkError = $state<string | null>(null);
   let checking = $state(false);
   let saving = $state(false);
+  let saveError = $state<string | null>(null);
 
-  const colors = ["style", "speed", "build", "crew", "outlaw", "peach"];
+  const colors = [
+    { id: "style", label: "Pink" },
+    { id: "speed", label: "Blue" },
+    { id: "build", label: "Yellow" },
+    { id: "crew", label: "Green" },
+    { id: "outlaw", label: "Purple" },
+    { id: "peach", label: "Peach" },
+  ];
+  // The server creates new drivers itself; choosing these needs its support.
+  const START_OPTIONS = [
+    { value: "prologue", label: "Prologue" },
+    { value: "skip", label: "Skip prologue" },
+  ] as const;
+  const BANK_OPTIONS = [
+    { value: "story", label: "Story" },
+    { value: "250k", label: "$250K" },
+    { value: "1m", label: "$1M" },
+  ] as const;
 
   $effect(() => {
     api
@@ -45,7 +66,7 @@
     preflight = null;
     try {
       await session.save({ game_dir: gameDir || null });
-      const result = await api.runCheck();
+      const result = sampleMode ? await sampleCheck() : await api.runCheck();
       if (result.kind === "error") checkError = result.message;
       else preflight = preflightFromResult(result);
     } catch (e) {
@@ -62,15 +83,22 @@
       await runCheck();
       return;
     }
-    if (step === 2) await session.save({ player_name: name.trim() || "Driver", avatar });
     step = Math.min(steps.length - 1, step + 1);
   }
 
   async function finish() {
     saving = true;
-    if (inTauri) await session.save({ first_run_done: true });
-    saving = false;
-    onDone();
+    saveError = null;
+    try {
+      if (inTauri) {
+        await session.save({ player_name: name.trim() || "Driver", avatar, first_run_done: true });
+      }
+      onDone();
+    } catch (e) {
+      saveError = String(e instanceof Error ? e.message : e);
+    } finally {
+      saving = false;
+    }
   }
 
   let canNext = $derived(
@@ -161,49 +189,51 @@
           {/each}
         </div>
       {/if}
-    {:else if step === 2}
-      <h1 class="t-step-title">Your driver</h1>
-      <p>This is how you show up on servers. It stays on this PC.</p>
-      <div class="driver">
-        <span class="me" style="background: var(--{avatar})">{initials(name)}</span>
-        <Field id="name" label="Driver name" bind:value={name} />
-      </div>
-      <div role="radiogroup" aria-label="Avatar color" class="swatches">
-        {#each colors as color (color)}
-          <button
-            type="button"
-            role="radio"
-            aria-checked={avatar === color}
-            aria-label={color}
-            class="swatch"
-            class:picked={avatar === color}
-            style="background: var(--{color})"
-            onclick={() => (avatar = color)}
-          ></button>
-        {/each}
-      </div>
     {:else}
-      <h1 class="t-step-title">You're set</h1>
-      <p>The garage is yours. You can change any of this later in Settings.</p>
-      <div class="tiles">
-        <div class="tile">
-          <span class="t-label">Game</span><span class="strong"
-            >{preflight?.game_sha256 ? "Supported build" : "Unchecked"}</span
-          >
-        </div>
-        <div class="tile">
-          <span class="t-label">Server</span><span class="strong"
-            >{session.serverTag ?? "This PC"}</span
-          >
-        </div>
-        <div class="tile">
-          <span class="t-label">Driver</span><span class="strong">{name}</span>
+      <h1 class="t-step-title">Make your driver</h1>
+      <p>This is you on your own server. You can change the picture later in Profile.</p>
+      <div class="picture">
+        <span class="me" style="background: var(--{avatar})" aria-hidden="true"
+          >{initials(name)}</span
+        >
+        <div class="picture-controls">
+          <div role="radiogroup" aria-label="Avatar colour" class="swatches">
+            {#each colors as color (color.id)}
+              <button
+                type="button"
+                role="radio"
+                aria-checked={avatar === color.id}
+                aria-label={color.label}
+                class="swatch"
+                class:picked={avatar === color.id}
+                style="background: var(--{color.id})"
+                onclick={() => (avatar = color.id)}
+              ></button>
+            {/each}
+          </div>
+          <span class="later"><Soon /><span class="hint">Or choose an image</span></span>
         </div>
       </div>
-      <Note
-        >This is a preview for testers. Keep your data folder backed up; the launcher copies your
-        saves before any update that changes the server.</Note
-      >
+      <Field
+        id="name"
+        label="Driver name"
+        bind:value={name}
+        maxlength={16}
+        hint="Your server names your new driver with this the first time you play."
+      />
+      <div class="choices">
+        <div class="choice">
+          <span class="choice-head"><span class="t-label">Where to start</span><Soon /></span>
+          <Segmented options={START_OPTIONS} value={null} label="Where to start" disabled />
+          <span class="hint">Choosing needs a server update.</span>
+        </div>
+        <div class="choice">
+          <span class="choice-head"><span class="t-label">Starting bank</span><Soon /></span>
+          <Segmented options={BANK_OPTIONS} value={null} label="Starting bank" disabled />
+          <span class="hint">Choosing needs a server update.</span>
+        </div>
+      </div>
+      {#if saveError}<Note kind="warn">{saveError}</Note>{/if}
     {/if}
 
     <div class="actions">
@@ -217,7 +247,12 @@
           >Next</button
         >
       {:else}
-        <button type="button" class="next" disabled={saving} onclick={finish}>Open garage</button>
+        <button
+          type="button"
+          class="next"
+          disabled={saving || name.trim().length === 0}
+          onclick={finish}>Finish</button
+        >
       {/if}
     </div>
   </section>
@@ -247,7 +282,7 @@
     margin: 0;
     padding: 0;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
   }
   .steps li {
@@ -325,13 +360,42 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .driver {
+  .picture {
     display: flex;
-    align-items: flex-end;
-    gap: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 18px;
   }
-  .driver :global(.field) {
-    flex: 1 1 auto;
+  .picture-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .later,
+  .choice-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .choice-head {
+    justify-content: space-between;
+  }
+  .choice-head .t-label {
+    color: var(--ink-muted);
+  }
+  .hint {
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .choices {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+  .choice {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
   .me {
     flex: 0 0 auto;
@@ -351,32 +415,14 @@
     gap: 10px;
   }
   .swatch {
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
   }
   .swatch.picked {
     box-shadow:
       0 0 0 3px rgba(24, 21, 29, 0.9),
       0 0 0 5px var(--ink);
-  }
-  .tiles {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .tile {
-    padding: 10px;
-    border-radius: var(--radius-row);
-    background: var(--field);
-    display: flex;
-    flex-direction: column;
-  }
-  .tile .t-label {
-    color: var(--ink-muted);
-  }
-  .strong {
-    font-weight: 700;
   }
   .actions {
     display: flex;

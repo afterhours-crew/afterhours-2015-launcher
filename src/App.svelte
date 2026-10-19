@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { inTauri } from "$lib/api/tauri";
   import Backdrop from "$lib/components/Backdrop.svelte";
   import Header from "$lib/components/Header.svelte";
@@ -6,6 +7,9 @@
   import PillButton from "$lib/components/PillButton.svelte";
   import UpdateBanner from "$lib/components/UpdateBanner.svelte";
   import { detectPlatform, isLive, launchBarModel } from "$lib/state/launchbar";
+  import { sampleMode } from "$lib/state/preview";
+  import { driverName, headerLine } from "$lib/state/profile";
+  import { current, records } from "$lib/state/records.svelte";
   import { router } from "$lib/state/router.svelte";
   import { session } from "$lib/state/session.svelte";
   import { updater } from "$lib/state/updater.svelte";
@@ -23,8 +27,22 @@
   let noticeDismissed = $state(false);
 
   $effect(() => {
-    void session.load().then(() => updater.start());
+    void session.load().then(() => {
+      updater.start();
+      // The header and the Garage show the active save's REP and bank.
+      void records.loadProfile();
+    });
   });
+
+  // A session that ends has changed the save and the session list.
+  let wasRunning = false;
+  $effect(() => {
+    const running = session.running;
+    if (wasRunning && !running) untrack(() => void records.refreshAfterSession());
+    wasRunning = running;
+  });
+
+  let profile = $derived(current(records.profile));
 
   // The wizard runs until it has been completed once; `#/first-run` shows it
   // in the browser preview.
@@ -61,15 +79,22 @@
   <Header
     {view}
     onNavigate={(v) => router.go(v)}
-    driverName={session.settings.player_name ?? "Driver"}
+    driverName={driverName(profile) ?? session.settings.player_name ?? "Driver"}
+    subline={headerLine(profile)}
+    avatar={session.settings.avatar}
     online={isLive(session.status?.state)}
     showNav={!firstRun}
   />
 
   {#if !inTauri}
     <p class="banner">
-      Browser preview: the desktop window is needed to run anything. Use <code>pnpm tauri dev</code
-      >.
+      {#if sampleMode}
+        Sample data · browser preview only. Nothing here comes from a real save or session.
+      {:else}
+        Browser preview: the desktop window is needed to run anything. Use <code
+          >pnpm tauri dev</code
+        >. Add <code>?sample</code> to the address to look at the screens with made-up records.
+      {/if}
     </p>
   {/if}
   {#if session.error}

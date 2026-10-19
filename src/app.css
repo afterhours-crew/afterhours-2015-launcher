@@ -115,3 +115,44 @@ a {
     animation: none !important;
   }
 }
+
+/* A selectable row: lists of saves, tables, files, sessions and presets. */
+.pick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: var(--radius-row);
+  text-align: left;
+  font: 400 15px/1.3 var(--font-ui);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.pick:hover:not(:disabled) {
+  background: var(--row-hover);
+}
+
+.pick[aria-checked="true"],
+.pick[aria-pressed="true"],
+.pick[aria-current="page"],
+.pick[aria-current="true"] {
+  background: var(--selected);
+  box-shadow: inset 0 0 0 1px var(--selected-edge);
+}
+
+.pick:disabled {
+  cursor: default;
+}
+
+/* Hidden but read aloud. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

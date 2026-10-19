@@ -7,6 +7,9 @@
     placeholder = "",
     mono = false,
     readonly = false,
+    disabled = false,
+    type = "text",
+    maxlength,
     hint,
     trailing,
   }: {
@@ -16,6 +19,9 @@
     placeholder?: string;
     mono?: boolean;
     readonly?: boolean;
+    disabled?: boolean;
+    type?: "text" | "search";
+    maxlength?: number;
     hint?: string;
     trailing?: Snippet;
   } = $props();
@@ -24,7 +30,17 @@
 <div class="field">
   <label for={id} class="t-label">{label}</label>
   <div class="row">
-    <input {id} bind:value {placeholder} {readonly} class:mono spellcheck="false" />
+    <input
+      {id}
+      {type}
+      bind:value
+      {placeholder}
+      {readonly}
+      {disabled}
+      {maxlength}
+      class:mono
+      spellcheck="false"
+    />
     {#if trailing}{@render trailing()}{/if}
   </div>
   {#if hint}<span class="hint">{hint}</span>{/if}
@@ -61,7 +77,8 @@
     font-family: var(--font-mono);
     font-size: 13px;
   }
-  input:read-only {
+  input:read-only,
+  input:disabled {
     color: var(--ink-soft);
   }
   .hint {

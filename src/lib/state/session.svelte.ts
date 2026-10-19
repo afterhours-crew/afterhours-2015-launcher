@@ -4,6 +4,7 @@
 import { api, inTauri, onSessionEvents, statusFromResult, type Unlisten } from "$lib/api/tauri";
 import type { AppInfo, OutputLine, SessionAction, Settings, Status } from "$lib/api/types";
 import { emptySettings } from "$lib/api/types";
+import { sampleAppInfo, sampleMode } from "./preview";
 
 export const MAX_CONSOLE_LINES = 400;
 
@@ -36,6 +37,7 @@ export class Session {
 
   async load(): Promise<void> {
     if (!inTauri) {
+      if (sampleMode) this.info = await sampleAppInfo();
       this.loaded = true;
       return;
     }
@@ -75,6 +77,11 @@ export class Session {
   }
 
   async save(patch: Partial<Settings>): Promise<void> {
+    if (!inTauri) {
+      // The browser preview keeps settings for this page only.
+      this.settings = { ...this.settings, ...patch };
+      return;
+    }
     this.settings = await api.saveSettings({ ...this.settings, ...patch });
   }
 

@@ -12,6 +12,7 @@ import type {
   Preflight,
   Recorded,
   SessionAction,
+  SessionFileText,
   Settings,
   Status,
 } from "./types";
@@ -41,6 +42,12 @@ export const api = {
   sessionActivity: () => invoke<Activity>("session_activity"),
   backupSaves: (from: string, to: string) => invoke<BackupReport>("backup_saves", { from, to }),
   appInfo: () => invoke<AppInfo>("app_info"),
+  /** `profile --json` for the active save, or the account named. */
+  profile: (accountId: string | null = null) => invoke<CliResult>("profile", { accountId }),
+  profileList: () => invoke<CliResult>("profile_list"),
+  sessions: () => invoke<CliResult>("sessions"),
+  sessionFile: (id: string, name: string) => invoke<SessionFileText>("session_file", { id, name }),
+  openSessionFolder: (id: string) => invoke<void>("open_session_folder", { id }),
 };
 
 export async function pickFolder(title: string): Promise<string | null> {

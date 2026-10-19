@@ -9,15 +9,22 @@
     view,
     onNavigate,
     driverName,
+    subline = null,
+    avatar = null,
     online = false,
     showNav = true,
   }: {
     view: View;
     onNavigate: (view: View) => void;
     driverName: string;
+    /** "REP 18 · $250,000" from the save; nothing without the profile. */
+    subline?: string | null;
+    avatar?: string | null;
     online?: boolean;
     showNav?: boolean;
   } = $props();
+  const COLORS = ["style", "speed", "build", "crew", "outlaw", "peach"];
+  let fill = $derived(COLORS.includes(avatar ?? "") ? `var(--${avatar})` : "var(--style)");
 
   const items: { id: View; label: string; dot?: string }[] = NAV;
 </script>
@@ -34,10 +41,12 @@
   {/if}
   <div class="profile ah-glass">
     {#if showNav}
-      <span class="avatar" class:online>{initials(driverName)}</span>
+      <span class="avatar" class:online style="background: {fill}" aria-hidden="true"
+        >{initials(driverName)}</span
+      >
       <span class="who">
         <span class="name">{driverName}</span>
-        <span class="t-data-small sub">REP [LEVEL]</span>
+        {#if subline}<span class="t-data-small sub">{subline}</span>{/if}
       </span>
     {/if}
     <WindowControls />
@@ -78,7 +87,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--style);
     color: var(--on-ink);
     font-weight: 800;
     font-size: 13px;

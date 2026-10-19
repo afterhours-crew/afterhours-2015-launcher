@@ -4,8 +4,9 @@
   let {
     lines,
     empty,
+    title = "Log",
     onOpenFolder,
-  }: { lines: OutputLine[]; empty: string; onOpenFolder?: () => void } = $props();
+  }: { lines: OutputLine[]; empty: string; title?: string; onOpenFolder?: () => void } = $props();
   let element: HTMLDivElement | undefined = $state();
   $effect(() => {
     void lines.length;
@@ -22,9 +23,9 @@
   };
 </script>
 
-<section class="log" aria-label="Log">
+<section class="log" aria-label={title}>
   <div class="head">
-    <h2 class="t-label">Log</h2>
+    <h2 class="t-label">{title}</h2>
     {#if onOpenFolder}<button type="button" class="t-data-small link" onclick={onOpenFolder}
         >Open folder</button
       >{/if}

@@ -4,6 +4,35 @@
 
 export type { State as SessionState, Status, StatusReport } from "./generated/status";
 export type { Preflight } from "./generated/check";
+export type { VersionReport } from "./generated/version";
+export type {
+  Car,
+  CarLocation,
+  CarSummary,
+  Cell,
+  Columns,
+  Counts,
+  Profile,
+  Reputation,
+  Save,
+} from "./generated/profile";
+export type { ProfileEntry, ProfileList } from "./generated/profile-list";
+export type {
+  CrashDump,
+  ServerLog,
+  SessionFile,
+  SessionList,
+  SessionSummary,
+  UnsupportedRoute,
+} from "./generated/sessions";
+
+/** One session file as the log viewer reads it (src-tauri/src/reads.rs). */
+export interface SessionFileText {
+  name: string;
+  bytes: number;
+  text: string;
+  truncated: boolean;
+}
 
 export type CliResult =
   { kind: "ok"; value: unknown } | { kind: "error"; exit: number; message: string };
