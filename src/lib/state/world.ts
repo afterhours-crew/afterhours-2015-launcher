@@ -97,23 +97,60 @@ export function applyChoice(
     : { ...report, rival_limit: args[1] === "original" ? null : Number(args[1]) };
 }
 
-/** Why the controls are locked: a session keeps the values it started with. */
-export function worldLock(status: Status | null): string | null {
-  return isLive(status?.state)
+/**
+ * Whether a save reaches a running session within about a second (`live`).
+ * Servers that predate it print no such field: their sessions keep the
+ * values they started with.
+ */
+export function appliesLive(report: SettingsReport | null): boolean {
+  return report?.live === true;
+}
+
+/** Whether a rival count above the game's own adds rivals; `false` when the server does not say. */
+export function rivalsAboveOriginal(report: SettingsReport | null): boolean {
+  return report?.rivals_above_original === true;
+}
+
+/**
+ * Why the controls are locked: on a server without live changes, a running
+ * session keeps the values it started with. A live server never locks.
+ */
+export function worldLock(status: Status | null, report: SettingsReport | null): string | null {
+  return isLive(status?.state) && !appliesLive(report)
     ? "Applies the next time you start. Stop the server to change it."
     : null;
 }
 
+/** When changes take effect, for the view's caption. */
+export function worldTiming(report: SettingsReport | null): string {
+  return appliesLive(report)
+    ? "Your server's city. Changes apply within a few seconds, even while you play."
+    : "Your server's city. Changes apply the next time you start.";
+}
+
+/** The rivals info text: what the number does on this server. */
+export function rivalHelp(report: SettingsReport | null): string {
+  const base = `The most roaming rivals at once, from 0 (off) to ${MAX_RIVALS}. Auto keeps the game's own number.`;
+  return rivalsAboveOriginal(report)
+    ? `${base} Above it, other rivals from the game join near you.`
+    : `${base} For now your server can only lower that number; more rivals than the game's own is coming in a future update.`;
+}
+
 /**
- * What the World view's coming note lists. Without the server's
- * `world-settings`, the traffic and rival settings themselves; with it,
- * what they cannot do yet. Cops always: they need research first.
+ * What the World view's coming note lists, or `null` when at most one thing
+ * is coming: that one already carries its own pill (Cops). Without the
+ * server's `world-settings`, the traffic and rival settings themselves;
+ * with it, what they cannot do yet. Cops always: they need research first.
  */
-export function worldUpcoming(capabilityReported: boolean, report: SettingsReport | null): string {
+export function worldUpcoming(
+  capabilityReported: boolean,
+  report: SettingsReport | null,
+): string | null {
   if (!capabilityReported)
     return listSentence(["traffic settings", "roaming rival settings", "cops"]);
   const items: string[] = [];
   if (!report || trafficUpcoming(report)) items.push("traffic up to 5x");
-  items.push("more roaming rivals than the game's own", "cops");
-  return listSentence(items);
+  if (!rivalsAboveOriginal(report)) items.push("more roaming rivals than the game's own");
+  items.push("cops");
+  return items.length > 1 ? listSentence(items) : null;
 }

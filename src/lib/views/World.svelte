@@ -15,21 +15,30 @@
   import { featureReady } from "$lib/state/capabilities";
   import { current, records } from "$lib/state/records.svelte";
   import { session } from "$lib/state/session.svelte";
-  import { MAX_RIVALS, rivalField, trafficRow, worldLock, worldUpcoming } from "$lib/state/world";
+  import {
+    rivalField,
+    rivalHelp,
+    trafficRow,
+    worldLock,
+    worldTiming,
+    worldUpcoming,
+  } from "$lib/state/world";
 
   // World (H5), one column. Traffic is a multiple of the game's own amount
-  // and roaming rivals a number, saved with the server's `settings` command
-  // for the next session; a running session keeps the values it started
-  // with, so the controls rest while one runs. Whatever is planned but not
-  // usable yet stays in view, marked as coming in a future update: traffic
-  // steps above the server's limit, cops, and without the server's
+  // and roaming rivals a number, saved with the server's `settings` command.
+  // A server that reports `live` applies a save to the running session
+  // within about a second; an older one keeps the values a session started
+  // with, so there the controls rest while one runs. Whatever is planned but
+  // not usable yet stays in view, marked as coming in a future update:
+  // traffic steps above the server's limit, cops, and without the server's
   // `world-settings` the traffic and rival rows themselves.
   let reported = $derived(featureReady(session.info?.server, "traffic"));
   let load = $derived(records.world);
   let world = $derived(current(load));
   let traffic = $derived(world ? trafficRow(world) : null);
   let rivals = $derived(world ? rivalField(world) : null);
-  let locked = $derived(worldLock(session.status));
+  let locked = $derived(worldLock(session.status, world));
+  let upcoming = $derived(worldUpcoming(reported, world));
   let failure = $state<string | null>(null);
 
   $effect(() => {
@@ -46,9 +55,7 @@
     <span class="title" data-enter>
       <h1 class="t-view-title">World</h1>
       <span class="t-caption"
-        >{reported
-          ? "Your server's city. Changes apply the next time you start."
-          : "Your server's city: traffic, rivals and cops."}</span
+        >{reported ? worldTiming(world) : "Your server's city: traffic, rivals and cops."}</span
       >
     </span>
 
@@ -86,10 +93,7 @@
           <IconSwords size={20} stroke={1.6} aria-hidden="true" class="icon" />
           <span class="grow name"
             ><span class="t-body-strong">Roaming rivals</span>
-            <InfoButton
-              label="About roaming rivals"
-              text="The most roaming rivals at once, from 0 (off) to {MAX_RIVALS}. Auto keeps the game's own number. For now your server can only lower that number; more rivals than the game's own is coming in a future update."
-            /></span
+            <InfoButton label="About roaming rivals" text={rivalHelp(world)} /></span
           >
           {#if rivals}
             <span class="rivals">
@@ -125,7 +129,7 @@
       {/if}
     {/if}
 
-    <div data-enter><ViewNote>{worldUpcoming(reported, world)}</ViewNote></div>
+    {#if upcoming}<div data-enter><ViewNote>{upcoming}</ViewNote></div>{/if}
   </div>
 </main>
 

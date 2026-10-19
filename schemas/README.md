@@ -47,13 +47,21 @@ stays in `vehicle.label`).
 | `status.schema.json`       | `status --json`: `{"version":1,"session":<status or null>}`               |
 
 The pinned v0.3.0 has none of the first four commands and reports no capabilities,
-so with it the app shows Profile, Cars, Save data and Logs as "Coming
-later", and `pnpm contract` skips their cases while the schemas are
+so with it the app shows Profile, Cars, Save data and Logs as "Coming in
+a future update", and `pnpm contract` skips their cases while the schemas are
 vendored and the server predates them. Against a local build of bec370d
 (`AFTERHOURS_EXE=<its Afterhours.exe> node scripts/contract.mjs`) all 10
 cases pass with these schemas, `status` among them (7 against v0.3.0),
 and that build's `profile --json` on a real save validates against
 `profile.schema.json`.
+
+`settings.schema.json` comes from afterhours-2015 `feature/ai-amounts`
+077b812 (2026-10-19): up to 500 % traffic, up to 15 rivals, and two new
+fields. `rivals_above_original` says a count above the game's own adds
+rivals. `live` says a running session applies a save within about a second.
+Earlier development builds such as 0bad8f6 print neither, so the app treats
+a missing field as `false`; `pnpm contract` validates against this schema
+and so expects them.
 
 `server-pin.json` records `"schemas": "vendored"` while that holds. The first
 pin bump to a release that attaches schemas (`*.schema.json` assets or an

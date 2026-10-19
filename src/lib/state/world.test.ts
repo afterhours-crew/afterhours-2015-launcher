@@ -2,25 +2,48 @@ import { describe, expect, it } from "vitest";
 import type { SettingsReport, Status } from "$lib/api/types";
 import {
   MAX_RIVALS,
+  appliesLive,
   applyChoice,
   rivalField,
+  rivalHelp,
+  rivalsAboveOriginal,
   saveArgs,
   trafficRow,
   trafficUpcoming,
   worldLock,
+  worldTiming,
   worldUpcoming,
 } from "./world";
 
+/** A record from a server without live changes or extra rivals (0bad8f6's limits). */
 const report = (patch: Partial<SettingsReport> = {}): SettingsReport => ({
   version: 1,
   traffic_percent: 100,
   rival_limit: null,
   max_traffic_percent: 300,
   max_rivals: 128,
+  rivals_above_original: false,
+  live: false,
   file: "C:\\Users\\Driver\\AppData\\Local\\Afterhours2015\\settings.json",
   saved: false,
   ...patch,
 });
+
+/** A record from a server with live changes, 5x traffic and up to 15 rivals (077b812). */
+const liveReport = (patch: Partial<SettingsReport> = {}): SettingsReport =>
+  report({
+    max_traffic_percent: 500,
+    max_rivals: 15,
+    rivals_above_original: true,
+    live: true,
+    ...patch,
+  });
+
+/** What an older server prints: neither field. */
+const older = (): SettingsReport => {
+  const { live: _live, rivals_above_original: _above, ...rest } = report();
+  return rest as SettingsReport;
+};
 
 describe("traffic", () => {
   it("shows Off to 5x, with the steps above the server's maximum coming later", () => {
@@ -107,19 +130,56 @@ describe("saving", () => {
 
 describe("while a session runs", () => {
   const status = (state: Status["state"]) => ({ state }) as Status;
+  const running = ["preparing", "starting", "activation", "ready", "stopping"] as const;
 
-  it("locks both controls: a session keeps the values it started with", () => {
-    for (const state of ["preparing", "starting", "activation", "ready", "stopping"] as const) {
-      expect(worldLock(status(state))).toBe(
-        "Applies the next time you start. Stop the server to change it.",
-      );
+  it("locks both controls on a server whose sessions keep their starting values", () => {
+    for (const state of running) {
+      for (const record of [report(), older(), null]) {
+        expect(worldLock(status(state), record)).toBe(
+          "Applies the next time you start. Stop the server to change it.",
+        );
+      }
     }
   });
 
+  it("never locks on a live server: a save reaches the running session", () => {
+    for (const state of running) expect(worldLock(status(state), liveReport())).toBeNull();
+  });
+
   it("unlocks when nothing runs", () => {
-    expect(worldLock(null)).toBeNull();
-    expect(worldLock(status("finished"))).toBeNull();
-    expect(worldLock(status("failed"))).toBeNull();
+    expect(worldLock(null, report())).toBeNull();
+    expect(worldLock(status("finished"), report())).toBeNull();
+    expect(worldLock(status("failed"), report())).toBeNull();
+  });
+});
+
+describe("what this server can do", () => {
+  it("treats fields an older server does not print as false", () => {
+    expect(appliesLive(older())).toBe(false);
+    expect(rivalsAboveOriginal(older())).toBe(false);
+    expect(appliesLive(null)).toBe(false);
+    expect(appliesLive(liveReport())).toBe(true);
+    expect(rivalsAboveOriginal(liveReport())).toBe(true);
+  });
+
+  it("says when changes apply", () => {
+    expect(worldTiming(liveReport())).toBe(
+      "Your server's city. Changes apply within a few seconds, even while you play.",
+    );
+    expect(worldTiming(report())).toBe(
+      "Your server's city. Changes apply the next time you start.",
+    );
+    expect(worldTiming(null)).toBe("Your server's city. Changes apply the next time you start.");
+  });
+
+  it("explains the rival number for what the server does with it", () => {
+    expect(rivalHelp(liveReport())).toContain("other rivals from the game join near you");
+    expect(rivalHelp(report())).toContain("coming in a future update");
+  });
+
+  it("offers 5x and up to 15 rivals when the server allows them", () => {
+    expect(trafficRow(liveReport()).options.some((o) => o.upcoming)).toBe(false);
+    expect(rivalField(liveReport())).toEqual({ value: null, max: 15 });
   });
 });
 
@@ -135,5 +195,9 @@ describe("the World view's coming note", () => {
     expect(worldUpcoming(true, report({ max_traffic_percent: 500 }))).toBe(
       "More roaming rivals than the game's own and cops.",
     );
+  });
+
+  it("gives no note when only Cops is coming: its row already says so", () => {
+    expect(worldUpcoming(true, liveReport())).toBeNull();
   });
 });
