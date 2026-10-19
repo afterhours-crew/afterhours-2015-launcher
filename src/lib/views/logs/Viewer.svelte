@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { staggerIn } from "$lib/motion";
   import { untrack } from "svelte";
   import Field from "$lib/components/Field.svelte";
   import Glass from "$lib/components/Glass.svelte";
@@ -123,7 +124,7 @@
   };
 </script>
 
-<div class="layout">
+<div class="layout" use:staggerIn>
   <Glass dense radius="phone" label="Log files" class="files">
     <PillButton variant="text" onclick={() => router.go("logs", "sessions")}
       >Back to logs</PillButton
@@ -208,7 +209,7 @@
         bind:value={query}
       />
 
-      <div class="lines" role="list" aria-label="Log lines">
+      <div class="lines" role="list" aria-label="Log lines" use:staggerIn={{ selector: ".item" }}>
         {#each visible.slice(0, limit) as row (row.line.index)}
           {@const line = row.line}
           <div role="listitem" class="item" class:picked={picked === line.index}>

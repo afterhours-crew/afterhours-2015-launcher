@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { staggerIn } from "$lib/motion";
   import ComingLater from "$lib/components/ComingLater.svelte";
   import { hasCapability } from "$lib/state/capabilities";
   import { session } from "$lib/state/session.svelte";
@@ -7,7 +8,7 @@
   let ready = $derived(hasCapability(session.info?.server, "map"));
 </script>
 
-<main>
+<main use:staggerIn>
   <ComingLater
     title="Map"
     track="Track 7 · live map · waits for the current server milestone"

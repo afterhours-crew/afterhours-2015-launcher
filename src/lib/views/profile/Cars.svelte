@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { staggerIn } from "$lib/motion";
   import type { Car, Profile } from "$lib/api/types";
   import Field from "$lib/components/Field.svelte";
   import Glass from "$lib/components/Glass.svelte";
@@ -41,7 +42,7 @@
   ];
 </script>
 
-<div class="layout">
+<div class="layout" use:staggerIn>
   <Glass dense radius="panel" label="Cars" class="list-panel">
     <div class="head">
       <span class="t-label crumb">Profile / Cars</span>
@@ -70,7 +71,7 @@
         </div>
       </div>
 
-      <div class="table" role="group" aria-label="Car list">
+      <div class="table" role="group" aria-label="Car list" use:staggerIn={{ selector: ".pick" }}>
         <div class="row header">
           {#each columns as column (column.label)}
             {#if column.sort}

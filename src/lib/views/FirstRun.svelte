@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { staggerIn } from "$lib/motion";
   import { untrack } from "svelte";
   import { api, inTauri, pickFolder, preflightFromResult } from "$lib/api/tauri";
   import type { Preflight } from "$lib/api/types";
@@ -130,7 +131,7 @@
   );
 </script>
 
-<main>
+<main use:staggerIn>
   <section class="card ah-glass" aria-label="Setup">
     <ol class="steps" aria-label="Steps">
       {#each steps as label, i (label)}

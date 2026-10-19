@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { staggerIn } from "$lib/motion";
   import type { Glyph as Icon } from "$lib/components/glyph";
   import IconDeviceGamepad2 from "@tabler/icons-svelte/icons/device-gamepad-2";
   import IconFileDescription from "@tabler/icons-svelte/icons/file-description";
@@ -82,7 +83,7 @@
   }
 </script>
 
-<div class="layout">
+<div class="layout" use:staggerIn>
   <Glass dense radius="panel" label="Logs" class="panel">
     <div class="head">
       <span class="title">
@@ -138,7 +139,7 @@
       </div>
       {#each shown.warnings as warning (warning)}<Note>{warning}</Note>{/each}
 
-      <section class="group" aria-labelledby="start-here">
+      <section class="group" aria-labelledby="start-here" use:staggerIn={{ selector: ".card" }}>
         <div class="group-head">
           <h2 id="start-here" class="t-panel-title">Start here</h2>
           <span class="caption">Read these first when something goes wrong.</span>
@@ -221,7 +222,7 @@
         </div>
       </section>
 
-      <section class="group" aria-labelledby="when-breaks">
+      <section class="group" aria-labelledby="when-breaks" use:staggerIn={{ selector: ".file" }}>
         <div class="group-head">
           <h2 id="when-breaks" class="t-panel-title">When something breaks</h2>
           <span class="caption">The full story, for when the warnings aren't enough.</span>
@@ -239,7 +240,7 @@
               <span class="caption">{entry.about}</span>
               {#if entry.names.includes("server.stderr.log") && shares.length > 0}
                 <span
-                  class="levels"
+                  class="levels grow-x"
                   role="img"
                   aria-label={shares.map((s) => `${formatCount(s.count)} ${s.level}`).join(", ")}
                 >

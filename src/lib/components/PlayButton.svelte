@@ -38,7 +38,6 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
     text-shadow: none;
-    transition: filter 160ms ease-out;
   }
   .play.long {
     font-size: 18px;

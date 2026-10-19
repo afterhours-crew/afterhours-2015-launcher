@@ -1,6 +1,8 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import ComingLater from "$lib/components/ComingLater.svelte";
+  import Stage from "$lib/components/Stage.svelte";
+  import { slidingIndicator, staggerIn } from "$lib/motion";
   import Note from "$lib/components/Note.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
   import { featureReady } from "$lib/state/capabilities";
@@ -30,7 +32,11 @@
 
 <main>
   {#if section !== "edit-driver"}
-    <nav aria-label="Profile" class="tabs ah-glass">
+    <nav
+      aria-label="Profile"
+      class="tabs ah-glass slider"
+      use:slidingIndicator={{ selector: '[aria-current="page"]' }}
+    >
       {#each tabs as id (id)}
         <button
           type="button"
@@ -42,58 +48,63 @@
     </nav>
   {/if}
 
-  {#if section === "edit-driver"}
-    <EditDriver {profile} {ready} />
-  {:else if !ready}
-    <div class="center">
-      {#if section === "cars"}
-        <ComingLater title="Cars" track="Needs the server's profile command (contract v1)">
-          <p>
-            Every car you own, in the garage and in the warehouse, with its parts and sale value.
-          </p>
-          <p>Your server does not report its profile yet. It arrives with a server update.</p>
-        </ComingLater>
-      {:else if section === "save-data"}
-        <ComingLater title="Save data" track="Needs the server's profile command (contract v1)">
-          <p>What your save holds, table by table, read without changing it.</p>
-          <p>Your server does not report its profile yet. It arrives with a server update.</p>
-        </ComingLater>
-      {:else}
-        <ComingLater title="Profile" track="Needs the server's profile command (contract v1)">
-          <p>Your driver as your save records it: REP, bank, cars and stats.</p>
-          <p>Your server does not report its profile yet. It arrives with a server update.</p>
-          <div class="actions">
-            <PillButton onclick={() => router.go("profile", "edit-driver")}>Edit driver</PillButton>
-          </div>
-        </ComingLater>
-      {/if}
-    </div>
-  {:else if section === "save-data"}
-    <SaveData />
-  {:else if !profile}
-    <div class="center">
-      {#if load.kind === "error"}
-        <Note kind="warn">Could not read your save: {load.message}</Note>
-        <PillButton onclick={() => records.loadProfile()}>Try again</PillButton>
-      {:else}
-        <p class="status">Reading your save…</p>
-      {/if}
-    </div>
-  {:else}
-    {#if load.kind === "error"}
-      <div class="note"><Note kind="warn">Showing the last read. {load.message}</Note></div>
-    {/if}
-    {#if profile.warnings.length > 0}
-      <div class="note">
-        <Note>{profile.warnings.join(" ")}</Note>
+  <!-- The sub-views crossfade; their panels fade in one by one. -->
+  <Stage key={section} flow>
+    {#if section === "edit-driver"}
+      <EditDriver {profile} {ready} />
+    {:else if !ready}
+      <div class="center" use:staggerIn>
+        {#if section === "cars"}
+          <ComingLater title="Cars" track="Needs the server's profile command (contract v1)">
+            <p>
+              Every car you own, in the garage and in the warehouse, with its parts and sale value.
+            </p>
+            <p>Your server does not report its profile yet. It arrives with a server update.</p>
+          </ComingLater>
+        {:else if section === "save-data"}
+          <ComingLater title="Save data" track="Needs the server's profile command (contract v1)">
+            <p>What your save holds, table by table, read without changing it.</p>
+            <p>Your server does not report its profile yet. It arrives with a server update.</p>
+          </ComingLater>
+        {:else}
+          <ComingLater title="Profile" track="Needs the server's profile command (contract v1)">
+            <p>Your driver as your save records it: REP, bank, cars and stats.</p>
+            <p>Your server does not report its profile yet. It arrives with a server update.</p>
+            <div class="actions">
+              <PillButton onclick={() => router.go("profile", "edit-driver")}
+                >Edit driver</PillButton
+              >
+            </div>
+          </ComingLater>
+        {/if}
       </div>
-    {/if}
-    {#if section === "cars"}
-      <Cars {profile} />
+    {:else if section === "save-data"}
+      <SaveData />
+    {:else if !profile}
+      <div class="center" use:staggerIn>
+        {#if load.kind === "error"}
+          <Note kind="warn">Could not read your save: {load.message}</Note>
+          <PillButton onclick={() => records.loadProfile()}>Try again</PillButton>
+        {:else}
+          <p class="status">Reading your save…</p>
+        {/if}
+      </div>
     {:else}
-      <Overview {profile} />
+      {#if load.kind === "error"}
+        <div class="note"><Note kind="warn">Showing the last read. {load.message}</Note></div>
+      {/if}
+      {#if profile.warnings.length > 0}
+        <div class="note">
+          <Note>{profile.warnings.join(" ")}</Note>
+        </div>
+      {/if}
+      {#if section === "cars"}
+        <Cars {profile} />
+      {:else}
+        <Overview {profile} />
+      {/if}
     {/if}
-  {/if}
+  </Stage>
 </main>
 
 <style>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { staggerIn } from "$lib/motion";
   import IconMessageCircle from "@tabler/icons-svelte/icons/message-circle";
   import Clock from "$lib/components/Clock.svelte";
   import Glass from "$lib/components/Glass.svelte";
@@ -29,8 +30,8 @@
   );
 </script>
 
-<main>
-  <section class="floor ah-on-art" aria-label="Tonight">
+<main use:staggerIn>
+  <section class="floor ah-on-art" aria-label="Tonight" data-enter>
     <span class="eyebrow">Your server · Ventura Bay</span>
     <Clock />
     <span class="caption">Tonight on your server.</span>

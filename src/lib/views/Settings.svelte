@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { staggerIn } from "$lib/motion";
   import Glass from "$lib/components/Glass.svelte";
+  import Stage from "$lib/components/Stage.svelte";
   import { router } from "$lib/state/router.svelte";
   import { SECTION_LABELS, SECTIONS } from "$lib/state/routes";
   import About from "./settings/About.svelte";
@@ -9,7 +11,7 @@
   let section = $derived(router.route.section ?? "general");
 </script>
 
-<main>
+<main use:staggerIn>
   <Glass dense radius="card" label="Settings sections" class="sections">
     <nav aria-label="Settings">
       {#each SECTIONS.settings as id (id)}
@@ -23,13 +25,15 @@
     </nav>
   </Glass>
   <div class="content">
-    {#if section === "updates"}
-      <Updates />
-    {:else if section === "about"}
-      <About />
-    {:else}
-      <General />
-    {/if}
+    <Stage key={section ?? "general"} flow>
+      {#if section === "updates"}
+        <Updates />
+      {:else if section === "about"}
+        <About />
+      {:else}
+        <General />
+      {/if}
+    </Stage>
   </div>
 </main>
 
@@ -72,6 +76,9 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
+    gap: var(--space-4);
+  }
+  .content :global(.scene) {
     gap: var(--space-4);
   }
   .content :global(.panel) {

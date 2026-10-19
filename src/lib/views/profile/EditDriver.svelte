@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { staggerIn } from "$lib/motion";
   import type { Profile } from "$lib/api/types";
   import Applies from "$lib/components/Applies.svelte";
   import Avatar from "$lib/components/Avatar.svelte";
@@ -48,7 +49,7 @@
   }
 </script>
 
-<div class="layout">
+<div class="layout" use:staggerIn>
   <Glass dense radius="panel" label="Driver" class="panel">
     <div class="head">
       <h1 class="t-view-title">Driver</h1>

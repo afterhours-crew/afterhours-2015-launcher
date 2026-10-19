@@ -6,6 +6,8 @@
   import HeaderPlay from "$lib/components/HeaderPlay.svelte";
   import LaunchBar from "$lib/components/LaunchBar.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
+  import Stage from "$lib/components/Stage.svelte";
+  import { toastIn } from "$lib/motion";
   import UpdateBanner from "$lib/components/UpdateBanner.svelte";
   import { detectPlatform, isLive, launchBarModel } from "$lib/state/launchbar";
   import { sampleMode } from "$lib/state/preview";
@@ -92,7 +94,7 @@
   </Header>
 
   {#if !inTauri}
-    <p class="banner">
+    <p class="banner" in:toastIn>
       {#if sampleMode}
         Sample data · browser preview only. Nothing here comes from a real save or session.
       {:else}
@@ -103,10 +105,10 @@
     </p>
   {/if}
   {#if session.error}
-    <p class="banner warn">{session.error}</p>
+    <p class="banner warn" in:toastIn>{session.error}</p>
   {/if}
   {#if session.closeBlocked}
-    <div class="banner warn row">
+    <div class="banner warn row" in:toastIn>
       <span
         >A session is running. Stop it before closing the launcher: closing now would end your game.</span
       >
@@ -114,13 +116,13 @@
     </div>
   {/if}
   {#if !firstRun && notice}
-    <div class="banner row">
+    <div class="banner row" in:toastIn>
       <span>{notice}</span>
       <PillButton variant="text" onclick={() => (noticeDismissed = true)}>OK</PillButton>
     </div>
   {/if}
   {#if !firstRun && updater.bannerVisible}
-    <UpdateBanner />
+    <div in:toastIn><UpdateBanner /></div>
   {/if}
 
   {#if firstRun}
@@ -129,21 +131,25 @@
       Community preservation project. Not affiliated with Electronic Arts or Ghost Games.
     </p>
   {:else}
-    {#if view === "garage"}
-      <Garage />
-    {:else if view === "profile"}
-      <Profile />
-    {:else if view === "world"}
-      <World />
-    {:else if view === "map"}
-      <MapView />
-    {:else if view === "host"}
-      <Host />
-    {:else if view === "logs"}
-      <Logs />
-    {:else}
-      <Settings />
-    {/if}
+    <!-- Changing view: the old one fades out, the new one rises 8px as its
+         panels fade in (Stage, staggerIn). -->
+    <Stage key={view} rise={8}>
+      {#if view === "garage"}
+        <Garage />
+      {:else if view === "profile"}
+        <Profile />
+      {:else if view === "world"}
+        <World />
+      {:else if view === "map"}
+        <MapView />
+      {:else if view === "host"}
+        <Host />
+      {:else if view === "logs"}
+        <Logs />
+      {:else}
+        <Settings />
+      {/if}
+    </Stage>
     <!-- The full launch bar sits on the Garage home's floor only; every other
          view runs to the window's edge and has the compact Play in the header. -->
     {#if view === "garage"}<LaunchBar {model} {onPlay} />{/if}

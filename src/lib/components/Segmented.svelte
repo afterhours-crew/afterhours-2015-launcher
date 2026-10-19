@@ -1,4 +1,5 @@
 <script lang="ts" generics="T extends string">
+  import { slidingIndicator } from "$lib/motion";
   // Pick one of two to four options. Real radio buttons in a group, so the
   // arrow keys move between them; 38px targets.
   let {
@@ -39,7 +40,13 @@
   }
 </script>
 
-<div role="radiogroup" aria-label={label} aria-disabled={disabled || undefined} class="seg">
+<div
+  role="radiogroup"
+  aria-label={label}
+  aria-disabled={disabled || undefined}
+  class="seg slider"
+  use:slidingIndicator={{ selector: '[aria-checked="true"]' }}
+>
   {#each options as option, i (option.value)}
     <button
       type="button"

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { staggerIn } from "$lib/motion";
   import { inTauri } from "$lib/api/tauri";
   import Glass from "$lib/components/Glass.svelte";
   import LogPanel from "$lib/components/LogPanel.svelte";
@@ -31,8 +32,8 @@
   }
 </script>
 
-<main>
-  <div class="console">
+<main use:staggerIn>
+  <div class="console" data-enter>
     <LogPanel
       title="Server log"
       lines={session.console}

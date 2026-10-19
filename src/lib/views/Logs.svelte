@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { staggerIn } from "$lib/motion";
   import { untrack } from "svelte";
   import ComingLater from "$lib/components/ComingLater.svelte";
+  import Stage from "$lib/components/Stage.svelte";
   import LogPanel from "$lib/components/LogPanel.svelte";
   import Note from "$lib/components/Note.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
@@ -27,8 +29,8 @@
 
 <main>
   {#if !ready}
-    <div class="split">
-      <div class="console">
+    <div class="split" use:staggerIn>
+      <div class="console" data-enter>
         <LogPanel
           lines={session.console}
           empty={running
@@ -50,7 +52,7 @@
       </aside>
     </div>
   {:else if !list}
-    <div class="center">
+    <div class="center" use:staggerIn>
       {#if records.sessions.kind === "error"}
         <Note kind="warn">Could not list the sessions: {records.sessions.message}</Note>
         <PillButton onclick={() => records.loadSessions()}>Try again</PillButton>
@@ -58,10 +60,10 @@
         <p class="status">Reading the session folders…</p>
       {/if}
     </div>
-  {:else if viewer}
-    <Viewer />
   {:else}
-    <Sessions {list} />
+    <Stage key={viewer ? "viewer" : "sessions"} flow>
+      {#if viewer}<Viewer />{:else}<Sessions {list} />{/if}
+    </Stage>
   {/if}
 </main>
 

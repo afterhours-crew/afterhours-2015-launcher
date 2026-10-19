@@ -68,7 +68,6 @@
     font-size: 13px;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    transition: filter 160ms ease-out;
   }
   .play {
     background: var(--play);

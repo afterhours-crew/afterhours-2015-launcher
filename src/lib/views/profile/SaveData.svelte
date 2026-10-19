@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { staggerIn } from "$lib/motion";
   import { untrack } from "svelte";
   import { api } from "$lib/api/tauri";
   import Avatar from "$lib/components/Avatar.svelte";
@@ -50,12 +51,17 @@
   }
 </script>
 
-<div class="layout">
+<div class="layout" use:staggerIn>
   <aside>
     <Glass dense radius="phone" label="Drivers on this PC" class="drivers">
       <h2 class="t-panel-title">Drivers on this PC</h2>
       {#if list}
-        <div role="radiogroup" aria-label="Driver" class="list">
+        <div
+          role="radiogroup"
+          aria-label="Driver"
+          class="list"
+          use:staggerIn={{ selector: ".pick" }}
+        >
           {#each list.accounts as account (account.account_id)}
             <button
               type="button"
@@ -133,7 +139,7 @@
       {#if profile.warnings.length > 0}<Note>{profile.warnings.join(" ")}</Note>{/if}
 
       <div class="split">
-        <div class="tables" role="group" aria-label="Tables">
+        <div class="tables" role="group" aria-label="Tables" use:staggerIn={{ selector: ".pick" }}>
           {#each ["Progress", "Account"] as group (group)}
             {@const rows = entries.filter((e) => e.group === group)}
             {#if rows.length > 0}

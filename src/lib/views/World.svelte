@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { staggerIn } from "$lib/motion";
   import type { Glyph as Icon } from "$lib/components/glyph";
   import Glass from "$lib/components/Glass.svelte";
   import IconBuildingWarehouse from "@tabler/icons-svelte/icons/building-warehouse";
@@ -28,7 +29,7 @@
   let waits = $derived(worldWaits(reported));
 </script>
 
-<main>
+<main use:staggerIn>
   <div class="cards">
     <Glass dense radius="card" label="Traffic" class="card">
       <PanelHeading icon={IconCar}>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { slidingIndicator } from "$lib/motion";
   import type { View } from "$lib/state/routes";
   let {
     current,
@@ -11,7 +12,11 @@
   } = $props();
 </script>
 
-<nav aria-label="Main" class="ah-glass flat">
+<nav
+  aria-label="Main"
+  class="ah-glass flat slider"
+  use:slidingIndicator={{ selector: '[aria-current="page"]' }}
+>
   {#each items as item (item.id)}
     <button
       type="button"

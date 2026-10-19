@@ -54,24 +54,27 @@
     border-radius: 14px;
     border: 1px solid rgba(255, 255, 255, 0.3);
     background: var(--field);
-    transition: background 160ms ease-out;
   }
   .track.on {
-    justify-content: flex-end;
-    border-color: transparent;
+    border-color: rgba(255, 255, 255, 0);
     background: var(--crew);
   }
   .track:disabled {
     opacity: 0.5;
     cursor: default;
   }
+  /* The knob slides across rather than jumping. */
   .knob {
     width: 20px;
     height: 20px;
     border-radius: 50%;
     background: var(--ink-faint);
+    transition:
+      transform var(--motion-base) var(--ease-out),
+      background-color var(--motion-base) var(--ease-out);
   }
   .on .knob {
+    transform: translateX(20px);
     background: var(--on-ink);
   }
 </style>

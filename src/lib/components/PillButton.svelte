@@ -26,7 +26,6 @@
     font-size: 13px;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    transition: background 160ms ease-out;
   }
   .solid {
     background: var(--ink);

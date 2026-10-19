@@ -154,6 +154,8 @@ export interface StatTile {
   stored: boolean;
   /** A resolved name, for `FavoriteVehicleId` when it is one of the cars. */
   name: string | null;
+  /** The number to count up to; `null` for IDs and missing cells. */
+  raw: number | null;
 }
 
 /** Every column of one single-row table, in the server's order. */
@@ -176,6 +178,7 @@ export function tableTiles(columns: Columns | undefined, cars: Car[] | null = nu
         : "not in this save's schema",
       stored: cell?.stored ?? false,
       name,
+      raw: cell && !column.endsWith("Id") ? cell.value : null,
     };
   });
 }

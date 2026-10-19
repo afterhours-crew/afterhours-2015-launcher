@@ -1,4 +1,8 @@
 <script lang="ts">
+  import CountUp from "$lib/components/CountUp.svelte";
+  import { staggerIn } from "$lib/motion";
+  import { formatCount, formatMoney } from "$lib/state/format";
+  import { staggerDelay } from "$lib/state/motion";
   import type { Profile } from "$lib/api/types";
   import Avatar from "$lib/components/Avatar.svelte";
   import Glass from "$lib/components/Glass.svelte";
@@ -35,7 +39,7 @@
   let save = $derived(saveFacts(profile.save, now));
 </script>
 
-<div class="layout">
+<div class="layout" use:staggerIn>
   <div class="main">
     <Glass dense radius="panel" label="Driver" class="driver">
       <div class="who">
@@ -48,11 +52,18 @@
         <div class="figures">
           <span class="figure"
             ><span class="t-label muted">REP level</span><span class="t-countdown"
-              >{card.level}</span
+              >{#if profile.reputation?.level != null}<CountUp
+                  value={profile.reputation.level}
+                  format={String}
+                />{:else}{card.level}{/if}</span
             ></span
           >
           <span class="figure"
-            ><span class="t-label muted">Bank</span><span class="t-countdown">{card.bank}</span
+            ><span class="t-label muted">Bank</span><span class="t-countdown"
+              >{#if profile.bank}<CountUp
+                  value={profile.bank.balance}
+                  format={formatMoney}
+                />{:else}{card.bank}{/if}</span
             ></span
           >
         </div>
@@ -73,7 +84,7 @@
             aria-valuemax={progress.span}
             aria-valuenow={progress.into}
           >
-            <div class="fill" style="width: {Math.round(progress.fraction * 100)}%"></div>
+            <div class="fill grow-x" style="width: {Math.round(progress.fraction * 100)}%"></div>
           </div>
         </div>
       {/if}
@@ -93,10 +104,15 @@
           <span class="t-label muted" aria-hidden="true"></span>
           <span class="t-label muted right">Score</span>
           <span class="t-label muted right">Medal</span>
-          {#each categories as row (row.key)}
+          {#each categories as row, i (row.key)}
             <span class="tag" style="background: {row.color}">{row.label}</span>
             <div class="track" aria-hidden="true">
-              <div style="width: {Math.round(row.fraction * 100)}%; background: {row.color}"></div>
+              <div
+                class="grow-x"
+                style="width: {Math.round(
+                  row.fraction * 100,
+                )}%; background: {row.color}; --grow-delay: {80 + staggerDelay(i)}ms"
+              ></div>
             </div>
             <span class="t-data right">{row.score}</span>
             <span class="t-data right soft">{row.medal}</span>
@@ -116,7 +132,7 @@
           {#snippet aside()}<span class="caption">Raw stored values · units unconfirmed</span
             >{/snippet}
         </PanelHeading>
-        <div class="tiles">
+        <div class="tiles" use:staggerIn={{ selector: ".tile" }}>
           {#each stats as tile (tile.column)}
             <div class="tile">
               <span class="t-label muted">{tile.label}</span>
@@ -124,7 +140,12 @@
                 <span class="t-body-strong">{tile.name}</span>
                 <span class="t-data-small soft">item {tile.value}</span>
               {:else}
-                <span class="t-countdown small" class:soft={!tile.stored}>{tile.value}</span>
+                <span class="t-countdown small" class:soft={!tile.stored}
+                  >{#if tile.raw !== null}<CountUp
+                      value={tile.raw}
+                      format={formatCount}
+                    />{:else}{tile.value}{/if}</span
+                >
               {/if}
               {#if !tile.stored}<span class="caption">Not saved yet · default</span>{/if}
             </div>
@@ -150,7 +171,7 @@
             <div class="column">
               <span class="t-data-small">{p.count}</span>
               <div
-                class="bar-v"
+                class="bar-v grow-y"
                 style="height: {Math.max(2, Math.round(p.fraction * 80))}px; opacity: {p.count
                   ? 0.4 + 0.6 * p.fraction
                   : 0.25}"

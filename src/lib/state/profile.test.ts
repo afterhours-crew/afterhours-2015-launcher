@@ -123,6 +123,7 @@ describe("stats", () => {
     const distance = tiles.find((t) => t.column === "DistanceDriven")!;
     expect(distance).toMatchObject({ label: "Distance driven", value: "1,284,021", stored: true });
     expect(tiles.find((t) => t.column === "TopSpeed")!.value).toBe("312");
+    expect(tiles.find((t) => t.column === "TopSpeed")!.raw).toBe(312);
     expect(tiles.find((t) => t.column === "LargestFineEscaped")!.stored).toBe(false);
   });
 
@@ -132,6 +133,8 @@ describe("stats", () => {
       "NISSAN Skyline GT-R KPGC10 (1971)",
     );
     expect(tiles.find((t) => t.column === "FavoriteVehicleId")!.value).toBe("1000001");
+    // IDs are not amounts: they never count up.
+    expect(tiles.find((t) => t.column === "FavoriteVehicleId")!.raw).toBeNull();
     const other = { FavoriteVehicleId: { value: 5, stored: true } };
     expect(tableTiles(other, SAMPLE_PROFILE.cars)[0]!.name).toBeNull();
     expect(tableTiles({ Missing: null })[0]!.value).toBe("not in this save's schema");
