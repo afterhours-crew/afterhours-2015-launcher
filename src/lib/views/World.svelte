@@ -2,7 +2,6 @@
   import { staggerIn } from "$lib/motion";
   import type { Glyph as Icon } from "$lib/components/glyph";
   import Glass from "$lib/components/Glass.svelte";
-  import IconBuildingWarehouse from "@tabler/icons-svelte/icons/building-warehouse";
   import IconCar from "@tabler/icons-svelte/icons/car";
   import IconMoon from "@tabler/icons-svelte/icons/moon";
   import IconRoad from "@tabler/icons-svelte/icons/road";
@@ -18,7 +17,7 @@
   // World (A3). Every setting here belongs to the server. Traffic, rivals
   // and presets wait for its `world-settings` capability and a command to
   // read and change them; no current value is shown until then. Cops wait
-  // for research, garage slots for a server setting.
+  // for research.
   const PRESET_ICONS: Record<(typeof PRESETS)[number]["id"], Icon> = {
     empty: IconRoad,
     cruise: IconCar,
@@ -62,20 +61,6 @@
         </span>
       </div>
       <p class="caption">{waits}</p>
-    </Glass>
-
-    <Glass dense radius="card" label="Garage" class="card">
-      <PanelHeading icon={IconBuildingWarehouse}>
-        Garage
-        {#snippet aside()}<Soon />{/snippet}
-      </PanelHeading>
-      <div class="row">
-        <span class="text">
-          <span>Garage slots</span>
-          <span class="hint">How many cars you can keep at hand. Your garage has five today.</span>
-        </span>
-      </div>
-      <p class="caption">Changing it needs a server setting that does not exist yet.</p>
     </Glass>
   </div>
 

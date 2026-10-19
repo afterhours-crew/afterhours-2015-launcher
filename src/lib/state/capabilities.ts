@@ -32,7 +32,6 @@ export const FEATURES = {
   traffic: "world-settings",
   rivals: "world-settings",
   "world-presets": "world-settings",
-  "garage-slots": null,
   map: "map",
   cops: null,
   /** Name, bank and REP edits: track 4's `account set`. */

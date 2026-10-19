@@ -42,9 +42,9 @@ describe("features", () => {
     expect(ready({ capabilities: ["map"] })).toEqual(["map"]);
   });
 
-  it("never open Cops, garage slots or account edits", () => {
+  it("never open Cops or account edits", () => {
     const everything = { capabilities: ["profile", "sessions", "events", "world-settings", "map"] };
-    for (const feature of ["cops", "garage-slots", "account-edits"] as const) {
+    for (const feature of ["cops", "account-edits"] as const) {
       expect(featureReady(everything, feature)).toBe(false);
     }
   });

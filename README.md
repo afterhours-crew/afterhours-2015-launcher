@@ -57,7 +57,9 @@ and the Map wait for server work. No release has been published yet. See
    Windows and `serve` elsewhere.
 
    Host runs `serve`: the server without a game, shown as "Hosting · server
-   running". Play then starts the game in that session with `play` when
+   running". Like every session it needs the game folder (`--game-dir`);
+   on Windows the server also runs `start`'s game checks for `serve`, so
+   a game can join later, and the launcher never passes `--server-only`. Play then starts the game in that session with `play` when
    `version --json` lists capability `play`; the session goes Starting →
    In game and back to hosting when the game closes. A server without
    `play` (v0.3.0) offers "Restart with game" instead, which stops the
