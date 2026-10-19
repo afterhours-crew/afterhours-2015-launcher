@@ -37,7 +37,12 @@ export class Session {
 
   async load(): Promise<void> {
     if (!inTauri) {
-      if (sampleMode) this.info = await sampleAppInfo();
+      if (sampleMode) {
+        this.info = await sampleAppInfo();
+        // As the desktop window reports it: the launcher's folder is the game folder.
+        const inFolder = this.info.game_in_launcher_folder;
+        if (inFolder) this.settings = { ...this.settings, game_dir: inFolder };
+      }
       this.loaded = true;
       return;
     }

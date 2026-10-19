@@ -158,7 +158,7 @@ pub fn read_session_file(data: &Path, id: &str, name: &str) -> Result<SessionFil
 }
 
 fn settings_of(state: &State<'_, crate::AppState>) -> Settings {
-    state.settings.lock().map(|s| s.clone()).unwrap_or_default()
+    state.settings()
 }
 
 async fn run_read(args: Vec<String>) -> Result<cli::CliResult, String> {

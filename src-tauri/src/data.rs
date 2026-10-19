@@ -338,7 +338,7 @@ pub fn backup_saves(
 
 #[tauri::command]
 pub fn recorded(state: State<'_, crate::AppState>) -> Recorded {
-    let settings = state.settings.lock().map(|s| s.clone()).unwrap_or_default();
+    let settings = state.settings();
     match data_dir(&settings) {
         Some(data) => recorded_session(&data),
         None => Recorded::None,
@@ -353,7 +353,7 @@ pub fn open_folder(
     state: State<'_, crate::AppState>,
     which: String,
 ) -> Result<(), String> {
-    let settings = state.settings.lock().map(|s| s.clone()).unwrap_or_default();
+    let settings = state.settings();
     let data = data_dir(&settings).ok_or("No data folder is known on this system.")?;
     let path = match which.as_str() {
         "data" => data,

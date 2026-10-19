@@ -111,6 +111,8 @@ export interface AppInfo {
   launcher_version: string;
   server: ServerInfo;
   data_dir: string | null;
+  /** The launcher's own folder when it holds the game: then the game folder in use. */
+  game_in_launcher_folder: string | null;
   updater: { endpoint: string | null; configured: boolean };
   debug_build: boolean;
 }

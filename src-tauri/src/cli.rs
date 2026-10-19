@@ -243,7 +243,7 @@ impl RunningSession {
 }
 
 fn settings_of(state: &State<'_, crate::AppState>) -> Settings {
-    state.settings.lock().map(|s| s.clone()).unwrap_or_default()
+    state.settings()
 }
 
 #[tauri::command]
@@ -365,7 +365,7 @@ pub fn start_session(
                         serde_json::json!({"action": running.action, "code": status.code()}),
                     );
                     // One final status so the window shows the end state.
-                    let settings = state.settings.lock().map(|s| s.clone()).unwrap_or_default();
+                    let settings = state.settings();
                     if let Ok(result) = self::status(&settings) {
                         let _ = state_app.emit("session-status", &result);
                     }

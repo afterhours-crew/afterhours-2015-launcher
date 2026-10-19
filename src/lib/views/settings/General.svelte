@@ -13,6 +13,9 @@
   // the data folder; this only says where it is.
   let name = $state(session.settings.player_name ?? "");
   let gameDir = $state(session.settings.game_dir ?? "");
+  // A launcher in the game folder uses that game; Settings shows it and does
+  // not offer another. The folder is only read.
+  let inFolder = $derived(session.info?.game_in_launcher_folder ?? null);
   let dataDir = $state(session.settings.data_dir ?? "");
   let note = $state<{ kind: "ready" | "warn"; text: string } | null>(null);
   let checking = $state(false);
@@ -30,7 +33,8 @@
     await session.save({ player_name: name.trim() || null });
   }
   async function saveFolders() {
-    await session.save({ game_dir: gameDir.trim() || null, data_dir: dataDir.trim() || null });
+    const game = inFolder ? {} : { game_dir: gameDir.trim() || null };
+    await session.save({ ...game, data_dir: dataDir.trim() || null });
     await session.refreshInfo();
   }
   async function verify() {
@@ -85,12 +89,20 @@
 
 <Glass dense radius="card" label="Game and data" class="panel">
   <PanelHeading icon={IconFolder}>Game &amp; data</PanelHeading>
-  <Field id="s-game" label="Install folder" bind:value={gameDir} mono>
-    {#snippet trailing()}<PillButton
-        onclick={() => pick((v) => (gameDir = v), "Choose the Need for Speed (2015) folder")}
-        >Browse</PillButton
-      >{/snippet}
-  </Field>
+  {#if inFolder}
+    <Field id="s-game" label="Install folder" value={inFolder} mono readonly />
+    <Note
+      >The launcher is in this game folder, so it uses the game it sits in and changes nothing
+      there. To pick a different install, run the launcher from somewhere else.</Note
+    >
+  {:else}
+    <Field id="s-game" label="Install folder" bind:value={gameDir} mono>
+      {#snippet trailing()}<PillButton
+          onclick={() => pick((v) => (gameDir = v), "Choose the Need for Speed (2015) folder")}
+          >Browse</PillButton
+        >{/snippet}
+    </Field>
+  {/if}
   <Field
     id="s-data"
     label="Data folder"

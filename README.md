@@ -56,6 +56,20 @@ and the Map wait for server work. No release has been published yet. See
 `pnpm bundle` builds the per-user NSIS installer without updater artifacts
 (those need the signing key; see [RELEASING.md](RELEASING.md)).
 
+### A copy in the game folder
+
+The launcher executable and its bundled `Afterhours.exe` can also be copied
+into the game folder, next to `NFS16.exe`, the way the terminal
+`Afterhours.exe` is placed. That copy uses the game it sits in: the first
+run skips "Find your game" and goes straight to the file check, and
+Settings shows the folder without offering another one (run the launcher
+from somewhere else to pick a different install). Its own folder is tried
+first, then the usual install places. The launcher only reads the game
+folder: its settings, the data folder and logs stay where they always are.
+An installed launcher (per user, under `%LOCALAPPDATA%`) never sits next to
+the game and keeps the usual first run. The decision is
+`src-tauri/src/detect.rs` (`game_folder`).
+
 ## How it works
 
 ```text

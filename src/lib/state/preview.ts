@@ -35,6 +35,10 @@ export async function sampleAppInfo(): Promise<AppInfo> {
       error: null,
     },
     data_dir: "C:\\Users\\Driver\\AppData\\Local\\Afterhours2015",
+    // `?sample&portable`: a launcher copied into the game folder.
+    game_in_launcher_folder: new URLSearchParams(window.location.search).has("portable")
+      ? "C:\\Games\\Need for Speed"
+      : null,
     updater: { endpoint: null, configured: false },
     debug_build: true,
   };

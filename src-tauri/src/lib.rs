@@ -34,8 +34,31 @@ use tauri::{Emitter, Manager};
 
 /// State shared by every command: settings and the running session, if any.
 pub struct AppState {
+    /// As saved. Read through [`AppState::settings`], which applies the
+    /// game folder decision.
     pub settings: Mutex<settings::Settings>,
     pub session: Mutex<Option<cli::RunningSession>>,
+    /// The folder holding this launcher's executable.
+    pub launcher_dir: Option<std::path::PathBuf>,
+}
+
+impl AppState {
+    /// Where the game folder in use comes from, for these saved settings:
+    /// the launcher's own folder when it holds `NFS16.exe` (a copy placed in
+    /// the game folder), else the saved one. The folder is only read.
+    pub fn game_folder(&self, stored: &settings::Settings) -> detect::GameFolder {
+        detect::game_folder(
+            self.launcher_dir.as_deref(),
+            stored.game_dir.as_deref(),
+            std::path::Path::is_file,
+        )
+    }
+
+    /// The settings in use, with the game folder decision applied.
+    pub fn settings(&self) -> settings::Settings {
+        let stored = self.settings.lock().map(|s| s.clone()).unwrap_or_default();
+        settings::effective(&stored, &self.game_folder(&stored))
+    }
 }
 
 /// Build and run the application.
@@ -50,6 +73,7 @@ pub fn run() {
             app.manage(AppState {
                 settings: Mutex::new(settings),
                 session: Mutex::new(None),
+                launcher_dir: detect::launcher_dir(),
             });
             Ok(())
         })

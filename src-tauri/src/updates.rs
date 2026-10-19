@@ -75,7 +75,7 @@ fn probe(settings: &crate::settings::Settings) -> StatusProbe {
 
 #[tauri::command]
 pub async fn session_activity(state: State<'_, crate::AppState>) -> Result<Activity, String> {
-    let settings = state.settings.lock().map(|s| s.clone()).unwrap_or_default();
+    let settings = state.settings();
     let window_session = window_session(&state);
     let (cli, recorded) = tauri::async_runtime::spawn_blocking(move || {
         let recorded = match data::data_dir(&settings) {
@@ -104,7 +104,7 @@ pub async fn backup_saves(
     if window_session(&state) {
         return Err("A session is running. Saves are copied once it has stopped.".into());
     }
-    let settings = state.settings.lock().map(|s| s.clone()).unwrap_or_default();
+    let settings = state.settings();
     tauri::async_runtime::spawn_blocking(move || {
         if let StatusProbe::Ok { state } = probe(&settings)
             && data::is_live_state(&state)
@@ -130,6 +130,9 @@ pub struct AppInfo {
     pub launcher_version: String,
     pub server: server::ServerInfo,
     pub data_dir: Option<PathBuf>,
+    /// The launcher's own folder when it holds the game: it is then the game
+    /// folder, and Settings does not offer another.
+    pub game_in_launcher_folder: Option<PathBuf>,
     pub updater: UpdaterInfo,
     pub debug_build: bool,
 }
@@ -152,12 +155,13 @@ fn updater_info(app: &AppHandle) -> UpdaterInfo {
 pub async fn app_info(app: AppHandle) -> Result<AppInfo, String> {
     let launcher_version = app.package_info().version.to_string();
     let updater = updater_info(&app);
-    let settings = app
-        .state::<crate::AppState>()
-        .settings
-        .lock()
-        .map(|s| s.clone())
-        .unwrap_or_default();
+    let state = app.state::<crate::AppState>();
+    let settings = state.settings();
+    let stored = state.settings.lock().map(|s| s.clone()).unwrap_or_default();
+    let folder = state.game_folder(&stored);
+    let game_in_launcher_folder = (folder.source == crate::detect::GameSource::LauncherFolder)
+        .then_some(folder.path)
+        .flatten();
     let (server, data_dir) =
         tauri::async_runtime::spawn_blocking(move || (server::info(), data::data_dir(&settings)))
             .await
@@ -166,6 +170,7 @@ pub async fn app_info(app: AppHandle) -> Result<AppInfo, String> {
         launcher_version,
         server,
         data_dir,
+        game_in_launcher_folder,
         updater,
         debug_build: cfg!(debug_assertions),
     })

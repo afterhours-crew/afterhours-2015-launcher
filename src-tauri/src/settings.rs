@@ -7,6 +7,7 @@
 //! server version last ran. Stored as one JSON file in the app's config
 //! directory. A missing, damaged or unknown file yields defaults.
 
+use crate::detect::{GameFolder, GameSource};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, State};
@@ -83,9 +84,33 @@ pub(crate) fn write(path: &Path, settings: &Settings) -> Result<(), String> {
     std::fs::rename(&temporary, path).map_err(|e| e.to_string())
 }
 
+/// The settings in use: the game folder is the one `folder` decided
+/// ([`detect::game_folder`]), so while the launcher sits in the game folder
+/// that folder is used, whatever is saved.
+pub fn effective(stored: &Settings, folder: &GameFolder) -> Settings {
+    Settings {
+        game_dir: folder.path.clone(),
+        ..stored.clone()
+    }
+}
+
+/// What to save from the window's `incoming` settings. While the launcher
+/// sits in the game folder the window cannot choose another one, and the
+/// saved game folder is kept as it was for when the launcher runs from
+/// elsewhere again.
+pub fn to_store(incoming: Settings, stored: &Settings, folder: &GameFolder) -> Settings {
+    match folder.source {
+        GameSource::LauncherFolder => Settings {
+            game_dir: stored.game_dir.clone(),
+            ..incoming
+        },
+        GameSource::Settings | GameSource::None => incoming,
+    }
+}
+
 #[tauri::command]
 pub fn get_settings(state: State<'_, crate::AppState>) -> Settings {
-    state.settings.lock().map(|s| s.clone()).unwrap_or_default()
+    state.settings()
 }
 
 #[tauri::command]
@@ -94,11 +119,14 @@ pub fn save_settings(
     state: State<'_, crate::AppState>,
     settings: Settings,
 ) -> Result<Settings, String> {
-    write(&file(&app)?, &settings)?;
-    if let Ok(mut current) = state.settings.lock() {
-        *current = settings.clone();
-    }
-    Ok(settings)
+    let mut current = state
+        .settings
+        .lock()
+        .map_err(|_| "settings state poisoned")?;
+    let stored = to_store(settings, &current, &state.game_folder(&current));
+    write(&file(&app)?, &stored)?;
+    *current = stored;
+    Ok(effective(&current, &state.game_folder(&current)))
 }
 
 #[cfg(test)]
@@ -128,6 +156,45 @@ mod tests {
         std::fs::write(&path, b"{ not json").unwrap();
         assert_eq!(read(&path), Settings::default());
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn the_launcher_folder_is_the_game_folder_in_use_but_never_saved() {
+        let launcher = Path::new("G:/Need for Speed");
+        let stored = Settings {
+            game_dir: Some(PathBuf::from("F:/EA Games/Need for Speed")),
+            player_name: Some("Driver".into()),
+            ..Settings::default()
+        };
+        let nfs16 = launcher.join(crate::detect::GAME_EXECUTABLE);
+        let in_game =
+            crate::detect::game_folder(Some(launcher), stored.game_dir.as_deref(), |p: &Path| {
+                p == nfs16
+            });
+        let elsewhere = crate::detect::game_folder(
+            Some(Path::new("C:/Programs/Afterhours")),
+            stored.game_dir.as_deref(),
+            |p: &Path| p == nfs16,
+        );
+
+        // In use: the launcher's folder, whatever is saved.
+        let used = effective(&stored, &in_game);
+        assert_eq!(used.game_dir.as_deref(), Some(launcher));
+        assert_eq!(used.player_name, stored.player_name);
+        // Elsewhere: the saved folder.
+        assert_eq!(effective(&stored, &elsewhere), stored);
+
+        // Saving from the window keeps the saved game folder while the
+        // launcher is in a game folder, and takes everything else.
+        let incoming = Settings {
+            game_dir: Some(launcher.to_path_buf()),
+            player_name: Some("Nova".into()),
+            ..stored.clone()
+        };
+        let saved = to_store(incoming.clone(), &stored, &in_game);
+        assert_eq!(saved.game_dir, stored.game_dir);
+        assert_eq!(saved.player_name.as_deref(), Some("Nova"));
+        assert_eq!(to_store(incoming.clone(), &stored, &elsewhere), incoming);
     }
 
     #[test]

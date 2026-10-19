@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { api, inTauri, pickFolder, preflightFromResult } from "$lib/api/tauri";
   import type { Preflight } from "$lib/api/types";
   import Field from "$lib/components/Field.svelte";
@@ -44,6 +45,21 @@
     { value: "250k", label: "$250K" },
     { value: "1m", label: "$1M" },
   ] as const;
+
+  // A launcher copied into the game folder uses that folder: the Game step
+  // is skipped and the file check runs at once. The folder is only read.
+  let inFolder = $derived(session.info?.game_in_launcher_folder ?? null);
+  let skippedGame = $state(false);
+  $effect(() => {
+    const folder = inFolder;
+    if (!folder || skippedGame || step !== 0) return;
+    skippedGame = true;
+    untrack(() => {
+      gameDir = folder;
+      step = 1;
+      void runCheck();
+    });
+  });
 
   $effect(() => {
     api
@@ -127,7 +143,8 @@
       <h1 class="t-step-title">Find your game</h1>
       <p>
         Point the launcher at your Need for Speed (2015) install. We looked in the usual places
-        first.
+        first. A launcher copied into the game folder, next to NFS16.exe, uses that install by
+        itself.
       </p>
       {#if detected.length > 0}
         <Note kind="ready">
@@ -156,6 +173,12 @@
         Making sure the game is the supported build and can talk to the rebuilt server. Nothing is
         changed by this check.
       </p>
+      {#if inFolder}
+        <Note kind="ready">
+          <strong>Using the game in this folder</strong>
+          <span class="t-data path">{inFolder}</span>
+        </Note>
+      {/if}
       {#if checking}
         <div class="progress"><div class="fill indeterminate"></div></div>
       {:else if checkError}
@@ -240,7 +263,7 @@
       <PillButton
         variant="text"
         onclick={() => (step = Math.max(0, step - 1))}
-        disabled={step === 0}>Back</PillButton
+        disabled={step === 0 || (step === 1 && inFolder !== null)}>Back</PillButton
       >
       {#if step < steps.length - 1}
         <button type="button" class="next" disabled={!canNext || checking} onclick={next}
