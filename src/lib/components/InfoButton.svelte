@@ -1,30 +1,29 @@
 <script lang="ts">
   import IconInfoCircle from "@tabler/icons-svelte/icons/info-circle";
   // Help behind an ⓘ instead of a sentence under every control. The
-  // tooltip shows on hover and on keyboard focus, and the button's
-  // description is the same text, so a screen reader reads it too.
+  // tooltip shows while the button is hovered or focused (CSS, so it does
+  // not depend on event timing), Escape hides it until the pointer or focus
+  // leaves, and the button's description is the same text, so a screen
+  // reader reads it too.
   let { label, text, size = 18 }: { label: string; text: string; size?: number } = $props();
   const id = `info-${Math.random().toString(36).slice(2, 10)}`;
-  let open = $state(false);
+  let closed = $state(false);
 </script>
 
-<span class="info">
+<span class="info" class:closed>
   <button
     type="button"
     aria-label={label}
     aria-describedby={id}
-    onmouseenter={() => (open = true)}
-    onmouseleave={() => (open = false)}
-    onfocus={() => (open = true)}
-    onblur={() => (open = false)}
+    onmouseleave={() => (closed = false)}
+    onblur={() => (closed = false)}
     onkeydown={(e) => {
-      if (e.key === "Escape") open = false;
+      if (e.key === "Escape") closed = true;
     }}
-    onclick={() => (open = !open)}
   >
     <IconInfoCircle {size} stroke={1.6} aria-hidden="true" />
   </button>
-  <span {id} role="tooltip" class="tip" class:open>{text}</span>
+  <span {id} role="tooltip" class="tip">{text}</span>
 </span>
 
 <style>
@@ -72,12 +71,17 @@
       transform var(--motion-fast) var(--ease-out),
       visibility 0s linear var(--motion-fast);
   }
-  .tip.open {
+  .info:hover .tip,
+  .info:focus-within .tip {
     opacity: 1;
     visibility: visible;
     transform: translate(-50%, 0);
     transition:
       opacity var(--motion-fast) var(--ease-out),
       transform var(--motion-fast) var(--ease-out);
+  }
+  .info.closed .tip {
+    opacity: 0;
+    visibility: hidden;
   }
 </style>
