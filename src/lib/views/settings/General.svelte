@@ -1,4 +1,7 @@
 <script lang="ts">
+  import IconFolder from "@tabler/icons-svelte/icons/folder";
+  import IconUser from "@tabler/icons-svelte/icons/user";
+  import PanelHeading from "$lib/components/PanelHeading.svelte";
   import { api, pickFolder } from "$lib/api/tauri";
   import Field from "$lib/components/Field.svelte";
   import Glass from "$lib/components/Glass.svelte";
@@ -56,7 +59,7 @@
 </script>
 
 <Glass dense radius="card" label="Driver" class="panel">
-  <h2 class="t-panel-title">Driver</h2>
+  <PanelHeading icon={IconUser}>Driver</PanelHeading>
   <Field
     id="s-name"
     label="Driver name"
@@ -81,7 +84,7 @@
 </Glass>
 
 <Glass dense radius="card" label="Game and data" class="panel">
-  <h2 class="t-panel-title">Game &amp; data</h2>
+  <PanelHeading icon={IconFolder}>Game &amp; data</PanelHeading>
   <Field id="s-game" label="Install folder" bind:value={gameDir} mono>
     {#snippet trailing()}<PillButton
         onclick={() => pick((v) => (gameDir = v), "Choose the Need for Speed (2015) folder")}

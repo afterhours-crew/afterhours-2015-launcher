@@ -2,6 +2,9 @@
   import type { Profile } from "$lib/api/types";
   import Avatar from "$lib/components/Avatar.svelte";
   import Glass from "$lib/components/Glass.svelte";
+  import IconChartBar from "@tabler/icons-svelte/icons/chart-bar";
+  import IconFlag3 from "@tabler/icons-svelte/icons/flag-3";
+  import IconSteeringWheel from "@tabler/icons-svelte/icons/steering-wheel";
   import PanelHeading from "$lib/components/PanelHeading.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
   import { garageList } from "$lib/state/cars";
@@ -84,7 +87,7 @@
 
     {#if categories}
       <Glass dense radius="card" label="REP by category" class="card">
-        <PanelHeading color="var(--style)">REP by category</PanelHeading>
+        <PanelHeading icon={IconChartBar}>REP by category</PanelHeading>
         <div class="categories">
           <span class="t-label muted" aria-hidden="true"></span>
           <span class="t-label muted" aria-hidden="true"></span>
@@ -108,7 +111,7 @@
 
     {#if stats.length > 0}
       <Glass dense radius="card" label="Driving stats" class="card">
-        <PanelHeading color="var(--crew)">
+        <PanelHeading icon={IconSteeringWheel}>
           Driving stats
           {#snippet aside()}<span class="caption">Raw stored values · units unconfirmed</span
             >{/snippet}
@@ -132,7 +135,7 @@
 
     {#if speed}
       <Glass dense radius="card" label="SpeedList" class="card">
-        <PanelHeading color="var(--speed)">
+        <PanelHeading icon={IconFlag3}>
           SpeedList
           {#snippet aside()}<span class="t-data soft">{speed.summary}</span>{/snippet}
         </PanelHeading>

@@ -11,7 +11,7 @@
   } = $props();
 </script>
 
-<nav aria-label="Main" class="ah-glass">
+<nav aria-label="Main" class="ah-glass flat">
   {#each items as item (item.id)}
     <button
       type="button"

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import IconDownload from "@tabler/icons-svelte/icons/download";
+  import PanelHeading from "$lib/components/PanelHeading.svelte";
   import { api, openUrl } from "$lib/api/tauri";
   import type { UpdateMode } from "$lib/api/types";
   import Glass from "$lib/components/Glass.svelte";
@@ -68,7 +70,7 @@
 </script>
 
 <Glass dense radius="card" label="Updates" class="panel">
-  <h2 class="t-panel-title">Updates</h2>
+  <PanelHeading icon={IconDownload}>Updates</PanelHeading>
 
   <div role="radiogroup" aria-label="When updates install" class="modes">
     {#each modes as option (option.id)}

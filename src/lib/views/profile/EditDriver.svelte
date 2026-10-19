@@ -5,6 +5,10 @@
   import Field from "$lib/components/Field.svelte";
   import Glass from "$lib/components/Glass.svelte";
   import Note from "$lib/components/Note.svelte";
+  import IconCash from "@tabler/icons-svelte/icons/cash";
+  import IconIdBadge2 from "@tabler/icons-svelte/icons/id-badge-2";
+  import IconPhoto from "@tabler/icons-svelte/icons/photo";
+  import IconTrophy from "@tabler/icons-svelte/icons/trophy";
   import PanelHeading from "$lib/components/PanelHeading.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
   import Soon from "$lib/components/Soon.svelte";
@@ -55,7 +59,7 @@
 
     <div class="grid">
       <div class="column">
-        <PanelHeading color="var(--style)">
+        <PanelHeading icon={IconPhoto}>
           Picture
           {#snippet aside()}<Applies when="launcher" />{/snippet}
         </PanelHeading>
@@ -84,7 +88,7 @@
 
       <div class="column">
         <div class="setting">
-          <PanelHeading color="var(--speed)">
+          <PanelHeading icon={IconIdBadge2}>
             Name
             {#snippet aside()}<Soon />{/snippet}
           </PanelHeading>
@@ -96,7 +100,7 @@
         </div>
 
         <div class="setting rule">
-          <PanelHeading color="var(--build)">
+          <PanelHeading icon={IconCash}>
             Bank
             {#snippet aside()}<Soon />{/snippet}
           </PanelHeading>
@@ -113,7 +117,7 @@
         </div>
 
         <div class="setting rule">
-          <PanelHeading color="var(--crew)">
+          <PanelHeading icon={IconTrophy}>
             REP level
             {#snippet aside()}<Soon />{/snippet}
           </PanelHeading>

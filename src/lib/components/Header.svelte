@@ -45,7 +45,7 @@
   {/if}
   <div class="right">
     {#if play}{@render play()}{/if}
-    <div class="profile ah-glass">
+    <div class="profile ah-glass flat">
       {#if showNav}
         <span class="avatar" class:online style="background: {fill}" aria-hidden="true"
           >{initials(driverName)}</span

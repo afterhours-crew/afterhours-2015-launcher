@@ -1,5 +1,12 @@
 <script lang="ts">
+  import type { Glyph as Icon } from "$lib/components/glyph";
   import Glass from "$lib/components/Glass.svelte";
+  import IconBuildingWarehouse from "@tabler/icons-svelte/icons/building-warehouse";
+  import IconCar from "@tabler/icons-svelte/icons/car";
+  import IconMoon from "@tabler/icons-svelte/icons/moon";
+  import IconRoad from "@tabler/icons-svelte/icons/road";
+  import IconShield from "@tabler/icons-svelte/icons/shield";
+  import IconSwords from "@tabler/icons-svelte/icons/swords";
   import PanelHeading from "$lib/components/PanelHeading.svelte";
   import Segmented from "$lib/components/Segmented.svelte";
   import Soon from "$lib/components/Soon.svelte";
@@ -11,6 +18,12 @@
   // and presets wait for its `world-settings` capability and a command to
   // read and change them; no current value is shown until then. Cops wait
   // for research, garage slots for a server setting.
+  const PRESET_ICONS: Record<(typeof PRESETS)[number]["id"], Icon> = {
+    empty: IconRoad,
+    cruise: IconCar,
+    "night-run": IconMoon,
+  };
+
   let reported = $derived(featureReady(session.info?.server, "traffic"));
   let waits = $derived(worldWaits(reported));
 </script>
@@ -18,7 +31,7 @@
 <main>
   <div class="cards">
     <Glass dense radius="card" label="Traffic" class="card">
-      <PanelHeading color="var(--crew)">
+      <PanelHeading icon={IconCar}>
         Traffic
         {#snippet aside()}<Soon />{/snippet}
       </PanelHeading>
@@ -28,7 +41,7 @@
     </Glass>
 
     <Glass dense radius="card" label="Cops" class="card">
-      <PanelHeading color="var(--outlaw)">
+      <PanelHeading icon={IconShield}>
         Cops
         {#snippet aside()}<Soon />{/snippet}
       </PanelHeading>
@@ -37,7 +50,7 @@
     </Glass>
 
     <Glass dense radius="card" label="Rivals" class="card">
-      <PanelHeading color="var(--speed)">
+      <PanelHeading icon={IconSwords}>
         Rivals
         {#snippet aside()}<Soon />{/snippet}
       </PanelHeading>
@@ -51,7 +64,7 @@
     </Glass>
 
     <Glass dense radius="card" label="Garage" class="card">
-      <PanelHeading color="var(--build)">
+      <PanelHeading icon={IconBuildingWarehouse}>
         Garage
         {#snippet aside()}<Soon />{/snippet}
       </PanelHeading>
@@ -73,8 +86,9 @@
       </div>
       <div role="radiogroup" aria-label="World preset" aria-disabled="true" class="list">
         {#each PRESETS as preset (preset.id)}
+          {@const Glyph = PRESET_ICONS[preset.id]}
           <button type="button" role="radio" aria-checked="false" class="pick" disabled>
-            <span class="swatch" style="background: {preset.color}" aria-hidden="true"></span>
+            <Glyph size={20} stroke={1.6} aria-hidden="true" class="glyph" />
             <span class="text">
               <span class="name">{preset.name}</span>
               <span class="hint">{preset.about}</span>
@@ -172,12 +186,9 @@
   .pick:disabled {
     color: var(--ink-soft);
   }
-  .swatch {
+  .list :global(.glyph) {
     flex: 0 0 auto;
-    width: 30px;
-    height: 30px;
-    border-radius: 10px;
-    opacity: 0.6;
+    margin: 0 5px;
   }
   .name {
     font-weight: 700;

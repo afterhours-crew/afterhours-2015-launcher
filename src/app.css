@@ -67,6 +67,11 @@ a {
   background: var(--glass-dense);
 }
 
+/* The header is flat: a translucent fill with no edge highlight or shadow. */
+.ah-glass.flat {
+  box-shadow: none;
+}
+
 @supports not (backdrop-filter: blur(1px)) {
   .ah-glass {
     background: var(--glass-solid);

@@ -117,4 +117,6 @@ and builds the Windows installer as an unsigned artifact. See
 [MPL-2.0](LICENSE). The bundled server is MPL-2.0 too; its license and
 third-party notices are installed beside it in `afterhours-server/`. Fonts:
 Saira Semi Condensed and JetBrains Mono under the SIL Open Font License 1.1,
-vendored through fontsource.
+vendored through fontsource. Icons: [Tabler Icons](https://tabler.io/icons)
+(`@tabler/icons-svelte` 3.49.0, MIT), compiled into the app, so they work
+offline.

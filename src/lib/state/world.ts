@@ -23,14 +23,12 @@ export const PRESETS = [
     id: "empty",
     name: "Empty city",
     about: "No traffic, no rivals. Learn the roads.",
-    color: "var(--field)",
   },
-  { id: "cruise", name: "Cruise", about: "Light traffic, rivals off.", color: "var(--crew)" },
+  { id: "cruise", name: "Cruise", about: "Light traffic, rivals off." },
   {
     id: "night-run",
     name: "Night run",
     about: "Normal traffic, rivals on.",
-    color: "var(--speed)",
   },
 ] as const;
 

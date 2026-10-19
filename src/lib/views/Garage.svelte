@@ -1,4 +1,5 @@
 <script lang="ts">
+  import IconMessageCircle from "@tabler/icons-svelte/icons/message-circle";
   import Clock from "$lib/components/Clock.svelte";
   import Glass from "$lib/components/Glass.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
@@ -81,7 +82,7 @@
       {#if last}
         {@const words = stateWords(last.state)}
         <div class="message">
-          <span class="badge" aria-hidden="true"></span>
+          <IconMessageCircle size={20} stroke={1.6} aria-hidden="true" class="glyph" />
           <span class="body">
             <span
               ><strong>Last session</strong> <span class="t-data-small time">{lastTime}</span></span
@@ -204,12 +205,9 @@
     gap: 10px;
     padding: 4px 6px;
   }
-  .badge {
+  .message :global(.glyph) {
     flex: 0 0 auto;
-    width: 34px;
-    height: 34px;
-    border-radius: 10px;
-    background: var(--field);
+    margin-top: 1px;
   }
   .body {
     display: flex;

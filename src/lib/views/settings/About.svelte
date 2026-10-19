@@ -1,4 +1,6 @@
 <script lang="ts">
+  import IconServer from "@tabler/icons-svelte/icons/server";
+  import PanelHeading from "$lib/components/PanelHeading.svelte";
   import { api, openUrl } from "$lib/api/tauri";
   import Glass from "$lib/components/Glass.svelte";
   import Note from "$lib/components/Note.svelte";
@@ -41,7 +43,7 @@
 </script>
 
 <Glass dense radius="card" label="About" class="panel">
-  <h2 class="t-panel-title">About</h2>
+  <PanelHeading icon={IconServer}>About</PanelHeading>
   {#if !info}
     <Note>Versions show in the desktop window. This is the browser preview.</Note>
   {:else}

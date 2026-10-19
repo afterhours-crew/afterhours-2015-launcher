@@ -1,4 +1,12 @@
 <script lang="ts">
+  import type { Glyph as Icon } from "$lib/components/glyph";
+  import IconDeviceGamepad2 from "@tabler/icons-svelte/icons/device-gamepad-2";
+  import IconFileDescription from "@tabler/icons-svelte/icons/file-description";
+  import IconFileText from "@tabler/icons-svelte/icons/file-text";
+  import IconPackage from "@tabler/icons-svelte/icons/package";
+  import IconRocket from "@tabler/icons-svelte/icons/rocket";
+  import IconTerminal2 from "@tabler/icons-svelte/icons/terminal-2";
+  import IconUserPlus from "@tabler/icons-svelte/icons/user-plus";
   import type { SessionList } from "$lib/api/types";
   import DataChip from "$lib/components/DataChip.svelte";
   import Glass from "$lib/components/Glass.svelte";
@@ -38,11 +46,13 @@
   let shares = $derived(shown?.server_log ? levelShares(shown.server_log) : []);
   let note = $state<string | null>(null);
 
-  const swatch: Record<string, string> = {
-    "Server log": "var(--crew)",
-    "Startup report": "var(--speed)",
-    "Content preparation": "var(--build)",
-    "Account creation": "var(--style)",
+  // Decorative, so drawn in ink; a file the launcher does not describe gets a page.
+  const ICONS: Record<string, Icon> = {
+    "Server log": IconTerminal2,
+    "Startup report": IconRocket,
+    "Content preparation": IconPackage,
+    "Account creation": IconUserPlus,
+    "Game console": IconDeviceGamepad2,
   };
   const shareColor = {
     info: "rgba(244, 240, 234, 0.35)",
@@ -217,12 +227,9 @@
           <span class="caption">The full story, for when the warnings aren't enough.</span>
         </div>
         {#each groups.breaks as entry (entry.title)}
+          {@const Glyph = ICONS[entry.title] ?? IconFileDescription}
           <button type="button" class="pick file" onclick={() => logView.open(entry.names[0]!)}>
-            <span
-              class="swatch"
-              style="background: {swatch[entry.title] ?? 'var(--field)'}"
-              aria-hidden="true"
-            ></span>
+            <Glyph size={20} stroke={1.6} aria-hidden="true" class="glyph" />
             <span class="file-body">
               <span class="file-head"
                 ><span class="t-body-strong">{entry.title}</span><span class="t-data soft"
@@ -247,7 +254,7 @@
         {/each}
         {#if list.ea_desktop_logs}
           <div class="pick file static">
-            <span class="swatch empty" aria-hidden="true"></span>
+            <IconFileText size={20} stroke={1.6} aria-hidden="true" class="glyph" />
             <span class="file-body">
               <span class="file-head"
                 ><span class="t-body-strong">EA Desktop logs</span><span class="personal"
@@ -504,15 +511,10 @@
   .file.static:hover {
     background: transparent;
   }
-  .swatch {
+  .file :global(.glyph) {
     flex: 0 0 auto;
-    width: 30px;
-    height: 30px;
-    border-radius: 10px;
-  }
-  .swatch.empty {
-    background: var(--field);
-    border: 1px solid var(--glass-edge);
+    margin: 1px 5px 0;
+    color: var(--ink);
   }
   .file-body {
     flex: 1 1 auto;

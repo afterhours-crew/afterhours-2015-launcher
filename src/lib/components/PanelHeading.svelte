@@ -1,17 +1,18 @@
 <script lang="ts">
+  import type { Glyph as Icon } from "$lib/components/glyph";
   import type { Snippet } from "svelte";
-  // A glass panel's title with its colored tile. Color says the kind of
-  // thing (the category colors), never status.
+  // A glass panel's title with its icon, drawn in ink. Colour is kept for
+  // what it encodes (event types, status); a heading's icon is decoration.
   let {
-    color = "var(--build)",
+    icon: Glyph,
     level = 2,
     children,
     aside,
-  }: { color?: string; level?: 2 | 3; children: Snippet; aside?: Snippet } = $props();
+  }: { icon?: Icon; level?: 2 | 3; children: Snippet; aside?: Snippet } = $props();
 </script>
 
 <div class="heading">
-  <span class="tile" style="background: {color}" aria-hidden="true"></span>
+  {#if Glyph}<Glyph size={20} stroke={1.6} aria-hidden="true" class="glyph" />{/if}
   <svelte:element this={`h${level}`} class="t-panel-title">{@render children()}</svelte:element>
   {#if aside}<span class="aside">{@render aside()}</span>{/if}
 </div>
@@ -23,11 +24,9 @@
     gap: 10px;
     min-width: 0;
   }
-  .tile {
+  .heading :global(.glyph) {
     flex: 0 0 auto;
-    width: 30px;
-    height: 30px;
-    border-radius: 10px;
+    color: var(--ink);
   }
   .heading :global(h2),
   .heading :global(h3) {
