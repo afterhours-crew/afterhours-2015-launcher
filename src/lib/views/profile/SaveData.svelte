@@ -6,12 +6,14 @@
   import Glass from "$lib/components/Glass.svelte";
   import InfoButton from "$lib/components/InfoButton.svelte";
   import Note from "$lib/components/Note.svelte";
+  import PiiBadge from "$lib/components/PiiBadge.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
   import ShowMore from "$lib/components/ShowMore.svelte";
   import { formatCount, formatMoney } from "$lib/state/format";
   import { isLive } from "$lib/state/launchbar";
   import { baseName, saveFacts, tableDetail, tableEntries } from "$lib/state/profile";
   import { sampleMode } from "$lib/state/preview";
+  import { personalTable } from "$lib/state/privacy";
   import { current, records } from "$lib/state/records.svelte";
   import { session } from "$lib/state/session.svelte";
 
@@ -34,6 +36,9 @@
       null,
   );
   let detail = $derived(profile && chosen ? tableDetail(profile, chosen.id) : null);
+  // The identity table names the player: badged in the list and when open.
+  const IDENTITY = personalTable("domain:identity")!;
+  let chosenPersonal = $derived(chosen ? personalTable(chosen.id) : null);
   let facts = $derived(profile ? saveFacts(profile.save, new Date()) : null);
   let folder = $derived(
     profile
@@ -145,6 +150,7 @@
       <div class="rows">
         <div class="list-row">
           <span class="grow">Driver, bank and REP</span>
+          {#if profile.identity}<PiiBadge holds={IDENTITY} />{/if}
           <span class="t-data"
             >{profile.identity
               ? `Persona ${profile.identity.persona_id}`
@@ -187,7 +193,9 @@
                       onclick={() => (tableId = entry.id)}
                     >
                       <span class="grow">{entry.label}</span>
-                      <span class="t-data">{entry.hint}</span>
+                      {#if personalTable(entry.id)}<PiiBadge
+                          holds={personalTable(entry.id)}
+                        />{:else}<span class="t-data">{entry.hint}</span>{/if}
                     </button>
                   {/each}
                 {/if}
@@ -197,8 +205,14 @@
             {#if detail}
               <div class="detail">
                 <span class="title">
-                  <span class="t-body-strong">{detail.title}</span>
-                  <span class="t-caption">{detail.caption}</span>
+                  <span class="detail-name"
+                    ><span class="t-body-strong">{detail.title}</span>{#if chosenPersonal}<PiiBadge
+                        holds={chosenPersonal}
+                      />{/if}</span
+                  >
+                  <span class="t-caption"
+                    >{chosenPersonal ? `${chosenPersonal}. ` : ""}{detail.caption}</span
+                  >
                 </span>
                 {#if detail.rows.length > 0}
                   <div class="scroll">
@@ -272,6 +286,12 @@
   }
   .path {
     overflow-wrap: anywhere;
+  }
+  .detail-name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
   }
   .drivers {
     display: flex;

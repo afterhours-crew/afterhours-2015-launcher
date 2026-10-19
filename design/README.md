@@ -33,6 +33,14 @@ first run (H10). The rules, which apply to every screen:
   Identical cars share a row: "Volvo 242 (1975) × 4".
 - **Layout:** 24px panel padding, running text kept to about 65 characters
   a line, and single columns for World, Settings and Edit driver.
+- **Personal info is impossible to miss.** A source that holds it (EA
+  Desktop logs, game crash dumps, protocol recordings, the save's identity)
+  carries the amber `PiiBadge` with an icon and the words "Personal info",
+  plus a line saying what it holds; never colour alone. Such sources are
+  never folded away, start unchecked in a report, and Logs warns "Check
+  before you share". "Hide my user name" (on by default) puts %USERNAME% in
+  place of the Windows user name in everything the launcher copies
+  (`src/lib/state/privacy.ts`).
 - One accent button per screen: Play, Connect or Next, in the game logo's
   blue (`play`). The Afterhours mark keeps its own orange (`brand`).
 - Color means event type or status, and a status is always a word plus a dot.

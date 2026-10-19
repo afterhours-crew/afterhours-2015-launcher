@@ -8,6 +8,7 @@
   import PillButton from "$lib/components/PillButton.svelte";
   import Segmented from "$lib/components/Segmented.svelte";
   import ShowMore from "$lib/components/ShowMore.svelte";
+  import Toggle from "$lib/components/Toggle.svelte";
   import { formatBytes, formatCount, formatSaved } from "$lib/state/format";
   import {
     FILE_INFO,
@@ -21,6 +22,8 @@
     type LevelFilter,
   } from "$lib/state/logs";
   import { logView } from "$lib/state/logview.svelte";
+  import { copyablePath } from "$lib/state/privacy";
+  import { session as app } from "$lib/state/session.svelte";
   import { records } from "$lib/state/records.svelte";
   import { router } from "$lib/state/router.svelte";
 
@@ -89,8 +92,10 @@
     note = null;
     try {
       const separator = shown.directory.includes("\\") ? "\\" : "/";
-      await navigator.clipboard.writeText(`${shown.directory}${separator}${name}`);
-      note = "Path copied.";
+      // "Hide my user name" (Logs › Report a problem) applies to every copy.
+      const path = `${shown.directory}${separator}${name}`;
+      await navigator.clipboard.writeText(copyablePath(path, app.privacy));
+      note = app.hideUserName ? "Path copied, user name hidden." : "Path copied.";
     } catch {
       note = "Could not reach the clipboard.";
     }
@@ -155,15 +160,7 @@
       />
       <span class="group-switch">
         <span id="group-label">Group repeats</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={grouping}
-          aria-labelledby="group-label"
-          class="track"
-          class:on={grouping}
-          onclick={() => (grouping = !grouping)}><span class="knob"></span></button
-        >
+        <Toggle bind:checked={grouping} labelledby="group-label" />
       </span>
     </div>
     {#if areas.length > 1}
@@ -319,30 +316,6 @@
     display: inline-flex;
     align-items: center;
     gap: 10px;
-  }
-  .track {
-    width: 48px;
-    height: 28px;
-    padding: 3px;
-    display: flex;
-    border-radius: 14px;
-    border: 1px solid var(--graphite-outline);
-    background: var(--graphite-raised);
-  }
-  .track.on {
-    border-color: transparent;
-    background: var(--crew);
-  }
-  .knob {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--ink-faint);
-    transition: transform var(--motion-base) var(--ease-out);
-  }
-  .on .knob {
-    transform: translateX(20px);
-    background: var(--on-ink);
   }
   .areas {
     display: flex;

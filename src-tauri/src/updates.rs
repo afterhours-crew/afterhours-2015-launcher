@@ -135,6 +135,18 @@ pub struct AppInfo {
     pub game_in_launcher_folder: Option<PathBuf>,
     pub updater: UpdaterInfo,
     pub debug_build: bool,
+    /// The signed-in Windows user's name, so "Hide my user name" can take it
+    /// out of copied paths and summaries.
+    pub user_name: Option<String>,
+}
+
+/// The current user's name (`USERNAME` on Windows, `USER` elsewhere).
+pub fn user_name() -> Option<String> {
+    ["USERNAME", "USER"]
+        .iter()
+        .filter_map(|key| std::env::var(key).ok())
+        .map(|name| name.trim().to_owned())
+        .find(|name| !name.is_empty())
 }
 
 fn updater_info(app: &AppHandle) -> UpdaterInfo {
@@ -173,6 +185,7 @@ pub async fn app_info(app: AppHandle) -> Result<AppInfo, String> {
         game_in_launcher_folder,
         updater,
         debug_build: cfg!(debug_assertions),
+        user_name: user_name(),
     })
 }
 

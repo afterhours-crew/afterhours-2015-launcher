@@ -16,16 +16,28 @@
   import Glass from "$lib/components/Glass.svelte";
   import InfoButton from "$lib/components/InfoButton.svelte";
   import Note from "$lib/components/Note.svelte";
+  import PiiBadge from "$lib/components/PiiBadge.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
   import ShowMore from "$lib/components/ShowMore.svelte";
+  import Toggle from "$lib/components/Toggle.svelte";
   import { formatCount, formatSaved } from "$lib/state/format";
-  import { fileFacts, groupFiles, sessionLine, stateWords, summaryText } from "$lib/state/logs";
+  import { fileFacts, groupFiles, sessionLine, stateWords } from "$lib/state/logs";
   import { logView } from "$lib/state/logview.svelte";
+  import {
+    REDACTED,
+    copyablePath,
+    personalSource,
+    reportItems,
+    reportSummary,
+  } from "$lib/state/privacy";
   import { records } from "$lib/state/records.svelte";
+  import { session as app } from "$lib/state/session.svelte";
 
   // Logs (H7): one session at a time. "Start here" says what matters in a
-  // line each; the files follow; everything rarely needed (EA Desktop
-  // logs, recordings, crash dumps, raw records) waits behind Show more.
+  // line each; then the session's files; then the sources that hold
+  // personal information, always in view with their badges. Report a
+  // problem warns before sharing, starts with personal sources unchecked
+  // and hides the user name in what it copies.
   let { list }: { list: SessionList } = $props();
 
   let shown = $derived(logView.session);
@@ -44,6 +56,20 @@
     return text.charAt(0).toUpperCase() + text.slice(1);
   });
   let note = $state<string | null>(null);
+  let sourceNote = $state<string | null>(null);
+
+  const EA = personalSource("ea-desktop-logs")!;
+  const CRASH = personalSource("crash-dumps")!;
+  const RECORDING = personalSource("protocol-recording")!;
+
+  // The report's checklist: what exists for this session, personal sources
+  // unchecked until the player ticks them.
+  let items = $derived(shown ? reportItems(shown, list) : []);
+  let picks = $state<Record<string, boolean>>({});
+  const pickKey = (id: string) => `${shown?.id}:${id}`;
+  let included = $derived(
+    new Set(items.filter((i) => picks[pickKey(i.id)] ?? !i.personal).map((i) => i.id)),
+  );
 
   const ICONS: Record<string, Icon> = {
     "Session summary": IconFileDescription,
@@ -63,10 +89,20 @@
     if (!shown) return;
     note = null;
     try {
-      await navigator.clipboard.writeText(summaryText(shown));
-      note = "Summary copied.";
+      await navigator.clipboard.writeText(reportSummary(shown, items, included, app.privacy));
+      note = app.hideUserName ? `Summary copied, user name hidden.` : "Summary copied.";
     } catch {
       note = "Could not reach the clipboard.";
+    }
+  }
+
+  async function copyPath(path: string) {
+    sourceNote = null;
+    try {
+      await navigator.clipboard.writeText(copyablePath(path, app.privacy));
+      sourceNote = app.hideUserName ? "Path copied, user name hidden." : "Path copied.";
+    } catch {
+      sourceNote = "Could not reach the clipboard.";
     }
   }
 
@@ -165,9 +201,10 @@
                   >{crashes.length}
                   {crashes.length === 1 ? "game crash dump" : "game crash dumps"} this session</span
                 >
+                <PiiBadge holds={CRASH.holds} />
                 <InfoButton
                   label="About crash dumps"
-                  text="When the game crashes it saves a CrashDump file. Attach it to your report; it can hold personal information. {crashes
+                  text="When the game crashes it saves a CrashDump file. It helps a bug report, but it can hold anything that was in the game's memory. {crashes
                     .map((d) => d.name)
                     .join(', ')}"
                 />
@@ -198,29 +235,8 @@
             </div>
           {/each}
         </div>
-        <ShowMore label="More sources" summary="EA Desktop logs, recordings, crash dumps">
+        <ShowMore label="Session records" summary="request, stop and the session folder">
           <div class="rows">
-            {#if list.ea_desktop_logs}
-              <div class="list-row stack">
-                <span>EA Desktop logs <span class="t-caption">· EA account details</span></span>
-                <span class="t-data path">{list.ea_desktop_logs.path}</span>
-                <span class="t-caption"
-                  >Only matters when the launcher stopped at "EA activation needs your attention".</span
-                >
-              </div>
-            {/if}
-            <div class="list-row stack">
-              <span>Protocol recording <span class="t-caption">· account identity</span></span>
-              <span class="t-data path"
-                >{shown.runs_directory_exists ? shown.runs_directory : "Off for this session"}</span
-              >
-            </div>
-            {#if list.crash_dump_directory}
-              <div class="list-row stack">
-                <span>Game crash dumps <span class="t-caption">· personal information</span></span>
-                <span class="t-data path">{list.crash_dump_directory.path}</span>
-              </div>
-            {/if}
             {#each groups.deep as entry (entry.title)}
               <div class="list-row stack">
                 <span>{entry.title}</span>
@@ -234,6 +250,63 @@
           </div>
         </ShowMore>
       </Glass>
+
+      <!-- Personal information is never folded away: the section and each
+           source carry the badge and say what they hold. -->
+      <Glass radius="panel" label="Sources with personal info" class="panel sources">
+        <div class="section-head">
+          <h2 class="t-panel-title">More sources</h2>
+          <PiiBadge label="All contain personal info" icon="alert" />
+        </div>
+        <div class="rows">
+          <div class="list-row">
+            <span class="grow text"
+              ><span class="t-body-strong">{EA.title}</span><span class="t-caption">{EA.holds}</span
+              ></span
+            >
+            <PiiBadge holds={EA.holds} />
+            {#if list.ea_desktop_logs?.exists}
+              <PillButton variant="text" onclick={() => copyPath(list.ea_desktop_logs!.path)}
+                >Copy path</PillButton
+              >
+            {:else}
+              <span class="t-caption state">Not found</span>
+            {/if}
+          </div>
+          <div class="list-row">
+            <span class="grow text"
+              ><span class="t-body-strong">{CRASH.title}</span><span class="t-caption"
+                >{CRASH.holds}</span
+              ></span
+            >
+            <PiiBadge holds={CRASH.holds} />
+            {#if crashes?.length && list.crash_dump_directory}
+              <PillButton variant="text" onclick={() => copyPath(list.crash_dump_directory!.path)}
+                >Copy path</PillButton
+              >
+            {:else}
+              <span class="t-caption state">{crashes ? "None this session" : "Not looked for"}</span
+              >
+            {/if}
+          </div>
+          <div class="list-row">
+            <span class="grow text"
+              ><span class="t-body-strong">{RECORDING.title}</span><span class="t-caption"
+                >{RECORDING.holds}</span
+              ></span
+            >
+            <PiiBadge holds={RECORDING.holds} />
+            {#if shown.runs_directory_exists}
+              <PillButton variant="text" onclick={() => copyPath(shown!.runs_directory)}
+                >Copy path</PillButton
+              >
+            {:else}
+              <span class="t-caption state">Off</span>
+            {/if}
+          </div>
+        </div>
+        {#if sourceNote}<span class="t-caption" role="status">{sourceNote}</span>{/if}
+      </Glass>
       {#if list.truncated}<span class="t-caption"
           >Older sessions exist beyond the newest {count}.</span
         >{/if}
@@ -243,17 +316,50 @@
   <aside data-enter>
     <Glass radius="phone" label="Report a problem" class="panel">
       <h2 class="t-panel-title">Report a problem</h2>
-      <span class="measure"
-        >Copy this session's summary into your report and attach files from its folder. Nothing is
+      <span class="t-caption"
+        >Copy this session's summary, with the files to attach, into your report. Nothing is
         uploaded.</span
       >
+      <div class="privacy" role="note" aria-labelledby="check-title">
+        <h3 id="check-title">
+          <IconAlertTriangle size={20} stroke={2} aria-hidden="true" />Check before you share
+        </h3>
+        <ul>
+          <li>File paths show your Windows user name</li>
+          <li>EA Desktop logs hold your EA account details</li>
+          <li>Crash dumps can hold anything from memory</li>
+        </ul>
+      </div>
+      {#if items.length > 0}
+        <fieldset class="include">
+          <legend class="t-label">Include</legend>
+          {#each items as item (item.id)}
+            <label class="check">
+              <input
+                type="checkbox"
+                checked={included.has(item.id)}
+                onchange={(e) => (picks[pickKey(item.id)] = e.currentTarget.checked)}
+              />
+              <span class="grow">{item.label}</span>
+              {#if item.personal}<PiiBadge holds={item.personal.holds} />{/if}
+            </label>
+          {/each}
+        </fieldset>
+      {/if}
+      <div class="list-row hide">
+        <span class="grow text"
+          ><span id="hide-name" class="t-body-strong">Hide my user name</span><span
+            class="t-caption">Copied paths show {REDACTED}</span
+          ></span
+        >
+        <Toggle bind:checked={app.hideUserName} labelledby="hide-name" />
+      </div>
       <div class="buttons">
         <PillButton variant="solid" disabled={!shown} onclick={copySummary}>Copy summary</PillButton
         >
         <PillButton disabled={!shown} onclick={openFolder}>Open folder</PillButton>
       </div>
       {#if note}<span class="t-caption" role="status">{note}</span>{/if}
-      <span class="t-caption">Paths include your Windows user name. Look before you share.</span>
     </Glass>
   </aside>
 </div>
@@ -292,6 +398,92 @@
     align-items: flex-end;
     justify-content: space-between;
     gap: 12px;
+  }
+  .section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+    padding-bottom: 6px;
+  }
+  .section-head h2 {
+    padding: 0;
+  }
+  .text {
+    display: flex;
+    flex-direction: column;
+  }
+  .state {
+    text-align: right;
+  }
+  /* Badges line up: the last column is one width whatever it holds. */
+  .layout :global(.sources .list-row > :last-child) {
+    flex: 0 0 140px;
+    display: flex;
+    justify-content: flex-end;
+  }
+  /* "Check before you share": amber, titled, and a note to assistive tech. */
+  .privacy {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px 18px;
+    border-radius: var(--radius-row);
+    background: var(--pii-callout);
+    border: 1px solid var(--pii-edge);
+  }
+  .privacy h3 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--warn-ink);
+  }
+  .privacy :global(svg) {
+    flex: 0 0 auto;
+  }
+  .privacy ul {
+    margin: 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  .include {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .include legend {
+    padding: 0 0 4px;
+  }
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    cursor: pointer;
+  }
+  .check input {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    accent-color: var(--ink);
+  }
+  .check .grow {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .hide {
+    border-top: 1px solid var(--graphite-edge);
   }
   .title {
     display: flex;

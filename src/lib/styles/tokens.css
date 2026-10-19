@@ -33,6 +33,9 @@
   --warn-soft: rgba(255,194,51,0.16);
   --warn-edge: rgba(255,194,51,0.45);
   --warn-ink: #FFD772;
+  --pii-soft: rgba(255,194,51,0.18);
+  --pii-edge: rgba(255,194,51,0.6);
+  --pii-callout: rgba(255,194,51,0.12);
   --mods-soft: rgba(169,130,255,0.22);
   --mods-ink: #CDB8FF;
   /* spacing */

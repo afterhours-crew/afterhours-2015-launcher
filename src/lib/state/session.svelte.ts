@@ -33,6 +33,16 @@ export class Session {
   restarting = $state(false);
   /** When this window started its session; `null` for one started elsewhere. */
   startedAt = $state<Date | null>(null);
+  /**
+   * "Hide my user name": copied paths and summaries show %USERNAME%
+   * instead. On by default, for this run of the launcher.
+   */
+  hideUserName = $state(true);
+
+  /** What copy actions need to hide the user name. */
+  get privacy(): { on: boolean; userName: string | null } {
+    return { on: this.hideUserName, userName: this.info?.user_name ?? null };
+  }
 
   private unlisten: Unlisten | null = null;
 

@@ -117,6 +117,8 @@ export interface AppInfo {
   game_in_launcher_folder: string | null;
   updater: { endpoint: string | null; configured: boolean };
   debug_build: boolean;
+  /** The signed-in user's name, for "Hide my user name"; `null` when unknown. */
+  user_name: string | null;
 }
 
 export type Folder = "data" | "session" | "backups";

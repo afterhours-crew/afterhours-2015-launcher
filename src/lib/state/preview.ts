@@ -46,6 +46,7 @@ export async function sampleAppInfo(): Promise<AppInfo> {
       : null,
     updater: { endpoint: null, configured: false },
     debug_build: true,
+    user_name: "Driver",
   };
 }
 
