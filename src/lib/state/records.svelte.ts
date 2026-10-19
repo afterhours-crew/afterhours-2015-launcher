@@ -1,8 +1,8 @@
 // The records the screens read from the bundled server: the active save's
 // profile, the list of saves, and the sessions with their files. Each is
 // asked for only when the server reports its capability (`profile`,
-// `sessions`); without it the record stays idle and the screen says
-// "Coming later".
+// `sessions`); without it the record stays idle and the screen gives
+// one note instead.
 //
 // The browser preview reads made-up records instead in its sample mode
 // (./preview.ts).

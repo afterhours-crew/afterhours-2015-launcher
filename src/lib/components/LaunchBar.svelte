@@ -2,7 +2,7 @@
   import type { LaunchBarModel, PlayAction } from "$lib/state/launchbar";
   import PlayButton from "./PlayButton.svelte";
   import StatusDot from "./StatusDot.svelte";
-  // Always present, never on glass: the server and Play sit on the floor.
+  // On the Garage home, never in a panel: the server and Play sit on the floor.
   // It never shows a car.
   let { model, onPlay }: { model: LaunchBarModel; onPlay: (action: PlayAction) => void } = $props();
 </script>

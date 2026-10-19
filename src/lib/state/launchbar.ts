@@ -52,7 +52,7 @@ export interface LaunchBarModel {
 
 /**
  * The same control as the launch bar's Play, compact: blue Play or Serve
- * when it can start, a glass pill naming the session state while one is
+ * when it can start, a graphite pill naming the session state while one is
  * live (pressing it in game stops), and a disabled Play saying why.
  */
 export interface HeaderPill {

@@ -7,8 +7,7 @@
   // Swaps its content when `key` changes. The outgoing scene fades out and
   // takes no input; the incoming one rises `rise` px while its panels fade
   // in one by one (staggerIn). Both share one grid cell, so nothing below
-  // jumps. The rise only moves: fading a whole scene would switch off the
-  // glass blur of every panel in it until the fade ends.
+  // jumps. The rise only moves; each panel fades itself in (staggerIn).
   let {
     key,
     rise = 0,

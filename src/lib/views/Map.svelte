@@ -1,43 +1,54 @@
 <script lang="ts">
   import { staggerIn } from "$lib/motion";
-  import ComingLater from "$lib/components/ComingLater.svelte";
+  import IconMap from "@tabler/icons-svelte/icons/map";
+  import ViewNote from "$lib/components/ViewNote.svelte";
   import { hasCapability } from "$lib/state/capabilities";
   import { session } from "$lib/state/session.svelte";
 
-  // The live map waits for the server's `map` capability (track 7).
+  // The live map waits for the server's `map` capability (track 7). Until
+  // the screen is built, the view is its title and one note.
   let ready = $derived(hasCapability(session.info?.server, "map"));
 </script>
 
 <main use:staggerIn>
-  <ComingLater
-    title="Map"
-    track="Track 7 · live map · waits for the current server milestone"
-    chip={ready ? "Server ready" : "Coming later"}
-  >
-    <p>
-      Ventura Bay as your server sees it: you, traffic and rivals moving, and what spawns or clears
-      around you.
-    </p>
-    {#if ready}
-      <p>Your server reports the live map feed; this screen is built next.</p>
-    {:else}
-      <p>
-        It needs a read-only feed from the server and a road map built from your own installation.
-        Your server does not report it yet.
-      </p>
-    {/if}
-  </ComingLater>
+  <div class="column">
+    <span class="title" data-enter>
+      <h1 class="t-view-title">Map</h1>
+      <span class="t-caption">Ventura Bay as your server sees it: you, traffic and rivals.</span>
+    </span>
+    <div data-enter>
+      <ViewNote icon={IconMap}>
+        {ready
+          ? "Your server reports the live map. This launcher shows it in a later update."
+          : "The live map arrives with a later server update."}
+      </ViewNote>
+    </div>
+  </div>
 </main>
 
 <style>
   main {
     position: relative;
     flex: 1 1 auto;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding: var(--space-5) var(--space-6) var(--space-6);
     min-height: 0;
     overflow: auto;
+    padding: 28px var(--space-6) var(--space-6);
+    display: flex;
+    justify-content: center;
+  }
+  .column {
+    width: 100%;
+    max-width: 720px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+  .title {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  h1 {
+    margin: 0;
   }
 </style>

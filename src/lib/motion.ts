@@ -5,14 +5,14 @@ import { cubicOut } from "svelte/easing";
 import { MOTION, reducedMotion, staggerDelay } from "$lib/state/motion";
 
 export interface StaggerOptions {
-  /** What enters: glass panels by default. Only the outermost matches count. */
+  /** What enters: panels by default. Only the outermost matches count. */
   selector?: string;
 }
 
 /**
  * Panels or rows in `node` enter one after another when it mounts: each
  * fades in rising a few pixels, `staggerDelay` apart. A nested match (a
- * glass pill inside a glass panel) enters with its parent.
+ * chip inside a panel) enters with its parent.
  */
 export function staggerIn(node: HTMLElement, options: StaggerOptions = {}) {
   if (reducedMotion()) return;

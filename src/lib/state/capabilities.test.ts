@@ -22,7 +22,7 @@ describe("features", () => {
   const ready = (server: { capabilities: string[] | null } | null) =>
     all.filter((f) => featureReady(server, f)).sort();
 
-  it("are all Coming later for v0.3.0, which reports no capabilities", () => {
+  it("all wait for v0.3.0, which reports no capabilities", () => {
     expect(ready({ capabilities: null })).toEqual([]);
     expect(ready(null)).toEqual([]);
   });

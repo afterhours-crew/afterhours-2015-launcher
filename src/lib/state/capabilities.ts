@@ -1,6 +1,7 @@
 // What the bundled server says it can do, from `version --json`
 // (contract v1). Servers without that command report nothing, and every
-// screen that needs a capability shows "Coming later" until it appears.
+// screen that needs a capability hides it and gives one note until it
+// appears.
 
 import type { ServerInfo } from "$lib/api/types";
 
@@ -22,7 +23,7 @@ export function hasCapability(
 /**
  * Screens and controls, and the capability each one needs. `null` means no
  * server offers it yet and nothing is planned to: police have no server
- * support and need research first, so Cops is always "Coming later".
+ * support and need research first, so Cops always waits.
  */
 export const FEATURES = {
   profile: "profile",

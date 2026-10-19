@@ -10,10 +10,11 @@ them.
 
 **Preview stage.** The shell, the bundled server, the installer, the updater,
 the release workflows and the screens are in place. Each screen reads the
-bundled server through its JSON commands and shows "Coming later" for what
-that server does not report: with v0.3.0, which reports no capabilities,
-that is Profile, Cars, Save data and the Logs dashboard; World settings, Cops
-and the Map wait for server work. No release has been published yet. See
+bundled server through its JSON commands; what that server does not report
+is hidden, and the view gives one note that it arrives with a server update.
+With v0.3.0, which reports no capabilities, that is Profile, Cars, Save data
+and the Logs dashboard; World settings, Cops and the Map wait for server
+work. No release has been published yet. See
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Run it

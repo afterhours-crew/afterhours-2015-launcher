@@ -3,7 +3,7 @@
 // contract types; src/lib/state/sample.test.ts validates them against
 // schemas/ so they cannot drift from the server's shapes. The desktop
 // window never shows them: it reads the bundled server, and a screen whose
-// capability is missing shows "Coming later".
+// capability is missing gives one note instead.
 
 import type {
   Car,

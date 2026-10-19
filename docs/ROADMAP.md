@@ -25,8 +25,8 @@ The launch bar never shows a car. Its left side reads "Playing on", then
 "Running · this PC only".
 
 **Cops need research.** The server runs no police today. Nothing about cops is
-offered until research shows how the game expects them; the World screen
-lists them as "Coming later".
+offered until research shows how the game expects them; the World screen's
+note names them with traffic and rivals.
 
 ## Sync model
 
@@ -48,10 +48,10 @@ lists them as "Coming later".
   After it, breaking changes bump the record `version`, because installed
   launchers will meet them.
 - **Missing capabilities say so.** The launcher reads the server's
-  capabilities from `version --json` (Settings → About lists them; v0.3.0
-  reports none). A screen whose capability is missing, such as Map without
-  `map` or Profile without `profile`, shows "Coming later" rather than
-  sample data.
+  capabilities from `version --json` (Settings → About this build lists
+  them; v0.3.0 reports none). A screen whose capability is missing, such as
+  Map without `map` or Profile without `profile`, hides what it cannot
+  show and gives one note instead, never sample data.
 - **Saves only move forward.** A new server may migrate the account SQLite
   forward, and older servers refuse upgraded saves. That is why saves are
   copied before a server change and why nothing is ever downgraded. The first

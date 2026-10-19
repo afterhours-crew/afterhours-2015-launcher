@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { HeaderPill, PlayAction } from "$lib/state/launchbar";
   // The launch bar's Play, compact, for the header of every view but the
-  // Garage home. Blue when it can start, a glass pill naming the session
+  // Garage home. Blue when it can start, a graphite pill naming the session
   // while one is live (pressing it when ready stops), disabled with the
   // reason as its tooltip and accessible name.
   let {
