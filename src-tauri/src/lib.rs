@@ -99,6 +99,7 @@ pub fn run() {
             cli::session_status,
             cli::start_session,
             cli::stop_session,
+            cli::play_game,
             data::recorded,
             data::open_folder,
             updates::session_activity,

@@ -5,11 +5,12 @@
 import type { ServerInfo } from "$lib/api/types";
 
 /**
- * Capabilities screens wait for. `profile`, `sessions` and `events` are
- * contract v1's; `world-settings` (track 3, traffic density) and `map`
- * (track 7, the live map feed) are expected names no server reports yet.
+ * Capabilities screens wait for. `profile`, `sessions`, `events` and
+ * `play` (start the game in a running `serve` session) are contract v1's;
+ * `world-settings` (track 3, traffic density) and `map` (track 7, the live
+ * map feed) are expected names no server reports yet.
  */
-export type Capability = "profile" | "sessions" | "events" | "world-settings" | "map";
+export type Capability = "profile" | "sessions" | "events" | "play" | "world-settings" | "map";
 
 export function hasCapability(
   server: Pick<ServerInfo, "capabilities"> | null | undefined,

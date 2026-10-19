@@ -1,15 +1,32 @@
 <script lang="ts">
   // The one orange button. Its Starting state owns the only spinner in the app.
+  // `title` is a tooltip for a press whose effect needs saying, such as a
+  // restart of the running server.
   let {
     label,
     disabled = false,
     busy = false,
+    title = null,
     onclick,
-  }: { label: string; disabled?: boolean; busy?: boolean; onclick: () => void } = $props();
+  }: {
+    label: string;
+    disabled?: boolean;
+    busy?: boolean;
+    title?: string | null;
+    onclick: () => void;
+  } = $props();
   let long = $derived(label.length > 6);
 </script>
 
-<button type="button" class="play" class:long {disabled} aria-busy={busy} {onclick}>
+<button
+  type="button"
+  class="play"
+  class:long
+  {disabled}
+  aria-busy={busy}
+  title={title ?? undefined}
+  {onclick}
+>
   {#if busy}
     <span class="spinner" aria-hidden="true"></span>
   {:else}

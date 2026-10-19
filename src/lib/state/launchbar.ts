@@ -8,6 +8,14 @@ export type Platform = "windows" | "other";
 
 export type Dot = "ready" | "warn" | "info" | null;
 
+/**
+ * What Play does: `start` (server and game), `serve` (server alone),
+ * `stop`, `play` (start the game inside a running serve session, with the
+ * server's `play` capability) or `restart` (for servers without it: stop
+ * the serve session, then `start`).
+ */
+export type PlayAction = "start" | "serve" | "stop" | "play" | "restart";
+
 export interface LaunchBarInput {
   platform: Platform;
   /** The bundled server was found. */
@@ -18,6 +26,8 @@ export interface LaunchBarInput {
   status: Status | null;
   /** The window itself started a session that has not exited yet. */
   running: boolean;
+  /** The server reports `play`: it can start the game in a serve session. */
+  canPlay: boolean;
 }
 
 export interface LaunchBarModel {
@@ -29,9 +39,11 @@ export interface LaunchBarModel {
   dot: Dot;
   play: {
     label: string;
-    action: "start" | "serve" | "stop" | null;
+    action: PlayAction | null;
     disabled: boolean;
     reason: string | null;
+    /** A tooltip for an enabled Play whose effect needs saying. */
+    hint: string | null;
     busy: boolean;
   };
   /** The header's compact Play, on every view but the Garage home. */
@@ -41,12 +53,12 @@ export interface LaunchBarModel {
 /**
  * The same control as the launch bar's Play, compact: blue Play or Serve
  * when it can start, a glass pill naming the session state while one is
- * live (pressing it when ready stops), and a disabled Play saying why.
+ * live (pressing it in game stops), and a disabled Play saying why.
  */
 export interface HeaderPill {
   kind: "play" | "live" | "blocked";
   label: string;
-  action: "start" | "serve" | "stop" | null;
+  action: PlayAction | null;
   disabled: boolean;
   /** Tooltip and accessible name: what pressing it does, or why it cannot. */
   title: string;
@@ -71,6 +83,33 @@ export function detectPlatform(userAgent: string): Platform {
   return /Windows/i.test(userAgent) ? "windows" : "other";
 }
 
+/**
+ * Where a session is. `hosting` is a ready `serve` session without a game:
+ * the server runs and nobody is playing. A game makes it `in-game`, as a
+ * ready `start` session is. Records from before `action` existed carry a
+ * `game_running` derived from their game process ID (see status.ts).
+ */
+export type Phase =
+  "idle" | "preparing" | "hosting" | "starting" | "activation" | "in-game" | "stopping";
+
+export function sessionPhase(status: Status | null): Phase {
+  if (!status || !isLive(status.state)) return "idle";
+  switch (status.state) {
+    case "preparing":
+      return "preparing";
+    case "starting":
+      return "starting";
+    case "activation":
+      return "activation";
+    case "stopping":
+      return "stopping";
+    default:
+      return status.game_running || status.action === "start" ? "in-game" : "hosting";
+  }
+}
+
+export const RESTART_HINT = "Your server restarts: it stops, then starts again with the game.";
+
 export function launchBarModel(input: LaunchBarInput): LaunchBarModel {
   const serveOnly = input.platform !== "windows";
   const idleAction = serveOnly ? "serve" : "start";
@@ -78,57 +117,108 @@ export function launchBarModel(input: LaunchBarInput): LaunchBarModel {
   // The server listens on loopback only, so it is always this PC only.
   const eyebrow = "Playing on";
   const title = "Your server";
-  const state = input.status?.state;
-  const summary = `${isLive(state) ? "Running" : "Offline"} · this PC only`;
+  const phase = sessionPhase(input.status);
+  const summary = `${phase === "idle" ? "Offline" : "Running"} · this PC only`;
 
-  if (isLive(state) && input.status) {
-    const s = input.status;
-    const busy = s.state !== "ready";
-    const labels: Record<string, string> = {
-      preparing: "Preparing",
-      starting: "Starting",
-      activation: "Sign in",
-      ready: "Stop",
-      stopping: "Stopping",
-    };
-    const lines: Record<string, string> = {
-      preparing: "Checking game files and your account",
-      starting: serveOnly
-        ? "Starting the server"
-        : "Starting the game; wait for ready before pressing Space",
-      activation: "EA activation dialog open; finish it in the game",
-      ready: serveOnly ? "Server running · Ready" : "Ready · Press Space in the game",
-      stopping: "Closing the game, then the server",
-    };
-    const line = lines[s.state] ?? s.message;
-    const dot: Dot = s.state === "ready" ? "ready" : s.state === "activation" ? "warn" : "info";
-    const ready = s.state === "ready";
-    return {
+  if (phase !== "idle" && input.status) {
+    const live = (
+      label: string,
+      pillLabel: string,
+      line: string,
+      dot: Dot,
+      action: PlayAction | null,
+    ): LaunchBarModel => ({
       eyebrow,
       title,
       summary,
       stateLine: line,
       dot,
       play: {
-        label: labels[s.state] ?? "Working",
-        action: ready ? "stop" : null,
-        disabled: !ready,
+        label,
+        action,
+        disabled: action === null,
         reason: null,
-        busy,
+        hint: null,
+        busy: action === null,
       },
       pill: {
         kind: "live",
-        // While live the pill says where you are; pressing it when ready stops.
-        label: ready ? (serveOnly ? "Running" : "In game") : (labels[s.state] ?? "Working"),
-        action: ready ? "stop" : null,
-        disabled: !ready,
-        title: ready ? `${line} · Stop` : line,
+        label: pillLabel,
+        action,
+        disabled: action === null,
+        title: action === "stop" ? `${line} · Stop` : line,
         dot,
+        caption: line,
+      },
+    });
+    switch (phase) {
+      case "preparing":
+        return live("Preparing", "Preparing", "Checking game files and your account", "info", null);
+      case "starting":
+        return live(
+          "Starting",
+          "Starting",
+          "Starting the game; wait for ready before pressing Space",
+          "info",
+          null,
+        );
+      case "activation":
+        return live(
+          "Sign in",
+          "Sign in",
+          "EA activation dialog open; finish it in the game",
+          "warn",
+          null,
+        );
+      case "stopping":
+        return live(
+          "Stopping",
+          "Stopping",
+          input.status.game_running ? "Closing the game, then the server" : "Stopping the server",
+          "info",
+          null,
+        );
+      case "in-game":
+        return live("Stop", "In game", "In game · Press Space in the game", "ready", "stop");
+      default:
+        break;
+    }
+    // Hosting: the server runs without a game. Elsewhere than Windows no
+    // game can join, so Play stops the server as it always did.
+    if (serveOnly) return live("Stop", "Running", "Server running · Ready", "ready", "stop");
+    const line = "Hosting · server running";
+    const play: LaunchBarModel["play"] = input.canPlay
+      ? { label: "Play", action: "play", disabled: false, reason: null, hint: null, busy: false }
+      : {
+          label: "Restart with game",
+          action: "restart",
+          disabled: false,
+          reason: null,
+          hint: RESTART_HINT,
+          busy: false,
+        };
+    return {
+      eyebrow,
+      title,
+      summary,
+      stateLine: line,
+      dot: "ready",
+      play,
+      pill: {
+        kind: "play",
+        label: play.label,
+        action: play.action,
+        disabled: false,
+        title: input.canPlay
+          ? "Play: start the game on your running server"
+          : `Restart with the game. ${RESTART_HINT}`,
+        dot: "ready",
         caption: line,
       },
     };
   }
 
+  const state = input.status?.state;
   let reason: string | null = null;
   if (!input.serverReady) reason = "Server missing · see Settings › About";
   else if (input.updating) reason = "Installing an update";
@@ -152,6 +242,7 @@ export function launchBarModel(input: LaunchBarInput): LaunchBarModel {
     action: reason ? null : idleAction,
     disabled: reason !== null || input.running,
     reason,
+    hint: null,
     busy: false,
   };
   const line = reason ?? stateLine;

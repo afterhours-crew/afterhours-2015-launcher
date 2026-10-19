@@ -38,6 +38,8 @@ export const api = {
   sessionStatus: () => invoke<CliResult>("session_status"),
   startSession: (action: SessionAction) => invoke<void>("start_session", { action }),
   stopSession: () => invoke<CliResult>("stop_session"),
+  /** `play --json`: start the game in the running `serve` session. */
+  playGame: () => invoke<CliResult>("play_game"),
   recorded: () => invoke<Recorded>("recorded"),
   openFolder: (which: Folder) => invoke<void>("open_folder", { which }),
   sessionActivity: () => invoke<Activity>("session_activity"),

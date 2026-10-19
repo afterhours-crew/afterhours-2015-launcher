@@ -24,6 +24,11 @@ export const SESSION_STATES: readonly SessionState[] = [
 ];
 
 type Json = Record<string, unknown>;
+type Action = NonNullable<Status["action"]>;
+
+const ACTIONS: readonly Action[] = ["setup", "serve", "start"];
+/** States in which a game process can be running. */
+const GAME_STATES: readonly SessionState[] = ["starting", "activation", "ready", "stopping"];
 
 function isObject(value: unknown): value is Json {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -33,24 +38,39 @@ function isState(value: unknown): value is SessionState {
   return (SESSION_STATES as readonly unknown[]).includes(value);
 }
 
+function isAction(value: unknown): value is Action {
+  return (ACTIONS as readonly unknown[]).includes(value);
+}
+
 const pid = (value: unknown) =>
   typeof value === "number" && Number.isInteger(value) ? value : null;
 
 /**
  * One status record, normalised: only the contract's fields, in their
- * types. `null` when it has no session ID or a state this launcher does
- * not know, since nothing can be decided from it.
+ * types, with `action` and `game_running` filled in for older records.
+ * `null` when it has no session ID or a state this launcher does not know,
+ * since nothing can be decided from it.
  */
 export function readStatus(value: unknown): Status | null {
   if (!isObject(value) || typeof value.id !== "string" || !isState(value.state)) return null;
+  const state = value.state;
+  const gamePid = pid(value.game_pid);
   return {
     version: 1,
     id: value.id,
+    // `null` in records from before `action` existed (v0.3.0).
+    action: isAction(value.action) ? value.action : null,
+    // Older records have no `game_running`: a game process ID in a state
+    // where a game can run stands for it.
+    game_running:
+      typeof value.game_running === "boolean"
+        ? value.game_running
+        : gamePid !== null && GAME_STATES.includes(state),
     utc: typeof value.utc === "string" ? value.utc : "",
-    state: value.state,
+    state,
     message: typeof value.message === "string" ? value.message : "",
     worker_pid: pid(value.worker_pid) ?? 0,
-    game_pid: pid(value.game_pid),
+    game_pid: gamePid,
     server_pid: pid(value.server_pid),
   };
 }

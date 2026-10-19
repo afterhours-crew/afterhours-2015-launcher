@@ -9,7 +9,8 @@
   import Stage from "$lib/components/Stage.svelte";
   import { toastIn } from "$lib/motion";
   import UpdateBanner from "$lib/components/UpdateBanner.svelte";
-  import { detectPlatform, isLive, launchBarModel } from "$lib/state/launchbar";
+  import { hasCapability } from "$lib/state/capabilities";
+  import { detectPlatform, isLive, launchBarModel, type PlayAction } from "$lib/state/launchbar";
   import { sampleMode } from "$lib/state/preview";
   import { driverName, headerLine } from "$lib/state/profile";
   import { current, records } from "$lib/state/records.svelte";
@@ -67,13 +68,26 @@
       updating: updater.holdsPlay,
       gameChosen: session.settings.game_dir !== null || !inTauri,
       status: session.status,
-      running: session.running,
+      // Restart with game holds Play between stopping and starting again.
+      running: session.running || session.restarting,
+      canPlay: hasCapability(session.info?.server, "play"),
     }),
   );
 
-  function onPlay(action: "start" | "serve" | "stop") {
-    if (action === "stop") void session.stop();
-    else void session.start(action);
+  function onPlay(action: PlayAction) {
+    switch (action) {
+      case "stop":
+        void session.stop();
+        break;
+      case "play":
+        void session.play();
+        break;
+      case "restart":
+        void session.restartWithGame();
+        break;
+      default:
+        void session.start(action);
+    }
   }
 </script>
 

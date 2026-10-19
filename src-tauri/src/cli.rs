@@ -4,7 +4,7 @@
 
 //! Running the bundled `Afterhours.exe` and reporting what it says.
 //!
-//! Short commands (`check`, `status`, `stop`, `--version`) run to
+//! Short commands (`check`, `status`, `stop`, `play`, `--version`) run to
 //! completion within a deadline, and with `--json` their one JSON object is
 //! returned to the window. A session (`setup`, `serve`, `start`) is a
 //! long-running child: its console lines are forwarded as `session-output`
@@ -272,6 +272,22 @@ pub async fn stop_session(state: State<'_, crate::AppState>) -> Result<CliResult
     let mut args = global_args(&settings);
     args.push("stop".into());
     tauri::async_runtime::spawn_blocking(move || run_json(&server.path, &args, STOP_TIMEOUT))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// `play --json`: ask the running `serve` session to start the game. The
+/// serving supervisor starts it in the same session, so its progress
+/// arrives as that session's output and statuses; this only returns the
+/// request's record, or the refusal (no serve session, a game already
+/// running).
+#[tauri::command]
+pub async fn play_game(state: State<'_, crate::AppState>) -> Result<CliResult, String> {
+    let settings = settings_of(&state);
+    let server = server::current()?;
+    let mut args = global_args(&settings);
+    args.push("play".into());
+    tauri::async_runtime::spawn_blocking(move || run_json(&server.path, &args, STATUS_TIMEOUT))
         .await
         .map_err(|e| e.to_string())?
 }

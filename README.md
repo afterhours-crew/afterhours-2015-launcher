@@ -33,7 +33,10 @@ and the Map wait for server work. No release has been published yet. See
    runs there; add `?sample` to the address (`http://localhost:1420/?sample`)
    to look at the screens with the made-up records in
    `src/lib/state/sample.ts`. A banner says so, and production builds leave
-   that code out.
+   that code out. `&hosting` adds a `serve` session without a game
+   (`&hosting=game` with one playing in it), `&noplay` a server without
+   `play`, `&portable` a launcher in the game folder and `&feed` a server
+   log that keeps arriving.
 
    `pnpm sidecar` downloads the server release pinned in `server-pin.json`,
    checks its SHA-256 and places `Afterhours.exe` in `src-tauri/binaries/`.
@@ -52,6 +55,16 @@ and the Map wait for server work. No release has been published yet. See
 3. The first run asks for the game folder, runs the server's read-only check
    and asks for a driver name. Then the garage opens. Play runs `start` on
    Windows and `serve` elsewhere.
+
+   Host runs `serve`: the server without a game, shown as "Hosting · server
+   running". Play then starts the game in that session with `play` when
+   `version --json` lists capability `play`; the session goes Starting →
+   In game and back to hosting when the game closes. A server without
+   `play` (v0.3.0) offers "Restart with game" instead, which stops the
+   serve session and runs `start`. Stop while in game closes the game, then
+   the server. The phase comes from the session's `action` and
+   `game_running` (from its game process ID in older records):
+   `sessionPhase` in `src/lib/state/launchbar.ts`.
 
 `pnpm bundle` builds the per-user NSIS installer without updater artifacts
 (those need the signing key; see [RELEASING.md](RELEASING.md)).
@@ -78,7 +91,7 @@ window (Svelte)  --invoke-->  src-tauri (Rust)  --spawn-->  Afterhours.exe  --sp
 ```
 
 The Rust side runs the bundled server and reports what it says. `check`,
-`status` and `stop` run with `--json` within a deadline and their object
+`status`, `stop` and `play` run with `--json` within a deadline and their object
 comes back to the window, and so do the read-only `profile`,
 `profile --list` and `sessions` behind Profile and Logs, asked for only when
 `version --json` lists their capability. The log viewer reads one named file

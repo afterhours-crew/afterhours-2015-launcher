@@ -12,9 +12,10 @@
   import { session } from "$lib/state/session.svelte";
 
   // Host: the local server on its own. Serve runs the server without the
-  // game (`serve`), and its console lines show below as they arrive. Play
-  // in the launch bar still runs the server with the game. The server
-  // listens on this PC only; LAN play needs server support.
+  // game (`serve`), and its console lines show below as they arrive. While
+  // it hosts, Play starts the game in the same session (`play`), or on an
+  // older server restarts it with the game. The server listens on this PC
+  // only; LAN play needs server support.
   let model = $derived(
     hostModel({
       serverReady: session.serverReady || !inTauri,

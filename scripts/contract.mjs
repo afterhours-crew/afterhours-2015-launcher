@@ -12,7 +12,9 @@
 //
 // Cases for `stop`, `version`, `sessions` and `profile --list` run when a
 // schema of that name exists, so a pin bump that brings the contract v1
-// schemas exercises them without edits here. `status` is checked against
+// schemas exercises them without edits here. The `play` case runs when the
+// server reports capability `play`; it uses an empty data folder, so there
+// is no serve session to start a game in. `status` is checked against
 // the schema of the contract the server speaks: v1's
 // `{"version":1,"session":...}` (status.schema.json) when it answers
 // `version --json`, else v0.3.0's `{"state":"none"}` or bare status
@@ -146,7 +148,10 @@ function refusal(args, expectedCode) {
 // status, checked against status-legacy.schema.json while that is vendored.
 // A pin bump replaces schemas/ with the release's, whose status.schema.json
 // is v1's, and drops the legacy one.
-const speaksV1 = run(["version", "--json"]).code === 0;
+const versionOut = run(["version", "--json"]);
+const speaksV1 = versionOut.code === 0;
+/** What the server reports it can do; nothing before contract v1. */
+const capabilities = speaksV1 ? (JSON.parse(versionOut.stdout).capabilities ?? []) : [];
 const STATUS = !speaksV1 && validators.has("status-legacy") ? "status-legacy" : "status";
 
 /** `status --json`, validated against the schema of the server's contract and its shape. */
@@ -235,6 +240,11 @@ const cases = [
     },
   },
   {
+    name: "play --json with no serve session exits 4",
+    capability: "play",
+    run: () => refusal(["play", "--json", "--data-dir", dataDir("play-empty")], 4),
+  },
+  {
     name: "check --json refuses a folder without the game",
     run: () => {
       const dir = dataDir("check");
@@ -306,6 +316,10 @@ console.log(`Status contract: ${speaksV1 ? "v1" : "v0.3.0"} (${STATUS}.schema.js
 for (const testCase of cases) {
   if (testCase.optional && !validators.has(testCase.schema)) {
     console.log(`  skip  ${testCase.name}  (no ${testCase.schema} schema)`);
+    continue;
+  }
+  if (testCase.capability && !capabilities.includes(testCase.capability)) {
+    console.log(`  skip  ${testCase.name}  (the server does not report ${testCase.capability})`);
     continue;
   }
   if (testCase.optional && aheadOfServer && V1_ONLY.has(testCase.schema)) {

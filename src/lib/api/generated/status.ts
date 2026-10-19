@@ -1,6 +1,10 @@
 // Generated from schemas/status.schema.json by scripts/gen-types.mjs. Do not edit; run `pnpm types`.
 
 /**
+ * What a session was asked to do.
+ */
+export type Action = "setup" | "serve" | "start";
+/**
  * Session states, in the order a successful session passes through them.
  */
 export type State =
@@ -30,7 +34,19 @@ export interface StatusReport {
  * Also the final record of `setup`, `serve` and `start` with `--json`.
  */
 export interface Status {
+  /**
+   * What the session was started as. `serve` hosts the server and may
+   * start the game on request; `null` only in records written before
+   * this field existed.
+   */
+  action: Action | null;
   game_pid: number | null;
+  /**
+   * Whether the session's game process is running: from its start until
+   * it exits. With `action` `serve` this tells hosting from playing.
+   * Always `false` for an interrupted session.
+   */
+  game_running: boolean;
   /**
    * Session ID: 32 lowercase hexadecimal characters.
    */

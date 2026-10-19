@@ -5,7 +5,7 @@
 // ./sample are left out of them.
 
 import { inTauri } from "$lib/api/tauri";
-import type { AppInfo, CliResult, OutputLine } from "$lib/api/types";
+import type { AppInfo, CliResult, OutputLine, Status } from "$lib/api/types";
 
 /** The sample records, in development builds only; `null` in production. */
 export const loadSample = import.meta.env.DEV ? () => import("./sample") : null;
@@ -20,6 +20,11 @@ export const sampleMode =
 export async function sampleAppInfo(): Promise<AppInfo> {
   if (!loadSample) throw new Error("Sample records exist in development builds only.");
   const { SAMPLE_VERSION } = await loadSample();
+  const query = new URLSearchParams(window.location.search);
+  // `&noplay`: a server from before `play`, which can only restart with the game.
+  const capabilities = SAMPLE_VERSION.capabilities.filter(
+    (name) => name !== "play" || !query.has("noplay"),
+  );
   return {
     launcher_version: "0.1.0",
     server: {
@@ -31,7 +36,7 @@ export async function sampleAppInfo(): Promise<AppInfo> {
       source: "override",
       version_line: "Afterhours 0.0.0 (sample)",
       matches_pin: null,
-      capabilities: [...SAMPLE_VERSION.capabilities],
+      capabilities,
       error: null,
     },
     data_dir: "C:\\Users\\Driver\\AppData\\Local\\Afterhours2015",
@@ -42,6 +47,19 @@ export async function sampleAppInfo(): Promise<AppInfo> {
     updater: { endpoint: null, configured: false },
     debug_build: true,
   };
+}
+
+/**
+ * `?sample&hosting`: a `serve` session hosting without a game, for the
+ * launch bar, the header pill and Host; `&hosting=game` has a game playing
+ * in it. `null` (no session) without `hosting`.
+ */
+export async function sampleStatus(): Promise<Status | null> {
+  if (!loadSample) throw new Error("Sample records exist in development builds only.");
+  const hosting = new URLSearchParams(window.location.search).get("hosting");
+  if (hosting === null) return null;
+  const { sampleHosting } = await loadSample();
+  return sampleHosting(hosting === "game");
 }
 
 /** A passing check, so the preview's first run reaches its last step. */

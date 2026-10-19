@@ -1,13 +1,10 @@
 <script lang="ts">
-  import type { LaunchBarModel } from "$lib/state/launchbar";
+  import type { LaunchBarModel, PlayAction } from "$lib/state/launchbar";
   import PlayButton from "./PlayButton.svelte";
   import StatusDot from "./StatusDot.svelte";
   // Always present, never on glass: the server and Play sit on the floor.
   // It never shows a car.
-  let {
-    model,
-    onPlay,
-  }: { model: LaunchBarModel; onPlay: (action: "start" | "serve" | "stop") => void } = $props();
+  let { model, onPlay }: { model: LaunchBarModel; onPlay: (action: PlayAction) => void } = $props();
 </script>
 
 <footer class="ah-on-art">
@@ -24,6 +21,7 @@
       label={model.play.label}
       disabled={model.play.disabled}
       busy={model.play.busy}
+      title={model.play.hint}
       onclick={() => model.play.action && onPlay(model.play.action)}
     />
   </div>

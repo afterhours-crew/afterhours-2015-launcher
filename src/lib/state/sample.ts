@@ -12,6 +12,7 @@ import type {
   ProfileList,
   SessionFileText,
   SessionList,
+  Status,
   VersionReport,
 } from "$lib/api/types";
 
@@ -25,8 +26,27 @@ export const SAMPLE_VERSION: VersionReport = {
   os: "windows",
   game_launch: true,
   records: { profile: 1, "profile-list": 1, sessions: 1, status: 1, version: 1 },
-  capabilities: ["profile", "sessions", "events"],
+  capabilities: ["profile", "sessions", "events", "play"],
 };
+
+/**
+ * A `serve` session the window started, hosting without a game; with
+ * `game`, a game started in it by `play` is running.
+ */
+export function sampleHosting(game: boolean): Status {
+  return {
+    version: 1,
+    id: "5e55a0f1c2b3d4e5f60718293a4b5c6d",
+    action: "serve",
+    game_running: game,
+    utc: "2026-10-19T12:00:00Z",
+    state: "ready",
+    message: game ? "Routing applied; the game is connected." : "Server listening.",
+    worker_pid: 4242,
+    game_pid: game ? 4244 : null,
+    server_pid: 4243,
+  };
+}
 
 const ACCOUNT = "0f1e2d3c4b5a69788796a5b4c3d2e1f0";
 const SAVE_PATH = `C:\\Users\\Driver\\AppData\\Local\\Afterhours2015\\artifacts\\account\\${ACCOUNT}.sqlite`;

@@ -8,6 +8,7 @@ import {
   SAMPLE_SESSIONS,
   SAMPLE_VERSION,
   sampleFile,
+  sampleHosting,
 } from "./sample";
 
 // The sample records must be what the server could print: each is
@@ -28,6 +29,8 @@ describe("sample records", () => {
     ["profile", SAMPLE_PROFILE],
     ["profile-list", SAMPLE_PROFILE_LIST],
     ["sessions", SAMPLE_SESSIONS],
+    ["status", { version: 1, session: sampleHosting(false) }],
+    ["status", { version: 1, session: sampleHosting(true) }],
   ])("match %s.schema.json", (name, value) => {
     const check = validator(name);
     expect(check(value), JSON.stringify(check.errors)).toBe(true);

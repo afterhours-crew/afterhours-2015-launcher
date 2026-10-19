@@ -1,9 +1,11 @@
 // The Host screen's model: the local server on its own, without the game.
 // Play in the launch bar runs `start` (server and game) on Windows; Host
-// runs `serve`, the server alone, for checking it or for other tools.
+// runs `serve`, the server alone, for checking it or for other tools. A
+// game played in that serve session makes it "In game" here too; stopping
+// then closes the game, then the server.
 
 import type { Status } from "$lib/api/types";
-import { isLive } from "./launchbar";
+import { sessionPhase } from "./launchbar";
 
 export interface HostInput {
   serverReady: boolean;
@@ -21,16 +23,43 @@ export interface HostModel {
   reason: string | null;
 }
 
+const WAIT = "Wait until the session is ready to stop it.";
+
 export function hostModel(input: HostInput): HostModel {
-  const state = input.status?.state;
-  if (isLive(state) && input.status) {
-    const ready = state === "ready";
-    return {
-      state: ready ? "Running · this PC only" : `${state![0]!.toUpperCase()}${state!.slice(1)}…`,
-      dot: ready ? "ready" : "info",
-      button: { label: "Stop", action: ready ? "stop" : null, disabled: !ready },
-      reason: ready ? null : "Wait until the session is ready to stop it.",
-    };
+  const busy = (state: string, label = "Stop"): HostModel => ({
+    state,
+    dot: "info",
+    button: { label, action: null, disabled: true },
+    reason: WAIT,
+  });
+  switch (sessionPhase(input.status)) {
+    case "hosting":
+      return {
+        state: "Hosting · server running",
+        dot: "ready",
+        button: { label: "Stop server", action: "stop", disabled: false },
+        reason: null,
+      };
+    case "in-game":
+      return {
+        state: "In game",
+        dot: "ready",
+        button: { label: "Stop", action: "stop", disabled: false },
+        reason: null,
+      };
+    case "preparing":
+      return busy("Preparing…");
+    case "starting":
+      return busy("Starting the game…");
+    case "activation":
+      return { ...busy("Sign in, in the game…"), dot: "warn" };
+    case "stopping":
+      return {
+        ...busy(input.status?.game_running ? "Closing the game…" : "Stopping…", "Stopping"),
+        reason: null,
+      };
+    case "idle":
+      break;
   }
   let reason: string | null = null;
   if (!input.serverReady) reason = "The bundled server is missing. See Settings › About.";
