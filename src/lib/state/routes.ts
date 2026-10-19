@@ -25,11 +25,18 @@ export interface Route {
   firstRun: boolean;
 }
 
-export const NAV: { id: View; label: string }[] = [
+export interface NavItem {
+  id: View;
+  label: string;
+  /** The screen is coming in a future update: its tab carries the clock mark. */
+  upcoming?: boolean;
+}
+
+export const NAV: NavItem[] = [
   { id: "garage", label: "Garage" },
   { id: "profile", label: "Profile" },
   { id: "world", label: "World" },
-  { id: "map", label: "Map" },
+  { id: "map", label: "Map", upcoming: true },
   { id: "host", label: "Host" },
   { id: "logs", label: "Logs" },
   { id: "settings", label: "Settings" },

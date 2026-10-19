@@ -1,13 +1,10 @@
 <script lang="ts">
   import { staggerIn } from "$lib/motion";
-  import IconMap from "@tabler/icons-svelte/icons/map";
   import ViewNote from "$lib/components/ViewNote.svelte";
-  import { hasCapability } from "$lib/state/capabilities";
-  import { session } from "$lib/state/session.svelte";
 
-  // The live map waits for the server's `map` capability (track 7). Until
-  // the screen is built, the view is its title and one note.
-  let ready = $derived(hasCapability(session.info?.server, "map"));
+  // The live map (track 7) needs the server's `map` feed and this screen,
+  // neither built yet. Until then the view is its title and the coming
+  // note, and its tab carries the clock mark.
 </script>
 
 <main use:staggerIn>
@@ -17,11 +14,7 @@
       <span class="t-caption">Ventura Bay as your server sees it: you, traffic and rivals.</span>
     </span>
     <div data-enter>
-      <ViewNote icon={IconMap}>
-        {ready
-          ? "Your server reports the live map. This launcher shows it in a later update."
-          : "The live map arrives with a later server update."}
-      </ViewNote>
+      <ViewNote>A live map of your server: where you, traffic and rivals are right now.</ViewNote>
     </div>
   </div>
 </main>

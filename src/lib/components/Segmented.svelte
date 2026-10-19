@@ -1,7 +1,11 @@
 <script lang="ts" generics="T extends string">
   import { slidingIndicator } from "$lib/motion";
-  // Pick one of two to four options. Real radio buttons in a group, so the
-  // arrow keys move between them; 38px targets.
+  import Upcoming from "./Upcoming.svelte";
+  import { UPCOMING } from "$lib/state/upcoming";
+  // Pick one of a few options. Real radio buttons in a group, so the arrow
+  // keys move between them; 38px targets. An `upcoming` option stays in
+  // view with the clock mark but cannot be picked, and the arrow keys skip
+  // it.
   let {
     options,
     value = $bindable(null),
@@ -9,7 +13,7 @@
     disabled = false,
     onchange,
   }: {
-    options: readonly { value: T; label: string }[];
+    options: readonly { value: T; label: string; upcoming?: boolean }[];
     /** `null` checks nothing: the current value is not known. */
     value: T | null;
     label: string;
@@ -17,22 +21,26 @@
     onchange?: (value: T) => void;
   } = $props();
 
+  let pickable = $derived(options.filter((o) => !o.upcoming));
+
   function pick(next: T) {
     if (disabled || next === value) return;
+    if (options.find((o) => o.value === next)?.upcoming) return;
     value = next;
     onchange?.(next);
   }
 
-  function key(event: KeyboardEvent, index: number) {
+  function key(event: KeyboardEvent, current: T) {
     const step =
       event.key === "ArrowRight" || event.key === "ArrowDown"
         ? 1
         : event.key === "ArrowLeft" || event.key === "ArrowUp"
           ? -1
           : 0;
-    if (step === 0) return;
+    if (step === 0 || pickable.length === 0) return;
     event.preventDefault();
-    const next = options[(index + step + options.length) % options.length];
+    const at = pickable.findIndex((o) => o.value === current);
+    const next = pickable[(at + step + pickable.length) % pickable.length];
     if (!next) return;
     pick(next.value);
     const group = (event.currentTarget as HTMLElement).parentElement;
@@ -47,15 +55,20 @@
   class="seg slider"
   use:slidingIndicator={{ selector: '[aria-checked="true"]' }}
 >
-  {#each options as option, i (option.value)}
+  {#each options as option (option.value)}
     <button
       type="button"
       role="radio"
       aria-checked={option.value === value}
-      tabindex={option.value === value || (value === null && i === 0) ? 0 : -1}
+      aria-label={option.upcoming ? `${option.label}, ${UPCOMING.toLowerCase()}` : undefined}
+      title={option.upcoming ? UPCOMING : undefined}
+      class:upcoming={option.upcoming}
+      tabindex={option.value === value || (value === null && option === pickable[0]) ? 0 : -1}
       {disabled}
+      aria-disabled={option.upcoming || undefined}
       onclick={() => pick(option.value)}
-      onkeydown={(e) => key(e, i)}>{option.label}</button
+      onkeydown={(e) => key(e, option.value)}
+      >{option.label}{#if option.upcoming}<Upcoming compact />{/if}</button
     >
   {/each}
 </div>
@@ -76,8 +89,11 @@
     font-weight: 600;
     font-size: 14px;
     font-variant-numeric: tabular-nums;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
   }
-  button:hover:not(:disabled):not([aria-checked="true"]) {
+  button:hover:not(:disabled):not(.upcoming):not([aria-checked="true"]) {
     background: var(--hover);
   }
   button[aria-checked="true"] {
@@ -86,6 +102,11 @@
   }
   button:disabled {
     cursor: default;
+    color: var(--ink-faint);
+  }
+  /* Shown, hoverable for its tooltip, never picked. */
+  button.upcoming {
+    cursor: help;
     color: var(--ink-faint);
   }
   button[aria-checked="true"]:disabled {

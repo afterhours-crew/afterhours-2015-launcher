@@ -11,7 +11,8 @@ them.
 **Preview stage.** The shell, the bundled server, the installer, the updater,
 the release workflows and the screens are in place. Each screen reads the
 bundled server through its JSON commands; what that server does not report
-is hidden, and the view gives one note that it arrives with a server update.
+yet stays in view, marked "Coming in a future update" the same way on every
+screen (design/README.md).
 With v0.3.0, which reports no capabilities, that is Profile, Cars, car
 pictures, Save data, the Logs dashboard and World's traffic and rivals
 (`world-settings`, on afterhours-2015's launcher branches); Cops and the Map

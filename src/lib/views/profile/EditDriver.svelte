@@ -6,7 +6,7 @@
   import Glass from "$lib/components/Glass.svelte";
   import IconArrowLeft from "@tabler/icons-svelte/icons/arrow-left";
   import Note from "$lib/components/Note.svelte";
-  import ViewNote from "$lib/components/ViewNote.svelte";
+  import Upcoming from "$lib/components/Upcoming.svelte";
   import { driverName } from "$lib/state/profile";
   import { router } from "$lib/state/router.svelte";
   import { session } from "$lib/state/session.svelte";
@@ -14,7 +14,7 @@
   // Edit driver (H4), one column. The picture is the launcher's own
   // setting and saves at once. Name, bank and REP live in the save;
   // changing them needs the server's account edit command (track 4), so
-  // the name shows read-only and one note says the rest is coming.
+  // they show read-only under the Upcoming pill.
   let { profile }: { profile: Profile | null; ready: boolean } = $props();
 
   const COLORS = [
@@ -69,13 +69,22 @@
     {#if saveError}<Note kind="warn">{saveError}</Note>{/if}
   </Glass>
 
-  <Glass radius="panel" label="Name" class="panel">
+  <Glass radius="panel" label="Name, bank and REP" class="panel">
+    <span class="head">
+      <h2 class="t-panel-title">Name, bank and REP</h2>
+      <Upcoming />
+    </span>
     <Field id="driver-name" label="Driver name" value={name} readonly maxlength={16} />
+    <div class="pair">
+      <Field id="driver-bank" label="Bank" value={profile?.bank?.formatted ?? "—"} readonly />
+      <Field
+        id="driver-rep"
+        label="REP level"
+        value={profile?.reputation?.level != null ? String(profile.reputation.level) : "—"}
+        readonly
+      />
+    </div>
   </Glass>
-
-  <div data-enter>
-    <ViewNote>Renaming, bank and REP changes arrive with a server update.</ViewNote>
-  </div>
 </div>
 
 <style>
@@ -103,6 +112,18 @@
   h1,
   h2 {
     margin: 0;
+  }
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 18px;
   }
   .back {
     min-height: 38px;

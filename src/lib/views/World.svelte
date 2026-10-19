@@ -3,27 +3,32 @@
   import { staggerIn } from "$lib/motion";
   import IconCar from "@tabler/icons-svelte/icons/car";
   import IconSwords from "@tabler/icons-svelte/icons/swords";
+  import IconUserShield from "@tabler/icons-svelte/icons/user-shield";
   import Glass from "$lib/components/Glass.svelte";
   import InfoButton from "$lib/components/InfoButton.svelte";
   import Note from "$lib/components/Note.svelte";
+  import NumberStepper from "$lib/components/NumberStepper.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
   import Segmented from "$lib/components/Segmented.svelte";
+  import Upcoming from "$lib/components/Upcoming.svelte";
   import ViewNote from "$lib/components/ViewNote.svelte";
   import { featureReady } from "$lib/state/capabilities";
   import { current, records } from "$lib/state/records.svelte";
   import { session } from "$lib/state/session.svelte";
-  import { rivalRow, trafficRow, worldLock, worldNote } from "$lib/state/world";
+  import { MAX_RIVALS, rivalField, trafficRow, worldLock, worldUpcoming } from "$lib/state/world";
 
-  // World (H5), one column. Traffic and roaming rivals are multipliers of
-  // the game's own amounts, saved with the server's `settings` command for
-  // the next session; a running session keeps the values it started with,
-  // so the controls rest while one runs. Cops wait for research. Without
-  // the server's `world-settings` the view is its title and one note.
+  // World (H5), one column. Traffic is a multiple of the game's own amount
+  // and roaming rivals a number, saved with the server's `settings` command
+  // for the next session; a running session keeps the values it started
+  // with, so the controls rest while one runs. Whatever is planned but not
+  // usable yet stays in view, marked as coming in a future update: traffic
+  // steps above the server's limit, cops, and without the server's
+  // `world-settings` the traffic and rival rows themselves.
   let reported = $derived(featureReady(session.info?.server, "traffic"));
   let load = $derived(records.world);
   let world = $derived(current(load));
   let traffic = $derived(world ? trafficRow(world) : null);
-  let rivals = $derived(world ? rivalRow(world) : null);
+  let rivals = $derived(world ? rivalField(world) : null);
   let locked = $derived(worldLock(session.status));
   let failure = $state<string | null>(null);
 
@@ -47,18 +52,25 @@
       >
     </span>
 
-    {#if reported}
-      {#if traffic && rivals}
-        <Glass radius="panel" label="World settings" class="settings">
-          <div class="list-row tall">
-            <IconCar size={20} stroke={1.6} aria-hidden="true" class="icon" />
-            <span class="grow name"
-              ><span class="t-body-strong">Traffic</span>
-              <InfoButton
-                label="About traffic"
-                text="How many cars your server spawns around you, as a multiple of the game's own amount. More than 1x costs game performance."
-              /></span
-            >
+    {#if reported && !traffic && load.kind === "error"}
+      <div data-enter><Note kind="warn">Could not read your settings: {load.message}</Note></div>
+      <div data-enter>
+        <PillButton onclick={() => records.loadWorld()}>Try again</PillButton>
+      </div>
+    {:else if reported && !traffic}
+      <p class="t-caption" data-enter>Reading your settings…</p>
+    {:else}
+      <Glass radius="panel" label="World settings" class="settings">
+        <div class="list-row tall">
+          <IconCar size={20} stroke={1.6} aria-hidden="true" class="icon" />
+          <span class="grow name"
+            ><span class="t-body-strong">Traffic</span>
+            <InfoButton
+              label="About traffic"
+              text="How many cars your server spawns around you, as a multiple of the game's own amount. More than 1x costs game performance."
+            /></span
+          >
+          {#if traffic}
             <Segmented
               options={traffic.options}
               value={traffic.selected}
@@ -66,34 +78,54 @@
               disabled={locked !== null}
               onchange={(value) => save("traffic", value)}
             />
-          </div>
-          <div class="list-row tall">
-            <IconSwords size={20} stroke={1.6} aria-hidden="true" class="icon" />
-            <span class="grow name"><span class="t-body-strong">Roaming rivals</span></span>
-            <Segmented
-              options={rivals.options}
-              value={rivals.selected}
-              label="Roaming rivals"
-              disabled={locked !== null}
-              onchange={(value) => save("rivals", value)}
-            />
-          </div>
-          {#if locked}<p class="t-caption line" role="status">{locked}</p>{/if}
-        </Glass>
-        {#if failure}
-          <div data-enter role="alert"><Note kind="warn">Not saved: {failure}</Note></div>
-        {/if}
-      {:else if load.kind === "error"}
-        <div data-enter><Note kind="warn">Could not read your settings: {load.message}</Note></div>
-        <div data-enter>
-          <PillButton onclick={() => records.loadWorld()}>Try again</PillButton>
+          {:else}
+            <Upcoming />
+          {/if}
         </div>
-      {:else}
-        <p class="t-caption" data-enter>Reading your settings…</p>
+        <div class="list-row tall">
+          <IconSwords size={20} stroke={1.6} aria-hidden="true" class="icon" />
+          <span class="grow name"
+            ><span class="t-body-strong">Roaming rivals</span>
+            <InfoButton
+              label="About roaming rivals"
+              text="The most roaming rivals at once, from 0 (off) to {MAX_RIVALS}. Auto keeps the game's own number. For now your server can only lower that number; more rivals than the game's own is coming in a future update."
+            /></span
+          >
+          {#if rivals}
+            <span class="rivals">
+              {#if rivals.value !== null}
+                <PillButton
+                  variant="text"
+                  disabled={locked !== null}
+                  onclick={() => save("rivals", "original")}>Auto</PillButton
+                >
+              {/if}
+              <NumberStepper
+                value={rivals.value}
+                max={rivals.max}
+                label="Roaming rivals"
+                placeholder="Auto"
+                disabled={locked !== null}
+                oncommit={(value) => save("rivals", String(value))}
+              />
+            </span>
+          {:else}
+            <Upcoming />
+          {/if}
+        </div>
+        <div class="list-row tall">
+          <IconUserShield size={20} stroke={1.6} aria-hidden="true" class="icon" />
+          <span class="grow name"><span class="t-body-strong">Cops</span></span>
+          <Upcoming />
+        </div>
+        {#if locked && traffic}<p class="t-caption line" role="status">{locked}</p>{/if}
+      </Glass>
+      {#if failure}
+        <div data-enter role="alert"><Note kind="warn">Not saved: {failure}</Note></div>
       {/if}
     {/if}
 
-    <div data-enter><ViewNote>{worldNote(reported)}</ViewNote></div>
+    <div data-enter><ViewNote>{worldUpcoming(reported, world)}</ViewNote></div>
   </div>
 </main>
 
@@ -138,6 +170,11 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
+  }
+  .rivals {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
   }
   .line {
     margin: 0;

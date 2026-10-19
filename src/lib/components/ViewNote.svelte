@@ -1,31 +1,40 @@
 <script lang="ts">
-  import IconInfoCircle from "@tabler/icons-svelte/icons/info-circle";
+  import IconClockHour4 from "@tabler/icons-svelte/icons/clock-hour-4";
   import type { Snippet } from "svelte";
-  import type { Glyph as Icon } from "./glyph";
-  // The one note a view gives about what the server cannot do yet. The
-  // controls it is about are hidden, not shown disabled with explanations.
-  let { icon: Glyph = IconInfoCircle, children }: { icon?: Icon; children: Snippet } = $props();
+  import { UPCOMING } from "$lib/state/upcoming";
+  // The one "coming" note a view gives: on a view whose main content is not
+  // here yet, or at the end of one with several upcoming items. It always
+  // reads "Coming in a future update" in the upcoming violet with a clock,
+  // like the Upcoming pill, then says what is coming as a short noun phrase.
+  let { children }: { children: Snippet } = $props();
 </script>
 
 <div class="note" role="note">
-  <Glyph size={20} stroke={1.6} aria-hidden="true" class="glyph" />
+  <span class="head">
+    <IconClockHour4 size={18} stroke={1.8} aria-hidden="true" />
+    <span>{UPCOMING}</span>
+  </span>
   <span class="text">{@render children()}</span>
 </div>
 
 <style>
   .note {
     display: flex;
-    align-items: center;
-    gap: 12px;
+    flex-direction: column;
+    gap: 6px;
     padding: 14px 18px;
     border-radius: var(--radius-panel);
     background: var(--graphite);
-    border: 1px solid rgba(169, 130, 255, 0.35);
+    border: 1px solid var(--upcoming-edge);
     box-shadow: var(--shadow-panel);
   }
-  .note :global(.glyph) {
-    flex: 0 0 auto;
-    color: var(--mods-ink);
+  .head {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--upcoming-ink);
+    font-size: 14px;
+    font-weight: 700;
   }
   .text {
     font-size: 16px;

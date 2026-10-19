@@ -29,12 +29,12 @@
     <div class="column" use:staggerIn>
       <h1 class="t-view-title" data-enter>Logs</h1>
       <div data-enter>
-        <ViewNote>
-          Earlier sessions and their files arrive with a server update. The session you start here
-          shows its log live on Host.
-        </ViewNote>
+        <ViewNote>Earlier sessions, their files and what they say.</ViewNote>
       </div>
-      <div data-enter><PillButton onclick={() => router.go("host")}>Open Host</PillButton></div>
+      <div class="now" data-enter>
+        <span class="t-caption">The session you start now shows its log live on Host.</span>
+        <PillButton onclick={() => router.go("host")}>Open Host</PillButton>
+      </div>
     </div>
   {:else if !list}
     <div class="column" use:staggerIn>
@@ -53,6 +53,13 @@
 </main>
 
 <style>
+  /* What works already, beside the coming note. */
+  .now {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
   main {
     position: relative;
     flex: 1 1 auto;

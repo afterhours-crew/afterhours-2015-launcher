@@ -21,8 +21,15 @@ first run (H10). The rules, which apply to every screen:
   disabled controls only.
 - **Sentence case** for labels, titles, buttons and navigation, with little
   letter-spacing. Only event-type tags are uppercase.
-- **One note per view** for what the server cannot do yet (`ViewNote`).
-  Unsupported controls are hidden, not shown disabled with explanations.
+- **Say what is coming, the same way everywhere.** Anything planned but not
+  usable yet stays in view, marked "Coming in a future update" in the
+  `upcoming` violet with a clock icon, never colour alone: the `Upcoming`
+  pill where the feature will be (a row, a panel heading), the compact clock
+  on a step or tab that cannot be picked yet (traffic 4x and 5x, the Map
+  tab), and one coming note (`ViewNote`) on a view whose main content is
+  not here yet or that has several upcoming items. The note says what is
+  coming as a short noun phrase; what already works sits beside it. Things
+  with no plan are not shown.
 - **Help behind an info button** (`InfoButton`): an ⓘ with an accessible
   name and a tooltip that opens on hover and on focus, instead of a sentence
   under every control.

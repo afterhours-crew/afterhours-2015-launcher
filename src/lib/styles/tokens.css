@@ -38,6 +38,9 @@
   --pii-callout: rgba(255,194,51,0.12);
   --mods-soft: rgba(169,130,255,0.22);
   --mods-ink: #CDB8FF;
+  --upcoming-soft: rgba(169,130,255,0.14);
+  --upcoming-edge: rgba(169,130,255,0.5);
+  --upcoming-ink: #CDB8FF;
   /* spacing */
   --space-1: 4px;
   --space-2: 8px;

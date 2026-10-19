@@ -56,12 +56,10 @@
       <div class="column" use:staggerIn>
         <h1 class="t-view-title" data-enter>Profile</h1>
         <div data-enter>
-          <ViewNote>
-            Your driver, cars and save data arrive with a server update. You can already pick your
-            picture.
-          </ViewNote>
+          <ViewNote>Your driver, cars and save data, read from your save.</ViewNote>
         </div>
-        <div data-enter>
+        <div class="now" data-enter>
+          <span class="t-caption">You can already pick your picture.</span>
           <PillButton onclick={() => router.go("profile", "edit-driver")}>Edit driver</PillButton>
         </div>
       </div>
@@ -93,6 +91,13 @@
 </main>
 
 <style>
+  /* What works already, beside the coming note. */
+  .now {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
   main {
     position: relative;
     flex: 1 1 auto;
