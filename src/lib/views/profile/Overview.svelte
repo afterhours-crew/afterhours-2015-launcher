@@ -5,53 +5,61 @@
   import { staggerDelay } from "$lib/state/motion";
   import type { Profile } from "$lib/api/types";
   import Avatar from "$lib/components/Avatar.svelte";
+  import EmptyLine from "$lib/components/EmptyLine.svelte";
   import Glass from "$lib/components/Glass.svelte";
+  import IconCar from "@tabler/icons-svelte/icons/car";
   import IconChartBar from "@tabler/icons-svelte/icons/chart-bar";
   import IconFlag3 from "@tabler/icons-svelte/icons/flag-3";
   import IconSteeringWheel from "@tabler/icons-svelte/icons/steering-wheel";
+  import InfoButton from "$lib/components/InfoButton.svelte";
   import PanelHeading from "$lib/components/PanelHeading.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
+  import ShowMore from "$lib/components/ShowMore.svelte";
   import { garageList } from "$lib/state/cars";
   import {
-    collection,
+    collectionRows,
     driverCard,
+    recordedStats,
     repCategories,
     repProgress,
-    saveFacts,
     speedList,
     tableTiles,
   } from "$lib/state/profile";
   import { router } from "$lib/state/router.svelte";
   import { session } from "$lib/state/session.svelte";
 
-  // Profile from the save (D1). Stats are the raw stored integers: the
-  // game's units for distance, time and speed are not confirmed.
+  // Profile overview (G1b). Two text levels per panel; help sits behind ⓘ.
+  // Stats are the raw stored integers: the game's units for distance, time
+  // and speed are not confirmed, and the ⓘ says so.
   let { profile }: { profile: Profile } = $props();
 
   let now = $derived(new Date());
   let card = $derived(driverCard(profile, now));
   let progress = $derived(repProgress(profile.reputation));
   let categories = $derived(repCategories(profile.reputation, profile.tables));
-  let stats = $derived(tableTiles(profile.tables?.["GameplayStatsTable"], profile.cars));
+  let stats = $derived(
+    recordedStats(tableTiles(profile.tables?.["GameplayStatsTable"], profile.cars)),
+  );
   let speed = $derived(speedList(profile.tables));
+  let started = $derived(
+    speed ? (profile.tables?.["SpeedListStatsTable"]?.["Started"]?.value ?? 0) : 0,
+  );
   let cars = $derived(profile.cars ? garageList(profile.cars) : null);
-  let tiles = $derived(collection(profile.counts, profile.cars));
-  let save = $derived(saveFacts(profile.save, now));
+  let held = $derived(collectionRows(profile.counts));
 </script>
 
 <div class="layout" use:staggerIn>
   <div class="main">
-    <Glass dense radius="panel" label="Driver" class="driver">
+    <Glass radius="panel" label="Driver" class="panel">
       <div class="who">
-        <Avatar name={card.name} color={session.settings.avatar} size={84} />
-        <div class="names">
-          <span class="t-label soft">Driver profile</span>
-          <h1 class="t-car-name">{card.name}</h1>
-          <span class="t-data soft">{card.subline}</span>
-        </div>
-        <div class="figures">
+        <Avatar name={card.name} color={session.settings.avatar} size={64} />
+        <span class="names">
+          <h1 class="t-view-title">{card.name}</h1>
+          {#if card.subline}<span class="t-caption">{card.subline}</span>{/if}
+        </span>
+        <span class="figures">
           <span class="figure"
-            ><span class="t-label muted">REP level</span><span class="t-countdown"
+            ><span class="t-caption">REP level</span><span class="t-big"
               >{#if profile.reputation?.level != null}<CountUp
                   value={profile.reputation.level}
                   format={String}
@@ -59,20 +67,20 @@
             ></span
           >
           <span class="figure"
-            ><span class="t-label muted">Bank</span><span class="t-countdown"
+            ><span class="t-caption">Bank</span><span class="t-big"
               >{#if profile.bank}<CountUp
                   value={profile.bank.balance}
                   format={formatMoney}
                 />{:else}{card.bank}{/if}</span
             ></span
           >
-        </div>
+        </span>
       </div>
       {#if progress}
         <div class="progress">
           <div class="progress-text">
             <span class="t-body-strong">{progress.title}</span>
-            <span class="t-data soft">{progress.detail}</span>
+            <span class="t-data">{progress.detail}</span>
           </div>
           <div
             class="bar"
@@ -88,24 +96,23 @@
           </div>
         </div>
       {/if}
-      <div class="buttons">
+      <div>
         <PillButton onclick={() => router.go("profile", "edit-driver")}>Edit driver</PillButton>
-        <PillButton variant="text" onclick={() => router.go("profile", "save-data")}
-          >Save data</PillButton
-        >
       </div>
     </Glass>
 
     {#if categories}
-      <Glass dense radius="card" label="REP by category" class="card">
-        <PanelHeading icon={IconChartBar}>REP by category</PanelHeading>
+      <Glass radius="panel" label="REP by category" class="panel">
+        <PanelHeading icon={IconChartBar}>
+          REP by category
+          {#snippet aside()}<InfoButton
+              label="About REP categories"
+              text="Each event type earns its own REP. Medals come from the prestige table in your save; what each value means is not decoded yet."
+            />{/snippet}
+        </PanelHeading>
         <div class="categories">
-          <span class="t-label muted" aria-hidden="true"></span>
-          <span class="t-label muted" aria-hidden="true"></span>
-          <span class="t-label muted right">Score</span>
-          <span class="t-label muted right">Medal</span>
           {#each categories as row, i (row.key)}
-            <span class="tag" style="background: {row.color}">{row.label}</span>
+            <span class="t-tag tag" style="background: {row.color}">{row.label}</span>
             <div class="track" aria-hidden="true">
               <div
                 class="grow-x"
@@ -114,135 +121,114 @@
                 )}%; background: {row.color}; --grow-delay: {80 + staggerDelay(i)}ms"
               ></div>
             </div>
-            <span class="t-data right">{row.score}</span>
-            <span class="t-data right soft">{row.medal}</span>
+            <span class="t-num" class:zero={row.fraction === 0}>{row.score}</span>
           {/each}
         </div>
-        <span class="caption rule"
-          >Medals are the stored PrestigeMedalTable values; what each number means is not decoded
-          yet.</span
-        >
       </Glass>
     {/if}
 
-    {#if stats.length > 0}
-      <Glass dense radius="card" label="Driving stats" class="card">
-        <PanelHeading icon={IconSteeringWheel}>
-          Driving stats
-          {#snippet aside()}<span class="caption">Raw stored values · units unconfirmed</span
-            >{/snippet}
-        </PanelHeading>
-        <div class="tiles" use:staggerIn={{ selector: ".tile" }}>
+    <Glass radius="panel" label="Driving stats" class="panel">
+      <PanelHeading icon={IconSteeringWheel}>
+        Driving stats
+        {#snippet aside()}{#if stats.length > 0}<InfoButton
+              label="About driving stats"
+              text="Raw values from your save. The game's units for distance, time and speed are not confirmed, so none are shown."
+            />{/if}{/snippet}
+      </PanelHeading>
+      {#if stats.length === 0}
+        <EmptyLine
+          >No driving stats yet. They fill in as your server records your driving.</EmptyLine
+        >
+      {:else}
+        <div class="rows">
           {#each stats as tile (tile.column)}
-            <div class="tile">
-              <span class="t-label muted">{tile.label}</span>
+            <div class="list-row">
+              <span class="grow">{tile.name ? "Favorite car" : tile.label}</span>
               {#if tile.name}
-                <span class="t-body-strong">{tile.name}</span>
-                <span class="t-data-small soft">item {tile.value}</span>
+                <span class="t-num">{tile.name}</span>
               {:else}
-                <span class="t-countdown small" class:soft={!tile.stored}
+                <span class="t-num"
                   >{#if tile.raw !== null}<CountUp
                       value={tile.raw}
                       format={formatCount}
                     />{:else}{tile.value}{/if}</span
                 >
               {/if}
-              {#if !tile.stored}<span class="caption">Not saved yet · default</span>{/if}
             </div>
           {/each}
         </div>
-      </Glass>
-    {/if}
-
-    {#if speed}
-      <Glass dense radius="card" label="SpeedList" class="card">
-        <PanelHeading icon={IconFlag3}>
-          SpeedList
-          {#snippet aside()}<span class="t-data soft">{speed.summary}</span>{/snippet}
-        </PanelHeading>
-        <div
-          class="histogram"
-          role="img"
-          aria-label="Finishing positions: {speed.positions
-            .map((p) => `${p.label} ${p.count}`)
-            .join(', ')}"
+      {/if}
+      {#if speed}
+        <ShowMore
+          label="SpeedList"
+          icon={IconFlag3}
+          summary={started > 0 ? speed.summary : "no races yet"}
         >
-          {#each speed.positions as p (p.label)}
-            <div class="column">
-              <span class="t-data-small">{p.count}</span>
-              <div
-                class="bar-v grow-y"
-                style="height: {Math.max(2, Math.round(p.fraction * 80))}px; opacity: {p.count
-                  ? 0.4 + 0.6 * p.fraction
-                  : 0.25}"
-              ></div>
-              <span class="t-label muted">{p.label}</span>
-            </div>
-          {/each}
-        </div>
-      </Glass>
-    {/if}
+          <div
+            class="histogram"
+            role="img"
+            aria-label="Finishing positions: {speed.positions
+              .map((p) => `${p.label} ${p.count}`)
+              .join(', ')}"
+          >
+            {#each speed.positions as p (p.label)}
+              <div class="column">
+                <span class="t-data">{p.count}</span>
+                <div
+                  class="bar-v grow-y"
+                  style="height: {Math.max(2, Math.round(p.fraction * 80))}px; opacity: {p.count
+                    ? 0.4 + 0.6 * p.fraction
+                    : 0.25}"
+                ></div>
+                <span class="t-data">{p.label}</span>
+              </div>
+            {/each}
+          </div>
+        </ShowMore>
+      {/if}
+    </Glass>
   </div>
 
   <aside>
-    <Glass dense radius="phone" label="Garage and save" class="side">
-      {#if cars && profile.car_summary}
-        <div class="side-head">
-          <h2 class="t-panel-title">Cars</h2>
-          <span class="t-data-small soft"
-            >{profile.cars?.length} · {profile.car_summary.garage_used} garage · {profile
-              .car_summary.warehouse_used} warehouse</span
-          >
-        </div>
-        <ol class="garage">
+    <Glass radius="phone" label="Cars and collection" class="panel side">
+      <PanelHeading icon={IconCar}>
+        Cars
+        {#snippet aside()}{#if profile.cars}<span class="t-num"
+              >{formatCount(profile.cars.length)}</span
+            >{/if}{/snippet}
+      </PanelHeading>
+      {#if cars}
+        <div class="rows">
           {#each cars.garage as car (car.slot)}
-            <li>
-              <span class="t-data slot">{car.slot}</span>
-              <span class="t-body-strong car">{car.name}</span>
-              {#if car.active}<span class="active">Active</span>{/if}
-            </li>
+            <div class="list-row">
+              <span class="grow t-body-strong car">{car.name}</span>
+              {#if car.active}<span class="active">Active</span>{:else}<span class="t-caption"
+                  >Garage</span
+                >{/if}
+            </div>
           {/each}
           {#if cars.warehouse}
-            <li class="more">
-              <span class="slot" aria-hidden="true"></span><span>{cars.warehouse}</span>
-            </li>
+            <div class="list-row"><span class="grow">{cars.warehouse}</span></div>
           {/if}
-        </ol>
-        <div class="pad">
+        </div>
+        <div>
           <PillButton onclick={() => router.go("profile", "cars")}>All cars</PillButton>
         </div>
       {:else}
-        <div class="side-head"><h2 class="t-panel-title">Cars</h2></div>
-        <p class="caption pad">The server could not list cars without the game's item content.</p>
+        <EmptyLine>Cars show once the game's content has been prepared.</EmptyLine>
       {/if}
 
-      <div class="section">
+      <div class="collection">
         <h2 class="t-panel-title">Collection</h2>
-        <div class="collection">
-          {#each tiles as tile (tile.label)}
-            <span class="count"
-              ><span class="t-countdown small">{tile.value}</span><span class="t-label muted"
-                >{tile.label}</span
-              ></span
-            >
+        <div class="rows">
+          {#each held.rows as row (row.label)}
+            <div class="list-row">
+              <span class="grow">{row.label}</span><span class="t-num">{row.value}</span>
+            </div>
           {/each}
-        </div>
-      </div>
-
-      <div class="section">
-        <h2 class="t-panel-title">Save file</h2>
-        <dl class="facts">
-          <dt class="t-label muted">File</dt>
-          <dd class="t-data">{save.file}</dd>
-          <dt class="t-label muted">Schema</dt>
-          <dd class="t-data">{save.schema}</dd>
-          <dt class="t-label muted">Saves</dt>
-          <dd class="t-data">{save.generation}</dd>
-          <dt class="t-label muted">Last saved</dt>
-          <dd class="t-data">{save.saved}</dd>
-        </dl>
-        <div>
-          <PillButton onclick={() => router.go("profile", "save-data")}>Open save data</PillButton>
+          {#if held.none}
+            <div class="list-row"><span class="grow t-caption">{held.none}</span></div>
+          {/if}
         </div>
       </div>
     </Glass>
@@ -257,37 +243,35 @@
     align-items: flex-start;
   }
   .main {
-    flex: 999 1 600px;
+    flex: 999 1 560px;
     min-width: 0;
+    max-width: 820px;
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
+    gap: var(--space-5);
   }
-  .main :global(.driver) {
-    padding: 22px 24px;
+  .layout :global(.panel) {
+    padding: 24px;
     display: flex;
     flex-direction: column;
     gap: 18px;
   }
-  .main :global(.card) {
-    border-radius: var(--radius-panel);
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+  aside {
+    flex: 1 1 320px;
+    max-width: 380px;
   }
   .who {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 18px 24px;
+    gap: 20px;
   }
   .names {
-    flex: 1 1 220px;
+    flex: 1 1 200px;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
   }
   .names h1 {
     margin: 0;
@@ -296,18 +280,12 @@
   .figures {
     display: flex;
     flex-wrap: wrap;
-    gap: 28px;
+    gap: 36px;
   }
   .figure {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-  }
-  .soft {
-    color: var(--ink-soft);
-  }
-  .muted {
-    color: var(--ink-muted);
+    gap: 4px;
   }
   .progress {
     display: flex;
@@ -318,188 +296,79 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-    gap: 4px 16px;
+    gap: 4px 12px;
   }
-  .bar {
+  .bar,
+  .track {
     height: 8px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-pill);
+    background: var(--graphite-raised);
     overflow: hidden;
   }
   .fill {
+    min-width: 8px;
     height: 100%;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(--ink);
   }
-  .buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+  .track > div {
+    height: 100%;
   }
   .categories {
     display: grid;
-    grid-template-columns: 96px minmax(0, 1fr) 96px 96px;
-    gap: 12px 16px;
+    grid-template-columns: 92px minmax(0, 1fr) 80px;
+    gap: 14px 16px;
     align-items: center;
-  }
-  .right {
-    text-align: right;
   }
   .tag {
     justify-self: start;
     padding: 2px 10px;
     border-radius: var(--radius-pill);
     color: var(--on-ink);
-    font: 700 11px/16px var(--font-ui);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
   }
-  .track {
-    height: 10px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.1);
-    overflow: hidden;
-  }
-  .track > div {
-    height: 100%;
-  }
-  .caption {
-    font-size: 13px;
-    line-height: 18px;
+  .zero {
     color: var(--ink-soft);
-  }
-  .rule {
-    padding-top: 8px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-  }
-  .tiles {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-    gap: 10px;
-  }
-  .tile {
-    padding: 12px 14px;
-    border-radius: var(--radius-row);
-    background: var(--field);
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-  .small {
-    font-size: 20px;
   }
   .histogram {
     display: grid;
     grid-template-columns: repeat(8, minmax(0, 1fr));
     gap: 10px;
     align-items: end;
-    height: 120px;
+    padding: 4px 6px 8px;
   }
   .column {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-end;
-    gap: 4px;
-    height: 100%;
+    gap: 6px;
   }
   .bar-v {
     width: 100%;
-    border-radius: 8px 8px 2px 2px;
-    background: var(--ink);
-  }
-  aside {
-    flex: 1 1 300px;
-    max-width: 360px;
-  }
-  aside :global(.side) {
-    padding: 20px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-  .side-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 0 6px;
-  }
-  h2 {
-    margin: 0;
-  }
-  .garage {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .garage li {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-height: 40px;
-    padding: 4px 8px;
-  }
-  .slot {
-    width: 14px;
-    flex: 0 0 auto;
-    color: var(--ink-soft);
+    max-width: 36px;
+    border-radius: 4px 4px 0 0;
+    background: var(--speed);
   }
   .car {
-    flex: 1 1 auto;
-    min-width: 0;
-    line-height: 1.25;
-    overflow-wrap: anywhere;
+    line-height: 1.3;
   }
   .active {
-    padding: 0 8px;
+    flex: 0 0 auto;
+    padding: 2px 10px;
     border-radius: var(--radius-pill);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    font: 700 10px/16px var(--font-ui);
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-  }
-  .more {
-    color: var(--ink-soft);
-    font-size: 14px;
-  }
-  .pad {
-    padding: 0 6px;
-  }
-  .section {
-    padding: 12px 6px 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    border: 1px solid var(--crew);
+    color: var(--crew);
+    font-size: 13px;
+    font-weight: 600;
   }
   .collection {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px 12px;
-  }
-  .count .t-label {
-    font-size: 10px;
-    letter-spacing: 0.03em;
-    white-space: nowrap;
-  }
-  .count {
+    padding-top: 8px;
+    border-top: 1px solid var(--graphite-edge);
     display: flex;
     flex-direction: column;
+    gap: 4px;
   }
-  .facts {
+  .collection h2 {
     margin: 0;
-    display: grid;
-    grid-template-columns: 78px minmax(0, 1fr);
-    gap: 4px 12px;
-    align-items: baseline;
-  }
-  .facts dd {
-    margin: 0;
-    overflow-wrap: anywhere;
+    padding: 10px 0 4px;
   }
 </style>

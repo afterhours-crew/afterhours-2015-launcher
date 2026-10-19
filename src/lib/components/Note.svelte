@@ -11,11 +11,11 @@
   .note {
     padding: 12px 14px;
     border-radius: var(--radius-row);
-    background: var(--field);
-    border: 1px solid var(--glass-edge);
-    color: var(--ink-soft);
-    font-size: 14px;
-    line-height: 1.4;
+    background: var(--graphite-raised);
+    border: 1px solid var(--graphite-edge);
+    color: var(--ink);
+    font-size: 16px;
+    line-height: 1.5;
   }
   .warn {
     background: var(--warn-soft);

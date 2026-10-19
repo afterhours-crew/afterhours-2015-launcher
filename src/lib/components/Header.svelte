@@ -85,9 +85,8 @@
   }
   .wordmark {
     font-weight: 700;
-    font-size: 18px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font-size: 20px;
+    letter-spacing: 0.02em;
   }
   .profile {
     display: flex;
@@ -118,7 +117,8 @@
     line-height: 1.15;
   }
   .name {
-    font-weight: 700;
+    font-weight: 600;
+    font-size: 14px;
   }
   .sub {
     color: var(--ink-soft);

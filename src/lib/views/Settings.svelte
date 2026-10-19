@@ -110,7 +110,7 @@
     border-top: 1px solid rgba(255, 255, 255, 0.08);
   }
   .content :global(.row .t-label) {
-    color: var(--ink-muted);
+    color: var(--ink-soft);
   }
   .content :global(.row .value) {
     color: var(--ink-soft);

@@ -464,7 +464,7 @@
     padding: 14px 16px;
     border-radius: var(--radius-card);
     background: var(--field);
-    border: 1px solid var(--glass-edge);
+    border: 1px solid var(--graphite-edge);
     text-align: left;
   }
   button.card:hover {
@@ -550,7 +550,7 @@
   th {
     text-align: left;
     padding: 10px 14px;
-    color: var(--ink-muted);
+    color: var(--ink-soft);
   }
   td {
     padding: 8px 14px;

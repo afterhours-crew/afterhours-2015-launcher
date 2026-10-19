@@ -43,7 +43,7 @@
     padding: 2px 10px;
     border-radius: var(--radius-pill);
     background: var(--field);
-    color: var(--ink-muted);
+    color: var(--ink-soft);
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.05em;
@@ -59,6 +59,6 @@
     margin: 0;
   }
   .track {
-    color: var(--ink-muted);
+    color: var(--ink-soft);
   }
 </style>

@@ -3,7 +3,8 @@
 // design/tokens.json is the design system's token file, copied verbatim.
 // Every token becomes a CSS custom property on :root so components never
 // hard-code a color, size, radius or blur. Aliases such as "{crew}" become
-// var() references. Type styles become utility classes named .t-<style>.
+// var() references. Type styles become utility classes named .t-<style>,
+// sentence case unless the style names a textTransform.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,7 +24,7 @@ function value(raw) {
   return alias ? `var(--${alias[1]})` : raw;
 }
 
-for (const family of ["color", "spacing", "radius", "shadow", "blur", "size"]) {
+for (const family of ["color", "spacing", "radius", "shadow", "size"]) {
   const group = tokens[family];
   if (!group?.tokens) continue;
   lines.push(`  /* ${family} */`);
@@ -47,9 +48,8 @@ for (const group of tokens.type.groups) {
       `font-weight: ${style.fontWeight};`,
     ];
     if (style.letterSpacing) decl.push(`letter-spacing: ${style.letterSpacing};`);
-    if (group.name !== "Data" && !["body", "body-strong", "caption"].includes(style.name)) {
-      decl.push(`text-transform: uppercase;`);
-    }
+    // Sentence case unless a style says otherwise (only event-type tags do).
+    if (style.textTransform) decl.push(`text-transform: ${style.textTransform};`);
     // Figures line up wherever numbers are data: the clock, counts, money, times.
     if (group.name === "Data" || style.name === "clock")
       decl.push(`font-variant-numeric: tabular-nums;`);

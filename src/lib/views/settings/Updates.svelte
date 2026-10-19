@@ -168,7 +168,7 @@
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    border: 2px solid var(--ink-muted);
+    border: 2px solid var(--ink-soft);
   }
   .mode[aria-checked="true"] .radio {
     border-color: var(--ink);

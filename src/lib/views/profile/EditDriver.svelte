@@ -133,7 +133,7 @@
                 value={level}
                 disabled
               />
-              <span class="t-countdown"
+              <span class="t-big"
                 >{level}{#if maxLevel}<span class="of"> / {maxLevel}</span>{/if}</span
               >
             </div>
@@ -296,7 +296,7 @@
     color: var(--ink-soft);
   }
   .muted {
-    color: var(--ink-muted);
+    color: var(--ink-soft);
   }
   .section {
     padding-top: 14px;

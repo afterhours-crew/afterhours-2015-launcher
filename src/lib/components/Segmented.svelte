@@ -67,15 +67,15 @@
     gap: 4px;
     padding: 4px;
     border-radius: var(--radius-pill);
-    background: var(--field);
+    background: var(--graphite-raised);
   }
   button {
     min-height: var(--control-height);
-    padding: 0 12px;
+    padding: 0 14px;
     border-radius: var(--radius-pill);
-    font-weight: 700;
-    font-size: 13px;
-    letter-spacing: 0.03em;
+    font-weight: 600;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
   }
   button:hover:not(:disabled):not([aria-checked="true"]) {
     background: var(--hover);
@@ -89,7 +89,7 @@
     color: var(--ink-faint);
   }
   button[aria-checked="true"]:disabled {
-    background: rgba(244, 240, 234, 0.4);
+    background: var(--ink-faint);
     color: var(--on-ink);
   }
 </style>

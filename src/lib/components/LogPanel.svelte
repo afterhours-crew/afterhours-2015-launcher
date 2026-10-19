@@ -102,7 +102,7 @@
     {#each lines as line, i (first + i)}
       {#if line.kind === "status"}
         <div>
-          <span style="color: {colors[line.state] ?? 'var(--ink-muted)'}">{line.time}</span>
+          <span style="color: {colors[line.state] ?? 'var(--ink-soft)'}">{line.time}</span>
           {line.state} · {line.message}
         </div>
       {:else}
@@ -128,7 +128,7 @@
     gap: 8px;
     padding: 16px;
     border-radius: var(--radius-panel);
-    background: var(--log);
+    background: var(--graphite);
   }
   .head {
     display: flex;
@@ -137,10 +137,10 @@
   }
   h2 {
     margin: 0;
-    color: var(--ink-muted);
+    color: var(--ink-soft);
   }
   .link {
-    color: var(--ink-muted);
+    color: var(--ink-soft);
     text-decoration: underline;
   }
   .lines {
@@ -154,7 +154,7 @@
     line-height: 1.8;
     white-space: pre-wrap;
     word-break: break-word;
-    color: var(--ink-muted);
+    color: var(--ink-soft);
     user-select: text;
     -webkit-user-select: text;
   }
@@ -181,7 +181,7 @@
     font-size: 12px;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    box-shadow: var(--shadow-glass);
+    box-shadow: var(--shadow-panel);
   }
   .new {
     padding: 0 8px;

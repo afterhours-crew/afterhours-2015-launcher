@@ -51,7 +51,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 13px;
+    font-size: 14px;
     color: var(--ink-soft);
     text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
   }
@@ -64,9 +64,9 @@
     gap: 8px;
     border-radius: var(--radius-pill);
     font-weight: 700;
-    font-size: 13px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    font-size: 14px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
   }
   .play {
     background: var(--play);
@@ -76,9 +76,7 @@
     filter: brightness(1.06);
   }
   .live {
-    background: var(--glass);
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
-    backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+    background: var(--graphite);
     color: var(--ink);
   }
   .live:hover:not(:disabled) {
@@ -88,7 +86,7 @@
     cursor: default;
   }
   .blocked {
-    background: var(--field);
+    background: var(--graphite);
     color: var(--ink-faint);
     cursor: default;
   }

@@ -76,6 +76,8 @@
     margin: 12px var(--space-6) 0;
     padding: 10px 10px 10px 16px;
     border-radius: var(--radius-row);
+    background: var(--graphite);
+    border: 1px solid var(--graphite-edge);
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -91,12 +93,12 @@
   }
   .title :global(.status) {
     color: var(--ink);
-    font-weight: 700;
-    font-size: 14px;
+    font-weight: 600;
+    font-size: 16px;
   }
   .line {
     color: var(--ink-soft);
-    font-size: 13px;
+    font-size: 14px;
   }
   .notes {
     overflow: hidden;

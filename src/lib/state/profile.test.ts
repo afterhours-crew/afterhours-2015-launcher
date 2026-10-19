@@ -3,6 +3,8 @@ import type { Profile } from "$lib/api/types";
 import {
   baseName,
   collection,
+  collectionRows,
+  recordedStats,
   driverCard,
   headerLine,
   repCategories,
@@ -43,31 +45,24 @@ describe("driver", () => {
     expect(headerLine(null)).toBeNull();
   });
 
-  it("names the driver, the persona and the last save", () => {
+  it("names the driver and the last save", () => {
     expect(driverCard(SAMPLE_PROFILE, NOW, UTC)).toEqual({
       name: "Driver",
       initials: "DR",
-      subline: "Persona 1000000000000000001 · last saved today 19:40",
+      subline: "Last saved today 19:40",
       level: "18",
       bank: "$250,000",
     });
     const card = driverCard(bare(), NOW, UTC);
     expect(card).toMatchObject({ name: "Driver", subline: "", level: "—", bank: "—" });
   });
-
-  it("keeps the persona ID's digits beyond 2^53", () => {
-    const big = { ...SAMPLE_PROFILE.identity!, persona_id: "1666824901114517107" };
-    expect(driverCard({ ...SAMPLE_PROFILE, identity: big }, NOW, UTC).subline).toContain(
-      "Persona 1666824901114517107",
-    );
-  });
 });
 
 describe("REP", () => {
   it("measures progress within the current level", () => {
     const p = repProgress(SAMPLE_PROFILE.reputation)!;
-    expect(p.title).toBe("Level 18 → 19");
-    expect(p.detail).toBe("37,650 REP to go · 412,350 total");
+    expect(p.title).toBe("Level 19 next");
+    expect(p.detail).toBe("37,650 REP to go");
     expect(p.into).toBe(32_350);
     expect(p.span).toBe(70_000);
     expect(p.fraction).toBeCloseTo(0.4621, 3);
@@ -83,7 +78,8 @@ describe("REP", () => {
     const p = repProgress(rep)!;
     expect(p.nextLevel).toBeNull();
     expect(p.fraction).toBe(1);
-    expect(p.title).toBe("Level 70 · top level");
+    expect(p.title).toBe("Top level");
+    expect(p.detail).toBe("412,350 REP in all");
   });
 
   it("clamps a score outside the thresholds and reads nothing without a score", () => {
@@ -167,6 +163,54 @@ describe("stats", () => {
       "12",
       "61",
     ]);
+  });
+});
+
+describe("collection rows", () => {
+  it("lists what the save holds", () => {
+    expect(collectionRows(SAMPLE_PROFILE.counts)).toEqual({
+      rows: [
+        { label: "Items", value: "533" },
+        { label: "Wraps", value: "3" },
+        { label: "Collectibles", value: "37" },
+        { label: "Activities", value: "12" },
+        { label: "Places", value: "61" },
+      ],
+      none: null,
+    });
+  });
+
+  it("folds every empty or unknown count into one line", () => {
+    const counts = {
+      ...SAMPLE_PROFILE.counts,
+      livery_records: 8,
+      collectibles: 0,
+      activities: null,
+      points_of_interest: 0,
+    };
+    expect(collectionRows(counts)).toEqual({
+      rows: [
+        { label: "Items", value: "533" },
+        { label: "Wraps", value: "8" },
+      ],
+      none: "Collectibles, activities and places: none yet",
+    });
+    expect(collectionRows({ ...counts, items: 0, livery_records: 0 }).none).toBe(
+      "Items, wraps, collectibles, activities and places: none yet",
+    );
+    expect(collectionRows({ ...SAMPLE_PROFILE.counts, collectibles: 0 }).none).toBe(
+      "Collectibles: none yet",
+    );
+  });
+});
+
+describe("driving stats", () => {
+  it("shows only the stats the save holds", () => {
+    const tiles = tableTiles(SAMPLE_PROFILE.tables?.["GameplayStatsTable"], SAMPLE_PROFILE.cars);
+    const recorded = recordedStats(tiles);
+    expect(recorded.length).toBeLessThan(tiles.length);
+    expect(recorded.every((t) => t.stored)).toBe(true);
+    expect(recordedStats([])).toEqual([]);
   });
 });
 

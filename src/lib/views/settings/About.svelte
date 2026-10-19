@@ -114,7 +114,7 @@
 <style>
   .fine {
     margin: 0;
-    color: var(--ink-muted);
+    color: var(--ink-soft);
     font-size: 13px;
   }
 </style>

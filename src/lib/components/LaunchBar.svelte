@@ -43,10 +43,8 @@
     min-width: 0;
   }
   .eyebrow {
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-size: 14px;
+    font-weight: 600;
     color: var(--ink-soft);
   }
   .summary {

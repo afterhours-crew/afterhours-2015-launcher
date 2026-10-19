@@ -380,7 +380,7 @@
     flex: 1 1 auto;
   }
   .check .value {
-    color: var(--ink-muted);
+    color: var(--ink-soft);
     max-width: 60%;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -407,7 +407,7 @@
     justify-content: space-between;
   }
   .choice-head .t-label {
-    color: var(--ink-muted);
+    color: var(--ink-soft);
   }
   .hint {
     font-size: 13px;

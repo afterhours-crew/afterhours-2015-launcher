@@ -32,17 +32,17 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    min-height: 46px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    min-height: 48px;
+    border-top: 1px solid var(--graphite-edge);
   }
   .text {
     display: flex;
     flex-direction: column;
-    line-height: 1.25;
+    line-height: 1.4;
   }
   .hint {
-    font-size: 13px;
-    color: var(--ink-muted);
+    font-size: 14px;
+    color: var(--ink-soft);
   }
   .track {
     flex: 0 0 auto;
@@ -52,8 +52,8 @@
     display: flex;
     justify-content: flex-start;
     border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    background: var(--field);
+    border: 1px solid var(--graphite-outline);
+    background: var(--graphite-raised);
   }
   .track.on {
     border-color: rgba(255, 255, 255, 0);

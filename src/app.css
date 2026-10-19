@@ -22,7 +22,7 @@ body {
   background: var(--floor);
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.5;
   overflow: hidden;
   user-select: none;
@@ -62,35 +62,55 @@ a {
   display: none;
 }
 
-/* Glass: fill, blur, edge and shadow in one class. */
+/* A panel: opaque graphite with an edge and a drop shadow, no blur. The
+   class keeps its old name; nothing in the launcher is glass any more. */
 .ah-glass {
-  background: var(--glass);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
-  box-shadow: var(--shadow-glass);
+  background: var(--graphite);
+  border: 1px solid var(--graphite-edge);
+  box-shadow: var(--shadow-panel);
 }
 
-.ah-glass-dense {
-  background: var(--glass-dense);
-}
-
-/* The header is flat: a translucent fill with no edge highlight or shadow. */
+/* The header's pills are flat: graphite with no edge and no shadow. */
 .ah-glass.flat {
+  border: 0;
   box-shadow: none;
 }
 
-@supports not (backdrop-filter: blur(1px)) {
-  .ah-glass {
-    background: var(--glass-solid);
-  }
+/* Two text levels per panel (design/README.md). Labels and secondary text
+   are one size down in the secondary grey; numbers line up on the right. */
+.t-label,
+.t-caption,
+.t-data {
+  color: var(--ink-soft);
 }
 
-@media (prefers-reduced-transparency: reduce) {
-  .ah-glass {
-    background: var(--glass-solid);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
+.t-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* A panel's rows: a label, maybe a value, a rule between rows. */
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 48px;
+  padding: 6px 0;
+  border-top: 1px solid var(--graphite-edge);
+}
+
+.list-row:first-child {
+  border-top: 0;
+}
+
+.list-row > .grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Running text stays readable: about 65 characters a line. */
+.measure {
+  max-width: 65ch;
 }
 
 /* Text placed directly on the backdrop art. */

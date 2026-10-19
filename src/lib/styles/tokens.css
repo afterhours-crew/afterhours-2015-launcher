@@ -3,21 +3,20 @@
   /* color */
   --floor: #121015;
   --shade: rgba(14,12,17,0.55);
-  --shade-dim: rgba(14,12,17,0.35);
-  --glass: rgba(24,21,29,0.38);
-  --glass-dense: rgba(24,21,29,0.52);
-  --glass-solid: rgba(24,21,29,0.86);
-  --glass-edge: rgba(255,255,255,0.18);
-  --hover: rgba(255,255,255,0.12);
-  --row-hover: rgba(255,255,255,0.07);
-  --selected: rgba(255,255,255,0.13);
-  --selected-edge: rgba(244,240,234,0.55);
-  --field: rgba(255,255,255,0.06);
-  --log: rgba(8,7,10,0.72);
-  --ink: #F4F0EA;
-  --ink-soft: #DCD5CD;
-  --ink-muted: #C9C1B9;
-  --ink-faint: #B8B0A8;
+  --shade-dim: rgba(14,12,17,0.62);
+  --hover: rgba(255,255,255,0.10);
+  --row-hover: rgba(255,255,255,0.05);
+  --selected: var(--graphite-raised);
+  --selected-edge: var(--graphite-ring);
+  --field: var(--graphite-raised);
+  --graphite: #1D1E21;
+  --graphite-raised: #26272B;
+  --graphite-edge: #303136;
+  --graphite-outline: #3A3B41;
+  --graphite-ring: #4A4B52;
+  --ink: #F3F3F4;
+  --ink-soft: #BEBFC5;
+  --ink-faint: #8E8F96;
   --on-ink: #121015;
   --brand: #FF7A1A;
   --play: #1BA3E6;
@@ -55,12 +54,9 @@
   --radius-phone: 14px;
   --radius-pill: 999px;
   /* shadow */
-  --shadow-glass: 0 12px 40px rgba(0,0,0,0.35);
+  --shadow-panel: 0 16px 40px rgba(0,0,0,0.45);
   --shadow-float: 0 20px 60px rgba(0,0,0,0.45);
   --shadow-avatar: 0 0 0 2px rgba(18,16,21,0.8);
-  /* blur */
-  --glass-blur: 18px;
-  --glass-blur-heavy: 22px;
   /* size */
   --play-height: 58px;
   --play-min-width: 200px;
@@ -75,50 +71,53 @@
   --font-mono: "DM Sans", system-ui, "Segoe UI", sans-serif;
 }
 
-/* The Garage home clock only. Tabular numerals, on the shaded backdrop with text-on-art. */
-.t-clock { font-family: var(--font-ui); font-size: 136px; line-height: 0.85; font-weight: 500; letter-spacing: -0.03em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+/* The Garage home clock only. Tabular numerals, on the backdrop with text-on-art. */
+.t-clock { font-family: var(--font-ui); font-size: 160px; line-height: 0.9; font-weight: 500; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 
-/* Launch-bar left value: the car, server or setup step. Uppercase, directly on the floor. */
-.t-car-name { font-family: var(--font-ui); font-size: 26px; line-height: 1.05; font-weight: 700; letter-spacing: 0; text-transform: uppercase; }
+/* Launch-bar title: the server. Sentence case, directly on the floor. */
+.t-car-name { font-family: var(--font-ui); font-size: 26px; line-height: 1.05; font-weight: 700; letter-spacing: 0; }
 
-/* First-run step headings. Uppercase. */
-.t-step-title { font-family: var(--font-ui); font-size: 30px; line-height: 1; font-weight: 700; letter-spacing: -0.01em; text-transform: uppercase; }
+/* First-run step headings. Sentence case. */
+.t-step-title { font-family: var(--font-ui); font-size: 30px; line-height: 1.15; font-weight: 700; letter-spacing: -0.01em; }
 
-/* The title inside a view's main glass panel. Uppercase. */
-.t-view-title { font-family: var(--font-ui); font-size: 22px; line-height: 1.1; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; }
+/* A view's title, once per view. Sentence case. */
+.t-view-title { font-family: var(--font-ui); font-size: 26px; line-height: 1.2; font-weight: 700; letter-spacing: -0.01em; }
 
-/* Section heading inside a glass panel, next to its 30px icon tile. Uppercase. */
-.t-panel-title { font-family: var(--font-ui); font-size: 14px; line-height: 1.2; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+/* A panel's title, the first of its two text levels. Sentence case. */
+.t-panel-title { font-family: var(--font-ui); font-size: 18px; line-height: 1.3; font-weight: 700; letter-spacing: -0.005em; }
 
-/* The play button label. Uppercase. Drops to 20px for longer busy labels (Verifying 62%). */
-.t-play { font-family: var(--font-ui); font-size: 22px; line-height: 1; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+/* The Play button label. Sentence case. Drops to 18px for longer labels (Restart with game). */
+.t-play { font-family: var(--font-ui); font-size: 22px; line-height: 1; font-weight: 700; letter-spacing: 0.02em; }
 
-/* Nav pills. 800 on the current pill. Uppercase. */
-.t-nav { font-family: var(--font-ui); font-size: 13px; line-height: 1; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+/* Nav pills and Profile tabs. 700 on the current one. Sentence case. */
+.t-nav { font-family: var(--font-ui); font-size: 15px; line-height: 1; font-weight: 600; letter-spacing: 0.01em; }
 
-/* Pill buttons and filters. 700 on outline and text buttons. Uppercase. */
-.t-button { font-family: var(--font-ui); font-size: 12px; line-height: 1; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+/* Pill buttons. Sentence case. */
+.t-button { font-family: var(--font-ui); font-size: 14px; line-height: 1; font-weight: 600; letter-spacing: 0; }
 
-/* Field labels, column headers, eyebrow labels (12px, 0.16em on the floor). Uppercase. */
-.t-label { font-family: var(--font-ui); font-size: 11px; line-height: 1.2; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+/* Field labels and column headers, in ink-soft. Sentence case. */
+.t-label { font-family: var(--font-ui); font-size: 14px; line-height: 1.3; font-weight: 600; letter-spacing: 0; }
 
-/* Event-type tags and small chips. Uppercase, on-ink on the tag color. */
-.t-tag { font-family: var(--font-ui); font-size: 10px; line-height: 1.4; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+/* Event-type tags only: the one uppercase style. On-ink on the tag color. */
+.t-tag { font-family: var(--font-ui); font-size: 11px; line-height: 1.4; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 
-/* All running text. Sentence case. */
-.t-body { font-family: var(--font-ui); font-size: 14px; line-height: 21px; font-weight: 400; }
+/* All running text and row labels. Sentence case, at most about 65ch a line. */
+.t-body { font-family: var(--font-ui); font-size: 16px; line-height: 1.5; font-weight: 400; }
 
-/* Names: servers, drivers, mods, list-row titles. */
-.t-body-strong { font-family: var(--font-ui); font-size: 14px; line-height: 21px; font-weight: 600; }
+/* Names in rows: cars, files, settings. */
+.t-body-strong { font-family: var(--font-ui); font-size: 16px; line-height: 1.5; font-weight: 600; }
 
-/* Hints under controls and the launch-bar state line. */
-.t-caption { font-family: var(--font-ui); font-size: 13px; line-height: 18px; font-weight: 400; }
+/* Secondary text in ink-soft: the second text level. Hints, sublines, the launch-bar state line. */
+.t-caption { font-family: var(--font-ui); font-size: 14px; line-height: 1.5; font-weight: 400; }
 
-/* Addresses, ping, builds, paths, timestamps, counts. Never uppercase by CSS. */
-.t-data { font-family: var(--font-mono); font-size: 12px; line-height: 18px; font-weight: 400; font-variant-numeric: tabular-nums; }
+/* Paths, addresses, times and sizes at the secondary size. Tabular figures, never uppercase. */
+.t-data { font-family: var(--font-mono); font-size: 14px; line-height: 1.5; font-weight: 400; font-variant-numeric: tabular-nums; }
 
-/* Secondary data: profile subline, message times, file sizes. */
-.t-data-small { font-family: var(--font-mono); font-size: 11px; line-height: 16px; font-weight: 400; font-variant-numeric: tabular-nums; }
+/* The header profile pill's subline only. */
+.t-data-small { font-family: var(--font-mono); font-size: 12px; line-height: 1.3; font-weight: 400; font-variant-numeric: tabular-nums; }
 
-/* Event countdowns. */
-.t-countdown { font-family: var(--font-mono); font-size: 24px; line-height: 1.1; font-weight: 500; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+/* Numbers in rows: right-aligned, tabular figures. */
+.t-num { font-family: var(--font-mono); font-size: 16px; line-height: 1.4; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* A view's headline figures: REP level, bank. */
+.t-big { font-family: var(--font-mono); font-size: 32px; line-height: 1.1; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }

@@ -186,12 +186,12 @@
   }
   .banner {
     margin: 12px var(--space-6) 0;
-    padding: 10px 14px;
+    padding: 10px 16px;
     border-radius: var(--radius-row);
-    background: var(--field);
-    border: 1px solid var(--glass-edge);
+    background: var(--graphite);
+    border: 1px solid var(--graphite-edge);
     color: var(--ink-soft);
-    font-size: 13px;
+    font-size: 14px;
   }
   .banner.row {
     display: flex;
@@ -208,13 +208,13 @@
   code {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
-    font-size: 12px;
+    font-size: 14px;
   }
   .legal {
     margin: 0;
     padding: 0 var(--space-6) 18px;
     text-align: center;
-    font-size: 12px;
-    color: var(--ink-muted);
+    font-size: 14px;
+    color: var(--ink-soft);
   }
 </style>

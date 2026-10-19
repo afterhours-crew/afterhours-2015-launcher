@@ -30,7 +30,7 @@ export function headerLine(profile: Profile | null): string | null {
 export interface DriverCard {
   name: string;
   initials: string;
-  /** "Persona 1666824901114517107 · last saved today 21:40". */
+  /** "Last saved today 21:40". */
   subline: string;
   level: string;
   bank: string;
@@ -38,16 +38,12 @@ export interface DriverCard {
 
 export function driverCard(profile: Profile, now: Date, clock: Clock = {}): DriverCard {
   const name = driverName(profile) ?? "Driver";
-  const sub: string[] = [];
-  if (profile.identity) sub.push(`Persona ${profile.identity.persona_id}`);
-  if (profile.save.updated_at_utc) {
-    sub.push(`last saved ${formatSaved(profile.save.updated_at_utc, now, clock)}`);
-  }
+  const saved = profile.save.updated_at_utc;
   const level = profile.reputation?.level;
   return {
     name,
     initials: initials(name),
-    subline: sub.join(" · "),
+    subline: saved ? `Last saved ${formatSaved(saved, now, clock)}` : "",
     level: level == null ? "—" : String(level),
     bank: profile.bank ? formatMoney(profile.bank.balance) : "—",
   };
@@ -83,8 +79,8 @@ export function repProgress(rep: Reputation | null): RepProgress | null {
       nextLevel: null,
       score,
       fraction: 1,
-      title: `Level ${rep.level} · top level`,
-      detail: `${formatCount(score)} REP total`,
+      title: "Top level",
+      detail: `${formatCount(score)} REP in all`,
       into: 1,
       span: 1,
     };
@@ -97,8 +93,8 @@ export function repProgress(rep: Reputation | null): RepProgress | null {
     nextLevel: rep.level + 1,
     score,
     fraction: into / span,
-    title: `Level ${rep.level} → ${rep.level + 1}`,
-    detail: `${formatCount(toGo)} REP to go · ${formatCount(score)} total`,
+    title: `Level ${rep.level + 1} next`,
+    detail: `${formatCount(toGo)} REP to go`,
     into,
     span,
   };
@@ -219,6 +215,37 @@ export function collection(counts: Counts, cars: Car[] | null): CollectionTile[]
     { label: "Activities", value: rows(counts.activities) },
     { label: "Places", value: rows(counts.points_of_interest) },
   ];
+}
+
+/**
+ * The Profile's collection rows: counts the save has, with every empty or
+ * unknown one folded into a single line ("Collectibles, activities and
+ * places: none yet"). Cars have their own panel.
+ */
+export function collectionRows(counts: Counts): {
+  rows: CollectionTile[];
+  none: string | null;
+} {
+  const all: { label: string; n: number | null }[] = [
+    { label: "Items", n: counts.items },
+    { label: "Wraps", n: counts.livery_records },
+    { label: "Collectibles", n: counts.collectibles },
+    { label: "Activities", n: counts.activities },
+    { label: "Places", n: counts.points_of_interest },
+  ];
+  const rows = all.filter((r) => r.n).map((r) => ({ label: r.label, value: formatCount(r.n!) }));
+  const empty = all.filter((r) => !r.n).map((r) => r.label.toLowerCase());
+  if (empty.length === 0) return { rows, none: null };
+  const list =
+    empty.length === 1
+      ? empty[0]!
+      : `${empty.slice(0, -1).join(", ")} and ${empty[empty.length - 1]}`;
+  return { rows, none: `${list.charAt(0).toUpperCase()}${list.slice(1)}: none yet` };
+}
+
+/** Driving stats the save holds; served defaults are left out, not shown as zeros. */
+export function recordedStats(tiles: StatTile[]): StatTile[] {
+  return tiles.filter((tile) => tile.stored);
 }
 
 /** The last path component, for either separator. */

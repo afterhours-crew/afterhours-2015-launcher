@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Glyph as Icon } from "$lib/components/glyph";
   import type { Snippet } from "svelte";
-  // A glass panel's title with its icon, drawn in ink. Colour is kept for
+  // A panel's title with its icon in the secondary grey. Colour is kept for
   // what it encodes (event types, status); a heading's icon is decoration.
   let {
     icon: Glyph,
@@ -26,7 +26,7 @@
   }
   .heading :global(.glyph) {
     flex: 0 0 auto;
-    color: var(--ink);
+    color: var(--ink-soft);
   }
   .heading :global(h2),
   .heading :global(h3) {

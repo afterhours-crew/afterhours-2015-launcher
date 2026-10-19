@@ -52,8 +52,7 @@
     font-family: var(--font-ui);
     font-weight: 700;
     font-size: 22px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    letter-spacing: 0.02em;
     text-shadow: none;
   }
   .play.long {
@@ -63,12 +62,12 @@
     filter: brightness(1.06);
   }
   .play:disabled {
-    background: var(--field);
+    background: var(--graphite);
     color: var(--ink-faint);
     cursor: default;
   }
   .play[aria-busy="true"] {
-    background: var(--glass-solid);
+    background: var(--graphite);
     color: var(--ink);
   }
   .spinner {

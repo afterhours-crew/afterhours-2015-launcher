@@ -325,7 +325,7 @@
     color: var(--ink-soft);
   }
   .muted {
-    color: var(--ink-muted);
+    color: var(--ink-soft);
   }
   .caption {
     margin: 0;
@@ -392,7 +392,7 @@
     display: flex;
     flex-direction: column;
     border-radius: var(--radius-row);
-    background: var(--log);
+    background: var(--graphite);
     overflow: hidden;
     user-select: text;
     -webkit-user-select: text;
@@ -465,14 +465,14 @@
     margin: 0;
     padding: 14px;
     border-radius: var(--radius-row);
-    background: var(--log);
+    background: var(--graphite);
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     font-size: 11.5px;
     line-height: 1.7;
     white-space: pre-wrap;
     word-break: break-word;
-    color: var(--ink-muted);
+    color: var(--ink-soft);
     max-height: 60vh;
     overflow: auto;
     user-select: text;

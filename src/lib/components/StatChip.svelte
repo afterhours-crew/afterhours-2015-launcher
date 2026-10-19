@@ -1,17 +1,16 @@
 <script lang="ts">
-  // One fact with a status dot, on glass: the Garage home's chips.
-  let { tone = "ready", text }: { tone?: "ready" | "warn" | "info" | "off"; text: string } =
-    $props();
+  // One fact as a graphite chip, on the Garage home: bank, REP, cars.
+  let { tone = null, text }: { tone?: "ready" | "warn" | "info" | null; text: string } = $props();
   const colors = {
     ready: "var(--status-ready)",
     warn: "var(--status-warn)",
     info: "var(--status-info)",
-    off: "var(--ink-faint)",
   };
 </script>
 
-<span class="chip ah-glass"
-  ><span class="dot" style="background: {colors[tone]}" aria-hidden="true"></span>{text}</span
+<span class="chip"
+  >{#if tone}<span class="dot" style="background: {colors[tone]}" aria-hidden="true"
+    ></span>{/if}{text}</span
 >
 
 <style>
@@ -22,8 +21,12 @@
     align-items: center;
     gap: 8px;
     border-radius: var(--radius-pill);
-    font-size: 13px;
-    font-weight: 700;
+    background: var(--graphite);
+    border: 1px solid var(--graphite-edge);
+    font-size: 14px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
     text-shadow: none;
   }
   .dot {

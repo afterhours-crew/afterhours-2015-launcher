@@ -25,8 +25,7 @@ export function inGarage(car: Car): boolean {
 
 export function whereLabel(car: Car): string {
   if (car.location === "active") return "Active";
-  if (car.location === "garage") return car.slot == null ? "Garage" : `Garage ${car.slot + 1}`;
-  return "Warehouse";
+  return car.location === "garage" ? "Garage" : "Warehouse";
 }
 
 export function whereLong(car: Car): string {
@@ -80,23 +79,52 @@ export function sortCars(cars: Car[], sort: CarSort): Car[] {
   return [...cars].sort((a, b) => compare(a, b) || order.get(a)! - order.get(b)!);
 }
 
-/** "17 cars · 5 in the garage · 12 in the warehouse (holds 100) · worth $689,500 if sold". */
+/** "17 cars · worth $689,500 if sold". */
 export function summaryLine(summary: CarSummary, count: number): string {
-  return [
-    `${formatCount(count)} ${count === 1 ? "car" : "cars"}`,
-    `${summary.garage_used} in the garage`,
-    `${formatCount(summary.warehouse_used)} in the warehouse (holds ${formatCount(summary.warehouse_limit)})`,
-    `worth ${formatMoney(summary.total_sale_value)} if sold`,
-  ].join(" · ");
+  return `${formatCount(count)} ${count === 1 ? "car" : "cars"} · worth ${formatMoney(summary.total_sale_value)} if sold`;
 }
 
 export function filterOptions(cars: Car[]): { value: CarFilter; label: string }[] {
   const n = filterCounts(cars);
   return [
-    { value: "all", label: `All · ${n.all}` },
-    { value: "garage", label: `Garage · ${n.garage}` },
-    { value: "warehouse", label: `Warehouse · ${n.warehouse}` },
+    { value: "all", label: `All ${n.all}` },
+    { value: "garage", label: `Garage ${n.garage}` },
+    { value: "warehouse", label: `Warehouse ${n.warehouse}` },
   ];
+}
+
+/** One row of the car list: a car, or identical warehouse cars together. */
+export interface CarGroup {
+  /** The first car's ID; the row's key. */
+  key: string;
+  car: Car;
+  /** "Volvo 242 (1975) × 4" when more than one. */
+  count: number;
+}
+
+/**
+ * Identical cars as one row: warehouse cars with the same name, parts and
+ * sale price. Garage cars stay one per slot. Rows keep the order of each
+ * group's first car.
+ */
+export function groupCars(cars: Car[]): CarGroup[] {
+  const groups: CarGroup[] = [];
+  const byKey = new Map<string, CarGroup>();
+  for (const car of cars) {
+    if (car.location !== "warehouse") {
+      groups.push({ key: car.id, car, count: 1 });
+      continue;
+    }
+    const same = `${carName(car)}|${car.installed_parts}|${car.spare_parts}|${car.sale_price}`;
+    const group = byKey.get(same);
+    if (group) group.count += 1;
+    else {
+      const next = { key: car.id, car, count: 1 };
+      byKey.set(same, next);
+      groups.push(next);
+    }
+  }
+  return groups;
 }
 
 /** The Profile's car list: the garage, then one line for the warehouse. */
@@ -109,11 +137,6 @@ export function garageList(cars: Car[]): {
     name: carName(car),
     active: car.location === "active",
   }));
-  const stored = cars.filter((c) => !inGarage(c));
-  if (stored.length === 0) return { garage, warehouse: null };
-  const names = sortCars(stored, "name").map(carName);
-  const shown = names.slice(0, 3);
-  const rest = names.length - shown.length;
-  const list = rest > 0 ? `${shown.join(", ")} and ${rest} more` : shown.join(", ");
-  return { garage, warehouse: `+ ${formatCount(stored.length)} in the warehouse: ${list}` };
+  const stored = cars.filter((c) => !inGarage(c)).length;
+  return { garage, warehouse: stored === 0 ? null : `${formatCount(stored)} in the warehouse` };
 }

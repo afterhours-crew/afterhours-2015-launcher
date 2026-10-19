@@ -145,7 +145,7 @@
     gap: 10px;
   }
   .muted {
-    color: var(--ink-muted);
+    color: var(--ink-soft);
   }
   .facts {
     margin: 0;
