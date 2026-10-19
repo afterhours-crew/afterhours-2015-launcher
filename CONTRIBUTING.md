@@ -61,8 +61,8 @@ unsigned Windows installer.
 
 MPL-2.0 for this repository. Dependencies: Tauri and its plugins (dialog,
 opener, process, updater; MIT or Apache-2.0), `sha2` (MIT or Apache-2.0),
-Svelte and Vite (MIT), and for tooling only `json-schema-to-typescript`,
-`ajv` and `fflate` (MIT); fonts Saira Semi Condensed and JetBrains Mono
-through fontsource (SIL OFL 1.1). The bundled server is MPL-2.0 and ships with
+Svelte and Vite (MIT), `@tabler/icons-svelte` (MIT), the DM Sans font through
+fontsource (SIL OFL 1.1), and for tooling only `json-schema-to-typescript`,
+`ajv` and `fflate` (MIT). The bundled server is MPL-2.0 and ships with
 its own `LICENSE` and `THIRD-PARTY-NOTICES.txt`. Review a new dependency's
 license before adding it.

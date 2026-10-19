@@ -45,8 +45,8 @@
     background: var(--field);
     color: var(--ink-muted);
     font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0.1em;
+    font-weight: 700;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
   }
   .body {

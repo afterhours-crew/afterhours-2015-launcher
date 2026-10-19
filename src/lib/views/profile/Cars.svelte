@@ -240,7 +240,7 @@
   }
   .where.active {
     color: var(--crew);
-    font-weight: 800;
+    font-weight: 700;
   }
   .where.stored {
     color: var(--ink-soft);
@@ -284,7 +284,7 @@
     flex-direction: column;
   }
   .small {
-    font-size: 22px;
+    font-size: 20px;
   }
   .facts {
     margin: 0;

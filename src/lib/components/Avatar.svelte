@@ -27,7 +27,7 @@
     justify-content: center;
     border-radius: 50%;
     color: var(--on-ink);
-    font-weight: 800;
+    font-weight: 700;
     text-shadow: none;
   }
   .online {

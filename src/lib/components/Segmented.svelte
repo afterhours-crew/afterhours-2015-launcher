@@ -64,11 +64,11 @@
   }
   button {
     min-height: var(--control-height);
-    padding: 0 16px;
+    padding: 0 12px;
     border-radius: var(--radius-pill);
     font-weight: 700;
     font-size: 13px;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.03em;
   }
   button:hover:not(:disabled):not([aria-checked="true"]) {
     background: var(--hover);

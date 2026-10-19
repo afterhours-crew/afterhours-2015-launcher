@@ -50,7 +50,8 @@ for (const group of tokens.type.groups) {
     if (group.name !== "Data" && !["body", "body-strong", "caption"].includes(style.name)) {
       decl.push(`text-transform: uppercase;`);
     }
-    if (["clock", "countdown"].includes(style.name))
+    // Figures line up wherever numbers are data: the clock, counts, money, times.
+    if (group.name === "Data" || style.name === "clock")
       decl.push(`font-variant-numeric: tabular-nums;`);
     lines.push(`/* ${style.usage} */`, `.t-${style.name} { ${decl.join(" ")} }`, ``);
   }

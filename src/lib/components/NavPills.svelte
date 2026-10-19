@@ -34,7 +34,7 @@
     border-radius: var(--radius-pill);
   }
   .pill[aria-current="page"] {
-    font-weight: 800;
+    font-weight: 700;
   }
   .dot {
     width: 6px;

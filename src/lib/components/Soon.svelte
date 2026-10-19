@@ -13,8 +13,8 @@
     border-radius: var(--radius-pill);
     background: var(--mods-soft);
     color: var(--mods-ink);
-    font: 800 10px/16px var(--font-ui);
-    letter-spacing: 0.1em;
+    font: 700 10px/16px var(--font-ui);
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     white-space: nowrap;
   }

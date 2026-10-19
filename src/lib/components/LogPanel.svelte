@@ -75,6 +75,7 @@
     flex: 1 1 auto;
     overflow: auto;
     font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     font-size: 11.5px;
     line-height: 1.8;
     white-space: pre-wrap;

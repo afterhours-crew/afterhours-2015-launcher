@@ -416,9 +416,9 @@
     padding: 0 6px;
   }
   .when-title {
-    font-weight: 800;
+    font-weight: 700;
     font-size: 13px;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
   }
   .soft {
@@ -497,8 +497,8 @@
     border-radius: var(--radius-pill);
     background: var(--warn-soft);
     color: var(--warn-ink);
-    font: 800 10px/16px var(--font-ui);
-    letter-spacing: 0.1em;
+    font: 700 10px/16px var(--font-ui);
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     white-space: nowrap;
   }

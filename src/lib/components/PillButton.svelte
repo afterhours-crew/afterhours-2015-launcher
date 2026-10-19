@@ -24,14 +24,14 @@
     border-radius: var(--radius-pill);
     font-weight: 700;
     font-size: 13px;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     transition: background 160ms ease-out;
   }
   .solid {
     background: var(--ink);
     color: var(--on-ink);
-    font-weight: 800;
+    font-weight: 700;
   }
   .outline {
     border: 1px solid rgba(255, 255, 255, 0.35);

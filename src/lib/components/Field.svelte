@@ -75,6 +75,7 @@
   }
   input.mono {
     font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     font-size: 13px;
   }
   input:read-only,

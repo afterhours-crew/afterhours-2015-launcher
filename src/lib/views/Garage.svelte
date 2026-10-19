@@ -123,7 +123,7 @@
   .eyebrow {
     font-size: 12px;
     font-weight: 700;
-    letter-spacing: 0.22em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--ink-soft);
   }

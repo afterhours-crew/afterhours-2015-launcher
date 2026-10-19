@@ -187,6 +187,7 @@
   }
   code {
     font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     font-size: 12px;
   }
   .legal {

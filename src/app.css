@@ -1,10 +1,8 @@
 /* Fonts are vendored through @fontsource so the launcher renders offline. */
-@import "@fontsource/saira-semi-condensed/400.css";
-@import "@fontsource/saira-semi-condensed/500.css";
-@import "@fontsource/saira-semi-condensed/700.css";
-@import "@fontsource/saira-semi-condensed/800.css";
-@import "@fontsource/jetbrains-mono/400.css";
-@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/dm-sans/400.css";
+@import "@fontsource/dm-sans/500.css";
+@import "@fontsource/dm-sans/600.css";
+@import "@fontsource/dm-sans/700.css";
 @import "./lib/styles/tokens.css";
 
 *,
@@ -24,8 +22,8 @@ body {
   background: var(--floor);
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 15px;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.5;
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;

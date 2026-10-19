@@ -329,8 +329,8 @@
     padding: 2px 10px;
     border-radius: var(--radius-pill);
     color: var(--on-ink);
-    font: 800 11px/16px var(--font-ui);
-    letter-spacing: 0.12em;
+    font: 700 11px/16px var(--font-ui);
+    letter-spacing: 0.06em;
     text-transform: uppercase;
   }
   .track {
@@ -366,7 +366,7 @@
     min-width: 0;
   }
   .small {
-    font-size: 22px;
+    font-size: 20px;
   }
   .histogram {
     display: grid;
@@ -439,7 +439,7 @@
     border-radius: var(--radius-pill);
     border: 1px solid rgba(255, 255, 255, 0.3);
     font: 700 10px/16px var(--font-ui);
-    letter-spacing: 0.1em;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
   }
   .more {
@@ -459,7 +459,12 @@
   .collection {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px 8px;
+    gap: 10px 12px;
+  }
+  .count .t-label {
+    font-size: 10px;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
   }
   .count {
     display: flex;

@@ -84,9 +84,9 @@
     gap: 10px;
   }
   .wordmark {
-    font-weight: 800;
-    font-size: 21px;
-    letter-spacing: 0.08em;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
   }
   .profile {
@@ -104,7 +104,7 @@
     align-items: center;
     justify-content: center;
     color: var(--on-ink);
-    font-weight: 800;
+    font-weight: 700;
     font-size: 13px;
   }
   .avatar.online {

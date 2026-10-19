@@ -33,15 +33,15 @@
     background: var(--play);
     color: var(--on-ink);
     font-family: var(--font-ui);
-    font-weight: 800;
-    font-size: 26px;
-    letter-spacing: 0.12em;
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     text-shadow: none;
     transition: filter 160ms ease-out;
   }
   .play.long {
-    font-size: 20px;
+    font-size: 18px;
   }
   .play:hover:not(:disabled) {
     filter: brightness(1.06);

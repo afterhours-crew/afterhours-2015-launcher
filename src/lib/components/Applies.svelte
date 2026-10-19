@@ -21,7 +21,7 @@
     font-size: 12px;
     line-height: 16px;
     font-weight: 700;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.03em;
     color: var(--ink-soft);
     white-space: nowrap;
   }

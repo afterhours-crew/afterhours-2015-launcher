@@ -431,7 +431,7 @@
     align-items: center;
     justify-content: center;
     color: var(--on-ink);
-    font-weight: 800;
+    font-weight: 700;
     font-size: 22px;
   }
   .swatches {
@@ -464,9 +464,9 @@
     border-radius: 14px;
     background: var(--play);
     color: var(--on-ink);
-    font-weight: 800;
-    font-size: 18px;
-    letter-spacing: 0.12em;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
   }
   .next:disabled {

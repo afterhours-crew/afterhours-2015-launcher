@@ -64,9 +64,9 @@
     align-items: center;
     gap: 8px;
     border-radius: var(--radius-pill);
-    font-weight: 800;
+    font-weight: 700;
     font-size: 13px;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     transition: filter 160ms ease-out;
   }

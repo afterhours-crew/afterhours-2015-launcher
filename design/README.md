@@ -15,8 +15,9 @@ system's brand book:
   sit on the floor.
 - One accent button per screen: Play, Connect or Next, in the game logo's blue (`play`). Nothing else uses it. The Afterhours mark keeps its own orange (`brand`), which appears nowhere else.
 - Color means event type or status, and a status is always a word plus a dot.
-- Interface text is Saira Semi Condensed, data is JetBrains Mono. Short and
-  structural text is uppercase with tracking; sentences are sentence case;
+- All text is DM Sans; data (paths, IDs, times, counts, money) uses tabular
+  figures so numbers line up. Short and structural text is uppercase with
+  light tracking; sentences are sentence case;
   addresses and paths keep their real case.
 - Every target is at least 38px tall in a 44px hit area, with a visible focus
   ring, so the launcher works with a gamepad.

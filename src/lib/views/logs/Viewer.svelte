@@ -368,7 +368,7 @@
     border: 1px solid rgba(255, 255, 255, 0.4);
     font-weight: 700;
     font-size: 13px;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
   }
   .area[aria-pressed="true"] {
@@ -452,6 +452,7 @@
     gap: 2px 10px;
     padding: 0 14px 12px 122px;
     font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     font-size: 11px;
     line-height: 16px;
     overflow-wrap: anywhere;
@@ -465,6 +466,7 @@
     border-radius: var(--radius-row);
     background: var(--log);
     font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     font-size: 11.5px;
     line-height: 1.7;
     white-space: pre-wrap;
