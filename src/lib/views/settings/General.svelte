@@ -1,47 +1,29 @@
 <script lang="ts">
-  import IconFolder from "@tabler/icons-svelte/icons/folder";
-  import IconUser from "@tabler/icons-svelte/icons/user";
-  import PanelHeading from "$lib/components/PanelHeading.svelte";
   import { api, pickFolder } from "$lib/api/tauri";
-  import Field from "$lib/components/Field.svelte";
   import Glass from "$lib/components/Glass.svelte";
+  import InfoButton from "$lib/components/InfoButton.svelte";
   import Note from "$lib/components/Note.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
+  import { sampleMode } from "$lib/state/preview";
   import { session } from "$lib/state/session.svelte";
 
-  // Driver, game folder and data folder. The server owns everything inside
-  // the data folder; this only says where it is.
-  let name = $state(session.settings.player_name ?? "");
-  let gameDir = $state(session.settings.game_dir ?? "");
-  // A launcher in the game folder uses that game; Settings shows it and does
-  // not offer another. The folder is only read.
+  // Game and data (H9): where the game is and where the server keeps saves
+  // and logs. Changing the game folder checks it at once. A launcher in the
+  // game folder uses that game and offers no other; the folder is only read.
   let inFolder = $derived(session.info?.game_in_launcher_folder ?? null);
-  let dataDir = $state(session.settings.data_dir ?? "");
+  let gameDir = $derived(inFolder ?? session.settings.game_dir);
+  let dataDir = $derived(session.settings.data_dir ?? session.info?.data_dir ?? null);
   let note = $state<{ kind: "ready" | "warn"; text: string } | null>(null);
   let checking = $state(false);
-
-  const colors = ["style", "speed", "build", "crew", "outlaw", "peach"];
 
   function failure(e: unknown): string {
     return String(e instanceof Error ? e.message : e);
   }
-  async function pick(setter: (v: string) => void, title: string) {
-    const chosen = await pickFolder(title);
-    if (chosen) setter(chosen);
-  }
-  async function saveDriver() {
-    await session.save({ player_name: name.trim() || null });
-  }
-  async function saveFolders() {
-    const game = inFolder ? {} : { game_dir: gameDir.trim() || null };
-    await session.save({ ...game, data_dir: dataDir.trim() || null });
-    await session.refreshInfo();
-  }
-  async function verify() {
+
+  async function check() {
     checking = true;
     note = null;
     try {
-      await saveFolders();
       const result = await api.runCheck();
       note =
         result.kind === "ok"
@@ -53,8 +35,26 @@
       checking = false;
     }
   }
+
+  async function changeGame() {
+    const chosen = await pickFolder("Choose the Need for Speed (2015) folder");
+    if (!chosen) return;
+    await session.save({ game_dir: chosen });
+    await session.refreshInfo();
+    await check();
+  }
+
+  async function changeData() {
+    const chosen = await pickFolder("Choose a data folder");
+    if (!chosen) return;
+    await session.save({ data_dir: chosen });
+    await session.refreshInfo();
+  }
+
   async function openData() {
+    note = null;
     try {
+      if (sampleMode) throw new Error("The browser preview cannot open folders.");
       await api.openFolder("data");
     } catch (e) {
       note = { kind: "warn", text: failure(e) };
@@ -62,82 +62,59 @@
   }
 </script>
 
-<Glass dense radius="card" label="Driver" class="panel">
-  <PanelHeading icon={IconUser}>Driver</PanelHeading>
-  <Field
-    id="s-name"
-    label="Driver name"
-    bind:value={name}
-    hint="Used when your local account is first created. It does not rename an existing save."
-  />
-  <div role="radiogroup" aria-label="Avatar color" class="swatches">
-    {#each colors as color (color)}
-      <button
-        type="button"
-        role="radio"
-        aria-checked={session.settings.avatar === color}
-        aria-label={color}
-        class="swatch"
-        class:picked={session.settings.avatar === color}
-        style="background: var(--{color})"
-        onclick={() => session.save({ avatar: color })}
-      ></button>
-    {/each}
+<Glass radius="panel" label="Game and data" class="panel rows-panel">
+  <div class="list-row tall">
+    <span class="grow text">
+      <span class="name">
+        Game folder
+        {#if inFolder}<InfoButton
+            label="About the game folder"
+            text="The launcher sits in this game folder, so it uses the game it is in and changes nothing there. To use another install, run the launcher from somewhere else."
+          />{/if}
+      </span>
+      <span class="t-data path">{gameDir ?? "Not chosen yet"}</span>
+    </span>
+    {#if !inFolder}
+      <PillButton onclick={changeGame} disabled={checking}
+        >{checking ? "Checking…" : "Change"}</PillButton
+      >
+    {/if}
   </div>
-  <div class="actions"><PillButton variant="solid" onclick={saveDriver}>Save</PillButton></div>
-</Glass>
-
-<Glass dense radius="card" label="Game and data" class="panel">
-  <PanelHeading icon={IconFolder}>Game &amp; data</PanelHeading>
-  {#if inFolder}
-    <Field id="s-game" label="Install folder" value={inFolder} mono readonly />
-    <Note
-      >The launcher is in this game folder, so it uses the game it sits in and changes nothing
-      there. To pick a different install, run the launcher from somewhere else.</Note
-    >
-  {:else}
-    <Field id="s-game" label="Install folder" bind:value={gameDir} mono>
-      {#snippet trailing()}<PillButton
-          onclick={() => pick((v) => (gameDir = v), "Choose the Need for Speed (2015) folder")}
-          >Browse</PillButton
-        >{/snippet}
-    </Field>
-  {/if}
-  <Field
-    id="s-data"
-    label="Data folder"
-    bind:value={dataDir}
-    mono
-    placeholder={session.info?.data_dir ?? "Server default"}
-    hint="Accounts, content, logs, sessions and update backups. Keep it outside the game folder."
-  >
-    {#snippet trailing()}<PillButton
-        onclick={() => pick((v) => (dataDir = v), "Choose a data folder")}>Browse</PillButton
-      >{/snippet}
-  </Field>
-  {#if note}<Note kind={note.kind}>{note.text}</Note>{/if}
-  <div class="actions">
-    <PillButton onclick={openData}>Open data folder</PillButton>
-    <PillButton onclick={verify} disabled={checking}
-      >{checking ? "Checking…" : "Verify files"}</PillButton
-    >
-    <PillButton variant="solid" onclick={saveFolders}>Save</PillButton>
+  <div class="list-row tall">
+    <span class="grow text">
+      <span class="name">
+        Saves and logs
+        <InfoButton
+          label="About the data folder"
+          text="Accounts, prepared content, logs, sessions and update backups. Keep it outside the game folder."
+        />
+      </span>
+      <span class="t-data path">{dataDir ?? "The server's default folder"}</span>
+    </span>
+    <PillButton variant="text" onclick={changeData}>Change</PillButton>
+    <PillButton onclick={openData}>Open</PillButton>
   </div>
+  {#if note}<div class="note"><Note kind={note.kind}>{note.text}</Note></div>{/if}
 </Glass>
 
 <style>
-  .swatches {
+  .tall {
+    min-height: 72px;
+  }
+  .text {
     display: flex;
-    gap: 10px;
+    flex-direction: column;
   }
-  .swatch {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
+  .name {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
   }
-  .swatch.picked {
-    box-shadow:
-      0 0 0 3px rgba(24, 21, 29, 0.9),
-      0 0 0 5px var(--ink);
+  .path {
+    overflow-wrap: anywhere;
+  }
+  .note {
+    padding: 4px 0 16px;
   }
 </style>

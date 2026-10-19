@@ -1,53 +1,53 @@
 <script lang="ts">
-  import IconDownload from "@tabler/icons-svelte/icons/download";
-  import PanelHeading from "$lib/components/PanelHeading.svelte";
-  import { api, openUrl } from "$lib/api/tauri";
   import type { UpdateMode } from "$lib/api/types";
   import Glass from "$lib/components/Glass.svelte";
+  import InfoButton from "$lib/components/InfoButton.svelte";
   import Note from "$lib/components/Note.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
+  import Segmented from "$lib/components/Segmented.svelte";
+  import ShowMore from "$lib/components/ShowMore.svelte";
   import { session } from "$lib/state/session.svelte";
   import { updater } from "$lib/state/updater.svelte";
-  import { RELEASES_URL } from "$lib/state/updates";
+  import About from "./About.svelte";
 
-  const modes: { id: UpdateMode; label: string; hint: string }[] = [
-    {
-      id: "ask",
-      label: "Ask me",
-      hint: "Check in the background and ask before installing.",
-    },
-    {
-      id: "auto",
-      label: "Install automatically",
-      hint: "Install when no session is running. The launcher restarts by itself.",
-    },
-    { id: "off", label: "Off", hint: "Only check when you press Check for updates." },
+  // Updates (H9): when the launcher installs updates, which version this is
+  // and Check now. The rules live behind ⓘ; build details behind Show more.
+  let { aboutOpen = false }: { aboutOpen?: boolean } = $props();
+
+  const MODES: { value: UpdateMode; label: string }[] = [
+    { value: "ask", label: "Ask me" },
+    { value: "auto", label: "Automatic" },
+    { value: "off", label: "Off" },
   ];
 
   let mode = $derived(session.settings.updates.mode);
   let candidate = $derived(updater.candidate);
-  let folderError = $state<string | null>(null);
+  let open = $state(false);
+  $effect.pre(() => {
+    if (aboutOpen) open = true;
+  });
 
   let statusLine = $derived.by(() => {
     const at = updater.checkedAt?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const server = session.serverTag ? ` · server ${session.serverTag}` : "";
     switch (updater.phase) {
       case "checking":
         return "Checking…";
       case "current":
-        return `You have the latest launcher${at ? ` · checked ${at}` : ""}.`;
+        return `Up to date${at ? ` · checked ${at}` : ""}${server}`;
       case "available":
       case "waiting":
       case "downloading":
       case "installing":
-        return candidate ? `Launcher ${candidate.version} is available.` : "";
+        return candidate ? `Version ${candidate.version} is available` : server.slice(3);
       case "refused":
-        return "An update was found but is not offered.";
+        return "An update was found but is not offered";
       case "error":
-        return "The last attempt failed.";
+        return "The last check failed";
       default:
-        return mode === "off"
-          ? "Automatic checks are off."
-          : "Checks run in the background and stay quiet offline.";
+        return (
+          (mode === "off" ? "Automatic checks are off" : "Checks run in the background") + server
+        );
     }
   });
 
@@ -58,54 +58,42 @@
       ? `Bundles the same server, ${server.tag}.`
       : `Bundles server ${server.tag} (you have ${session.serverTag}). Your saves are copied to the data folder's backups first; the first start after it may rebuild the content cache.`;
   });
-
-  async function openBackups() {
-    folderError = null;
-    try {
-      await api.openFolder("backups");
-    } catch (e) {
-      folderError = String(e instanceof Error ? e.message : e);
-    }
-  }
 </script>
 
-<Glass dense radius="card" label="Updates" class="panel">
-  <PanelHeading icon={IconDownload}>Updates</PanelHeading>
-
-  <div role="radiogroup" aria-label="When updates install" class="modes">
-    {#each modes as option (option.id)}
-      <button
-        type="button"
-        role="radio"
-        aria-checked={mode === option.id}
-        class="mode row-hover"
-        onclick={() => void updater.setMode(option.id)}
-      >
-        <span class="radio" aria-hidden="true"></span>
-        <span class="mode-text">
-          <span class="mode-label">{option.label}{option.id === "ask" ? " (default)" : ""}</span>
-          <span class="hint">{option.hint}</span>
-        </span>
-      </button>
-    {/each}
+<Glass radius="panel" label="Updates" class="panel rows-panel">
+  <div class="list-row tall">
+    <span class="grow name">
+      Updates
+      <InfoButton
+        label="About updates"
+        text="Ask me checks in the background and asks before installing. Automatic installs when no session runs and restarts the launcher. Off checks only when you press Check now. Updates never install during a session, never go back a version, and copy your saves first when the bundled server changes."
+      />
+    </span>
+    <Segmented
+      options={MODES}
+      value={mode}
+      label="Updates"
+      onchange={(next) => void updater.setMode(next)}
+    />
   </div>
-
-  <div class="check">
-    <span class="status">{statusLine}</span>
-    <PillButton disabled={updater.busy} onclick={() => void updater.check(true)}
-      >Check for updates</PillButton
+  <div class="list-row tall">
+    <span class="grow text">
+      <span class="name">Afterhours {session.info?.launcher_version ?? ""}</span>
+      <span class="t-caption">{statusLine}</span>
+    </span>
+    <PillButton variant="text" disabled={updater.busy} onclick={() => void updater.check(true)}
+      >Check now</PillButton
     >
   </div>
 
   {#if candidate && updater.offer?.kind === "offer"}
     <section class="candidate" aria-label="Available update">
-      <div class="candidate-head">
-        <strong>Launcher {candidate.version}</strong>
-        {#if candidate.date}<span class="t-data-small date">{candidate.date.slice(0, 10)}</span
-          >{/if}
-        {#if updater.offer.skipped}<span class="t-data-small date">skipped</span>{/if}
-      </div>
-      {#if serverLine}<p class="server">{serverLine}</p>{/if}
+      <span class="name"
+        >Afterhours {candidate.version}{#if candidate.date}<span class="t-data">
+            · {candidate.date.slice(0, 10)}</span
+          >{/if}{#if updater.offer.skipped}<span class="t-data"> · skipped</span>{/if}</span
+      >
+      {#if serverLine}<p class="t-caption measure">{serverLine}</p>{/if}
       {#if candidate.notes}<pre class="notes">{candidate.notes}</pre>{/if}
       <div class="actions">
         <PillButton variant="text" onclick={() => void updater.skip()}>Skip this version</PillButton
@@ -120,98 +108,54 @@
   {/if}
 
   {#if updater.message && ["refused", "waiting", "error"].includes(updater.phase)}
-    <Note kind="warn">{updater.message}</Note>
+    <div class="note"><Note kind="warn">{updater.message}</Note></div>
   {/if}
   {#if updater.backup?.folder}
-    <Note kind="ready">Saves copied to <span class="t-data">{updater.backup.folder}</span>.</Note>
+    <div class="note">
+      <Note kind="ready">Saves copied to <span class="t-data">{updater.backup.folder}</span>.</Note>
+    </div>
   {/if}
   {#if session.info && !session.info.updater.configured}
-    <Note
-      >This build has no update signing key, so it can look for updates but not install them.
-      Released builds always have one.</Note
-    >
+    <div class="note">
+      <Note
+        >This build has no update signing key, so it can look for updates but not install them.
+        Released builds always have one.</Note
+      >
+    </div>
   {/if}
 
-  <ul class="rules">
-    <li>Updates never install while a session runs, even one started outside this window.</li>
-    <li>
-      Before an update that changes the bundled server, your saves are copied to
-      <span class="t-data">backups</span> in the data folder.
-    </li>
-    <li>Older versions of the launcher or its server are never offered.</li>
-    <li>Checks are quiet offline and never hold up Play.</li>
-  </ul>
-
-  {#if folderError}<Note kind="warn">{folderError}</Note>{/if}
-  <div class="actions">
-    <PillButton onclick={openBackups}>Open backups</PillButton>
-    <PillButton onclick={() => void openUrl(RELEASES_URL)}>Release notes on GitHub</PillButton>
+  <div class="more">
+    <ShowMore label="About this build" summary="for troubleshooting" bind:open>
+      <About />
+    </ShowMore>
   </div>
 </Glass>
 
 <style>
-  .modes {
-    display: flex;
-    flex-direction: column;
-  }
-  .mode {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-height: 54px;
-    padding: 6px 8px;
-    border-radius: var(--radius-row);
-    text-align: left;
-  }
-  .radio {
-    flex: 0 0 auto;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    border: 2px solid var(--ink-soft);
-  }
-  .mode[aria-checked="true"] .radio {
-    border-color: var(--ink);
-    background: radial-gradient(circle, var(--ink) 0 4px, transparent 5px);
-  }
-  .mode-text {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.25;
-  }
-  .mode-label {
-    font-weight: 700;
-  }
-  .hint,
-  .status,
-  .date,
-  .server {
-    color: var(--ink-soft);
-    font-size: 13px;
-  }
-  .check {
-    display: flex;
+  .tall {
+    min-height: 72px;
     flex-wrap: wrap;
+  }
+  .text {
+    display: flex;
+    flex-direction: column;
+  }
+  .name {
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px 16px;
-    padding-top: 10px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    gap: 6px;
+    font-weight: 600;
   }
   .candidate {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 14px;
+    margin-bottom: 12px;
+    padding: 16px;
     border-radius: var(--radius-row);
-    background: var(--field);
+    background: var(--graphite-raised);
   }
-  .candidate-head {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-  }
-  .server {
+  .candidate p {
     margin: 0;
   }
   .notes {
@@ -225,13 +169,16 @@
     user-select: text;
     -webkit-user-select: text;
   }
-  .rules {
-    margin: 0;
-    padding-left: 18px;
-    color: var(--ink-soft);
-    font-size: 13px;
+  .actions {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .note {
+    padding-bottom: 12px;
+  }
+  .more {
+    padding-bottom: 12px;
   }
 </style>
