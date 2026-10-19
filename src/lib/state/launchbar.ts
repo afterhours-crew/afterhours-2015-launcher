@@ -23,6 +23,8 @@ export interface LaunchBarInput {
 export interface LaunchBarModel {
   eyebrow: string;
   title: string;
+  /** Under the title: whether the server runs, and who can reach it. */
+  summary: string;
   stateLine: string;
   dot: Dot;
   play: {
@@ -54,9 +56,11 @@ export function launchBarModel(input: LaunchBarInput): LaunchBarModel {
   const serveOnly = input.platform !== "windows";
   const idleAction = serveOnly ? "serve" : "start";
   // The bar names the server, never a car (owner decision, 2026-10-19).
-  const title = "This PC";
-  const eyebrow = "Your server";
+  // The server listens on loopback only, so it is always this PC only.
+  const eyebrow = "Playing on";
+  const title = "Your server";
   const state = input.status?.state;
+  const summary = `${isLive(state) ? "Running" : "Offline"} · this PC only`;
 
   if (isLive(state) && input.status) {
     const s = input.status;
@@ -80,6 +84,7 @@ export function launchBarModel(input: LaunchBarInput): LaunchBarModel {
     return {
       eyebrow,
       title,
+      summary,
       stateLine: lines[s.state] ?? s.message,
       dot: s.state === "ready" ? "ready" : s.state === "activation" ? "warn" : "info",
       play: {
@@ -113,6 +118,7 @@ export function launchBarModel(input: LaunchBarInput): LaunchBarModel {
   return {
     eyebrow,
     title,
+    summary,
     stateLine: reason ?? stateLine,
     dot: reason ? "warn" : dot,
     play: {

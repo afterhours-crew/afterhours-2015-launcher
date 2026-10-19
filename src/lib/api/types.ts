@@ -73,6 +73,8 @@ export interface ServerInfo {
   source: "bundled" | "override" | null;
   version_line: string | null;
   matches_pin: boolean | null;
+  /** From `version --json`; null for servers without it (v0.3.0). */
+  capabilities: string[] | null;
   error: string | null;
 }
 

@@ -114,7 +114,38 @@ pub struct ServerInfo {
     /// Whether the bundled file still has the pinned hash. `None` for an
     /// override or when no file was found.
     pub matches_pin: Option<bool>,
+    /// Features the server reports in `version --json` (contract v1), such
+    /// as `profile` or `map`. `None` for servers without that command,
+    /// which report none: screens that need one say "Coming later".
+    pub capabilities: Option<Vec<String>>,
     pub error: Option<String>,
+}
+
+/// Most capabilities read from one server, and the longest name.
+const MAX_CAPABILITIES: usize = 64;
+const MAX_CAPABILITY_LEN: usize = 64;
+
+/// The `capabilities` array of `version --json`, bounded; anything
+/// malformed is no capabilities at all rather than a guess.
+pub fn parse_capabilities(stdout: &str) -> Option<Vec<String>> {
+    let value: serde_json::Value = serde_json::from_str(stdout.trim()).ok()?;
+    let list = value.get("capabilities")?.as_array()?;
+    if list.len() > MAX_CAPABILITIES {
+        return None;
+    }
+    list.iter()
+        .map(|item| {
+            item.as_str()
+                .filter(|name| {
+                    !name.is_empty()
+                        && name.len() <= MAX_CAPABILITY_LEN
+                        && name.bytes().all(|b| {
+                            b.is_ascii_lowercase() || b.is_ascii_digit() || b"-_".contains(&b)
+                        })
+                })
+                .map(str::to_owned)
+        })
+        .collect()
 }
 
 /// Locate the server, ask it for its version and re-check its hash.
@@ -128,6 +159,7 @@ pub fn info() -> ServerInfo {
         source: None,
         version_line: None,
         matches_pin: None,
+        capabilities: None,
         error: None,
     };
     let server = match current() {
@@ -158,6 +190,13 @@ pub fn info() -> ServerInfo {
         Ok(output) => info.error = Some(output.last_stderr_line()),
         Err(e) => info.error = Some(e),
     }
+    // v0.3.0 has no `version` command and refuses it; that is no capabilities.
+    let args = ["version".to_owned(), "--json".to_owned()];
+    if let Ok(output) = crate::cli::run_raw(&server.path, &args, std::time::Duration::from_secs(10))
+        && output.code == Some(0)
+    {
+        info.capabilities = parse_capabilities(&output.stdout);
+    }
     info.path = Some(server.path);
     info.source = Some(server.source);
     info
@@ -185,6 +224,34 @@ mod tests {
         let pinned = pin::Pin::parse(text).unwrap();
         assert_eq!(pinned.tag, PINNED_TAG);
         assert_eq!(pinned.executable_sha256, PINNED_SHA256);
+    }
+
+    #[test]
+    fn capabilities_come_only_from_a_well_formed_version_report() {
+        let report = r#"{"version":1,"program":"Afterhours","capabilities":["profile","sessions","events"]}"#;
+        assert_eq!(
+            parse_capabilities(report),
+            Some(vec!["profile".into(), "sessions".into(), "events".into()])
+        );
+        assert_eq!(parse_capabilities(r#"{"capabilities":[]}"#), Some(vec![]));
+        for bad in [
+            "",
+            "Afterhours 0.3.0 (v0.3.0 / 68aaaac)",
+            r#"{"version":1}"#,
+            r#"{"capabilities":"map"}"#,
+            r#"{"capabilities":["map",3]}"#,
+            r#"{"capabilities":["Map"]}"#,
+            r#"{"capabilities":["../x"]}"#,
+        ] {
+            assert_eq!(parse_capabilities(bad), None, "{bad}");
+        }
+        let many: Vec<String> = (0..=MAX_CAPABILITIES)
+            .map(|i| format!("\"c{i}\""))
+            .collect();
+        assert_eq!(
+            parse_capabilities(&format!(r#"{{"capabilities":[{}]}}"#, many.join(","))),
+            None
+        );
     }
 
     #[test]

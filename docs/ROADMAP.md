@@ -8,19 +8,21 @@ design canvas.
 
 ## Tracks
 
-| Track | What                                                                                                                                                                     | Where                                             | State                                                                     |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------- |
-| 1a    | Profile: `profile --json` reads one save without changing it (identity, REP, bank, garage slots, stats)                                                                  | afterhours-2015                                   | Done on a local branch, awaiting validation                               |
-| 1b    | CLI contract v1: JSON Schemas generated from the server's Rust types, `version --json` capabilities, `sessions --json`, the supervise event stream (afterhours-2015 #86) | afterhours-2015                                   | Done on a local branch (`feature/launcher-contract`), awaiting validation |
-| 1c    | Launcher foundation: shell and routing, bundled server, NSIS installer, updater, release and pin-bump workflows, generated types, this roadmap                           | this repository                                   | This branch (`feature/launcher-foundation`)                               |
-| 2     | Screens: Garage, Profile, World, Map, Host, Logs and Settings built from the designs, plus a Cars screen listing every owned car (garage and warehouse) from the profile | this repository                                   | Next, on top of 1c; the views are placeholders until then                 |
-| 3     | Traffic density: a server setting, then the World screen's control                                                                                                       | afterhours-2015, then here                        | Planned; waits until the milestone work on traffic AI is idle             |
-| 4     | Account edits: `account set` for name, bank and REP                                                                                                                      | afterhours-2015, then Profile                     | Planned                                                                   |
-| 5     | Overlay: the in-game companion window                                                                                                                                    | both; needs a live control endpoint in the server | Planned                                                                   |
-| 6     | v0.1 tester preview: the first published launcher release                                                                                                                | this repository                                   | Planned; uses the release machinery from 1c                               |
-| 7     | Live map: a read-only observer feed from the server (players, traffic and rival motion, spawns and clears) and a road map built from the tester's own installation       | afterhours-2015, then the Map screen              | Planned; waits for the current server milestone, like 3                   |
+| Track | What                                                                                                                                                                                 | Where                                             | State                                                                     |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------- |
+| 1a    | Profile: `profile --json` reads one save without changing it (identity, REP, bank, garage slots, stats)                                                                              | afterhours-2015                                   | Done on a local branch, awaiting validation                               |
+| 1b    | CLI contract v1: JSON Schemas generated from the server's Rust types, `version --json` capabilities, `sessions --json`, the supervise event stream (afterhours-2015 #86)             | afterhours-2015                                   | Done on a local branch (`feature/launcher-contract`), awaiting validation |
+| 1c    | Launcher foundation: shell and routing, bundled server, NSIS installer, updater, release and pin-bump workflows, generated types, this roadmap                                       | this repository                                   | This branch (`feature/launcher-foundation`)                               |
+| 2     | Screens: Garage, Profile (with Cars, every owned car in garage and warehouse, and Save data; Edit driver opens from it), World, Map, Host, Logs and Settings, built from the designs | this repository                                   | Next, on top of 1c; the views are placeholders until then                 |
+| 3     | Traffic density: a server setting, then the World screen's control                                                                                                                   | afterhours-2015, then here                        | Planned; waits until the milestone work on traffic AI is idle             |
+| 4     | Account edits: `account set` for name, bank and REP                                                                                                                                  | afterhours-2015, then Profile                     | Planned                                                                   |
+| 5     | Overlay: the in-game companion window                                                                                                                                                | both; needs a live control endpoint in the server | Planned                                                                   |
+| 6     | v0.1 tester preview: the first published launcher release                                                                                                                            | this repository                                   | Planned; uses the release machinery from 1c                               |
+| 7     | Live map: a read-only observer feed from the server (players, traffic and rival motion, spawns and clears) and a road map built from the tester's own installation                   | afterhours-2015, then the Map screen              | Planned; waits for the current server milestone, like 3                   |
 
-The launch bar names the server, never a "last driven" car.
+The launch bar never shows a car. Its left side reads "Playing on", then
+"Your server", then whether it runs: "Offline · this PC only" or
+"Running · this PC only".
 
 **Cops need research.** The server runs no police today. Nothing about cops is
 offered until research shows how the game expects them; the World screen
@@ -45,8 +47,11 @@ lists them as "Coming later".
   release, the CLI's JSON may change freely, moving together with the pin.
   After it, breaking changes bump the record `version`, because installed
   launchers will meet them.
-- **Missing capabilities say so.** A screen whose server capability does not
-  exist shows "Coming later" rather than sample data.
+- **Missing capabilities say so.** The launcher reads the server's
+  capabilities from `version --json` (Settings → About lists them; v0.3.0
+  reports none). A screen whose capability is missing, such as Map without
+  `map` or Profile without `profile`, shows "Coming later" rather than
+  sample data.
 - **Saves only move forward.** A new server may migrate the account SQLite
   forward, and older servers refuse upgraded saves. That is why saves are
   copied before a server change and why nothing is ever downgraded. The first

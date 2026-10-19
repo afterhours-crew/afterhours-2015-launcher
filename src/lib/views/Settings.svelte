@@ -1,7 +1,7 @@
 <script lang="ts">
   import Glass from "$lib/components/Glass.svelte";
   import { router } from "$lib/state/router.svelte";
-  import { SECTION_LABELS, SETTINGS_SECTIONS } from "$lib/state/routes";
+  import { SECTION_LABELS, SECTIONS } from "$lib/state/routes";
   import About from "./settings/About.svelte";
   import General from "./settings/General.svelte";
   import Updates from "./settings/Updates.svelte";
@@ -12,7 +12,7 @@
 <main>
   <Glass dense radius="card" label="Settings sections" class="sections">
     <nav aria-label="Settings">
-      {#each SETTINGS_SECTIONS as id (id)}
+      {#each SECTIONS.settings as id (id)}
         <button
           type="button"
           class="section row-hover"

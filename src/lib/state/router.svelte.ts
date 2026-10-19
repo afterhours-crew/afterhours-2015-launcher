@@ -1,12 +1,13 @@
 // The current screen, kept in the address hash so links and the browser
-// preview open any screen directly (`#/settings/about`).
+// preview open any screen directly (`#/profile/cars`).
 
 import {
   HOME,
   formatRoute,
   parseRoute,
+  sectionFor,
   type Route,
-  type SettingsSection,
+  type Section,
   type View,
 } from "./routes";
 
@@ -21,12 +22,8 @@ export class Router {
     });
   }
 
-  go(view: View, section: SettingsSection | null = null): void {
-    const next: Route = {
-      view,
-      section: view === "settings" ? (section ?? "general") : null,
-      firstRun: false,
-    };
+  go(view: View, section: Section | null = null): void {
+    const next: Route = { view, section: sectionFor(view, section), firstRun: false };
     this.route = next;
     if (typeof window !== "undefined") window.location.hash = formatRoute(next);
   }

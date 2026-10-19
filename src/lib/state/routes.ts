@@ -1,16 +1,24 @@
-// The window's screens and their addresses. Hash routes (`#/settings/about`)
-// keep links working in the desktop window and in the browser preview.
+// The window's screens and their addresses. Hash routes (`#/profile/cars`,
+// `#/settings/about`) keep links working in the desktop window and in the
+// browser preview.
 
 export const VIEWS = ["garage", "profile", "world", "map", "host", "logs", "settings"] as const;
 export type View = (typeof VIEWS)[number];
 
-export const SETTINGS_SECTIONS = ["general", "updates", "about"] as const;
-export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
+/** Views with sub-views; the first one is where the view opens. */
+export const SECTIONS = {
+  profile: ["overview", "cars", "save-data", "edit-driver"],
+  settings: ["general", "updates", "about"],
+} as const;
+export type ProfileSection = (typeof SECTIONS.profile)[number];
+export type SettingsSection = (typeof SECTIONS.settings)[number];
+export type Section = ProfileSection | SettingsSection;
+type Sectioned = keyof typeof SECTIONS;
 
 export interface Route {
   view: View;
-  /** Settings only. */
-  section: SettingsSection | null;
+  /** Profile and Settings only. */
+  section: Section | null;
   /** `#/first-run`: show the first run wizard (browser preview and tests). */
   firstRun: boolean;
 }
@@ -25,7 +33,11 @@ export const NAV: { id: View; label: string }[] = [
   { id: "settings", label: "Settings" },
 ];
 
-export const SECTION_LABELS: Record<SettingsSection, string> = {
+export const SECTION_LABELS: Record<Section, string> = {
+  overview: "Overview",
+  cars: "Cars",
+  "save-data": "Save data",
+  "edit-driver": "Edit driver",
   general: "General",
   updates: "Updates",
   about: "About",
@@ -37,8 +49,15 @@ function isView(text: string | undefined): text is View {
   return (VIEWS as readonly string[]).includes(text ?? "");
 }
 
-function isSection(text: string | undefined): text is SettingsSection {
-  return (SETTINGS_SECTIONS as readonly string[]).includes(text ?? "");
+function hasSections(view: View): view is Sectioned {
+  return view in SECTIONS;
+}
+
+/** The section to show for `view`: `wanted` if it belongs there, else the first. */
+export function sectionFor(view: View, wanted: string | null | undefined): Section | null {
+  if (!hasSections(view)) return null;
+  const sections: readonly Section[] = SECTIONS[view];
+  return sections.find((s) => s === wanted) ?? sections[0]!;
 }
 
 /** `#/settings/updates` → settings, updates. Anything unknown is the garage. */
@@ -46,12 +65,11 @@ export function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   if (parts[0] === "first-run") return { ...HOME, firstRun: true };
   if (!isView(parts[0])) return HOME;
-  if (parts[0] !== "settings") return { view: parts[0], section: null, firstRun: false };
-  return { view: "settings", section: isSection(parts[1]) ? parts[1] : "general", firstRun: false };
+  return { view: parts[0], section: sectionFor(parts[0], parts[1]), firstRun: false };
 }
 
 export function formatRoute(route: Route): string {
   if (route.firstRun) return "#/first-run";
-  if (route.view === "settings") return `#/settings/${route.section ?? "general"}`;
-  return `#/${route.view}`;
+  const section = sectionFor(route.view, route.section);
+  return section ? `#/${route.view}/${section}` : `#/${route.view}`;
 }

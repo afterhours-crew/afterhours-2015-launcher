@@ -3,13 +3,18 @@
   import Glass from "./Glass.svelte";
   // A screen whose server capability or design is not built yet. Says what
   // will be here and what it waits on, never shows sample data as real.
-  let { title, track, children }: { title: string; track: string; children: Snippet } = $props();
+  let {
+    title,
+    track,
+    chip = "Coming later",
+    children,
+  }: { title: string; track: string; chip?: string; children: Snippet } = $props();
 </script>
 
 <Glass dense radius="phone" label={title} class="coming-later">
   <div class="head">
     <h1 class="t-view-title">{title}</h1>
-    <span class="chip">Coming later</span>
+    <span class="chip">{chip}</span>
   </div>
   <div class="body">{@render children()}</div>
   <span class="t-data-small track">{track}</span>

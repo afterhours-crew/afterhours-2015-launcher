@@ -30,9 +30,14 @@ describe("launch bar", () => {
     expect(win.play).toMatchObject({ label: "Play", action: "start", disabled: false });
     const mac = launchBarModel({ ...base, platform: "other" });
     expect(mac.play).toMatchObject({ label: "Serve", action: "serve", disabled: false });
-    expect(mac.title).toBe("This PC");
-    expect(win.eyebrow).toBe("Your server");
-    expect(win.title).toBe("This PC");
+    // The bar names the server, never a car.
+    for (const model of [win, mac]) {
+      expect(model).toMatchObject({
+        eyebrow: "Playing on",
+        title: "Your server",
+        summary: "Offline · this PC only",
+      });
+    }
   });
 
   it("says why Play is disabled instead of just disabling it", () => {
@@ -69,6 +74,10 @@ describe("launch bar", () => {
       busy: false,
     });
     expect(ready.dot).toBe("ready");
+    expect(ready.summary).toBe("Running · this PC only");
+    expect(launchBarModel({ ...base, status: status("finished") }).summary).toBe(
+      "Offline · this PC only",
+    );
     expect(ready.stateLine).toContain("Press Space");
   });
 

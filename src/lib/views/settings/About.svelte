@@ -71,6 +71,14 @@
         <span class="value t-data-small">{server?.pinned_sha256}</span>
       </div>
       <div class="row">
+        <span class="t-label">Capabilities</span>
+        <span class="value t-data-small"
+          >{server?.capabilities
+            ? server.capabilities.join(", ") || "none"
+            : "not reported by this server"}</span
+        >
+      </div>
+      <div class="row">
         <span class="t-label">Server path</span>
         <span class="value t-data-small">{server?.path ?? "—"}</span>
       </div>

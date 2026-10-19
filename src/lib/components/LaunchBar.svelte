@@ -2,7 +2,8 @@
   import type { LaunchBarModel } from "$lib/state/launchbar";
   import PlayButton from "./PlayButton.svelte";
   import StatusDot from "./StatusDot.svelte";
-  // Always present, never on glass: the car or server name and Play sit on the floor.
+  // Always present, never on glass: the server and Play sit on the floor.
+  // It never shows a car.
   let {
     model,
     onPlay,
@@ -13,6 +14,7 @@
   <div class="left">
     <span class="eyebrow">{model.eyebrow}</span>
     <span class="t-car-name">{model.title}</span>
+    <span class="summary">{model.summary}</span>
   </div>
   <div class="right">
     <div class="state">
@@ -47,6 +49,10 @@
     font-weight: 700;
     letter-spacing: 0.16em;
     text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .summary {
+    font-size: 14px;
     color: var(--ink-soft);
   }
   .right {
