@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { CarImage, CarImages } from "$lib/api/types";
-import { carImagePath, insideDir, needsCarImages } from "./carimages";
+import {
+  carPicture,
+  coverRect,
+  insideDir,
+  needsCarImages,
+  parseRatio,
+  type ImageSize,
+} from "./carimages";
 import { groupCars } from "./cars";
 import { SAMPLE_CARS, SAMPLE_PROFILE } from "./sample";
 
@@ -13,6 +20,12 @@ const png = (name: string, size: number): CarImage => ({
   source_format: "BC1_UNORM",
 });
 const both: CarImages = { medium: png("m", 256), large: png("l", 512) };
+const carImagePath = (
+  image: CarImages | null | undefined,
+  size: ImageSize,
+  enabled: boolean,
+  dir: string | null,
+) => carPicture(image, size, enabled, dir)?.path ?? null;
 
 describe("choosing a car's picture", () => {
   it("takes the medium picture for thumbnails and the large one for the panel", () => {
@@ -27,6 +40,16 @@ describe("choosing a car's picture", () => {
     expect(carImagePath({ medium: png("m", 256), large: null }, "large", true, DIR)).toBe(
       `${DIR}\\m.png`,
     );
+  });
+
+  it("shows the squeezed large pictures at 16:9 and the medium ones square", () => {
+    expect(carPicture(both, "large", true, DIR)?.aspect).toBeCloseTo(16 / 9);
+    expect(carPicture(both, "medium", true, DIR)?.aspect).toBe(1);
+    // The aspect follows the picture used, not the size asked for.
+    expect(
+      carPicture({ medium: null, large: png("l", 512) }, "medium", true, DIR)?.aspect,
+    ).toBeCloseTo(16 / 9);
+    expect(carPicture({ medium: png("m", 256), large: null }, "large", true, DIR)?.aspect).toBe(1);
   });
 
   it("shows the placeholder for a car without pictures or before they exist", () => {
@@ -56,6 +79,35 @@ describe("choosing a car's picture", () => {
     const groups = groupCars([withImage, { ...withImage, id: "c2" }, { ...withImage, id: "c3" }]);
     expect(groups).toHaveLength(1);
     expect(carImagePath(groups[0]!.car.image, "medium", true, DIR)).toBe(`${DIR}\\m.png`);
+  });
+});
+
+describe("fitting a picture to its box", () => {
+  it("reads CSS aspect ratios", () => {
+    expect(parseRatio("16 / 9")).toBeCloseTo(16 / 9);
+    expect(parseRatio("72 / 40")).toBeCloseTo(1.8);
+    expect(parseRatio("1.5")).toBe(1.5);
+    for (const bad of ["", "wide", "1 / 0", "-1 / 2"]) expect(parseRatio(bad)).toBe(1);
+  });
+
+  it("fills a 16:9 box exactly with a 16:9 picture", () => {
+    expect(coverRect(16 / 9, 16 / 9)).toEqual({ left: 0, top: 0, width: 100, height: 100 });
+  });
+
+  it("covers a wider box by overflowing top and bottom, a bit more at the top", () => {
+    const rect = coverRect(1, 1.8);
+    expect(rect.width).toBe(100);
+    expect(rect.height).toBeCloseTo(180);
+    expect(rect.top).toBeCloseTo(-46.4);
+    expect(rect.left).toBe(0);
+  });
+
+  it("covers a narrower box by overflowing both sides equally", () => {
+    const rect = coverRect(16 / 9, 1);
+    expect(rect.height).toBe(100);
+    expect(rect.width).toBeCloseTo(177.78, 1);
+    expect(rect.left).toBeCloseTo(-38.89, 1);
+    expect(rect.top).toBe(0);
   });
 });
 

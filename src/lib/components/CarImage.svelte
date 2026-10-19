@@ -1,20 +1,22 @@
 <script lang="ts">
   import IconCar from "@tabler/icons-svelte/icons/car";
   import { imageSrc } from "$lib/api/images";
-  // A car's in-game picture, cropped to its box (`object-fit: cover`). It
-  // fades in once loaded (no fade with reduced motion: app.css turns
-  // transitions off). Without a picture, while one loads, or when it fails
-  // to load, a graphite tile with a car icon stands in: never a broken image.
+  import { coverRect, parseRatio, type CarPicture } from "$lib/state/carimages";
+  // A car's in-game picture, stretched back to its display aspect (the large
+  // pictures are stored squeezed) and cropped to cover its box. It fades in
+  // once loaded (no fade with reduced motion: app.css turns transitions off).
+  // Without a picture, while one loads, or when it fails to load, a graphite
+  // tile with a car icon stands in: never a broken image.
   let {
-    path,
+    picture,
     alt,
     ratio = "1 / 1",
     width = "100%",
     icon = 20,
     radius = "var(--radius-row)",
   }: {
-    /** From `carImagePath`; `null` shows the tile. */
-    path: string | null;
+    /** From `carPicture`; `null` shows the tile. */
+    picture: CarPicture | null;
     /** The car's name. */
     alt: string;
     /** Box shape, as CSS `aspect-ratio`. */
@@ -24,7 +26,8 @@
     radius?: string;
   } = $props();
 
-  let src = $derived(imageSrc(path));
+  let src = $derived(imageSrc(picture?.path ?? null));
+  let rect = $derived(coverRect(picture?.aspect ?? 1, parseRatio(ratio)));
   let loaded = $state(false);
   let failed = $state(false);
 
@@ -45,6 +48,7 @@
       {src}
       {alt}
       class:loaded
+      style="left: {rect.left}%; top: {rect.top}%; width: {rect.width}%; height: {rect.height}%"
       decoding="async"
       draggable="false"
       onload={() => (loaded = true)}
@@ -71,13 +75,9 @@
   }
   img {
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    /* The game frames each car a little below the middle of its square
-       picture; this keeps the wheels in a wide crop. */
-    object-position: 50% 58%;
+    max-width: none;
+    /* The size and place come from coverRect; the picture fills them. */
+    object-fit: fill;
     opacity: 0;
     transition: opacity var(--motion-slow) var(--ease-out);
   }

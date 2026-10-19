@@ -20,7 +20,7 @@
     type CarSort,
   } from "$lib/state/cars";
   import { featureReady } from "$lib/state/capabilities";
-  import { carImagePath } from "$lib/state/carimages";
+  import { carPicture } from "$lib/state/carimages";
   import { formatCount, formatMoney } from "$lib/state/format";
   import { session } from "$lib/state/session.svelte";
 
@@ -112,7 +112,7 @@
             {#if pictures}
               <!-- Identical cars share a row, so they share its picture. -->
               <CarImage
-                path={carImagePath(row.car.image, "medium", pictures, profile.car_images)}
+                picture={carPicture(row.car.image, "medium", pictures, profile.car_images)}
                 alt={carName(row.car)}
                 ratio="72 / 40"
                 width="72px"
@@ -152,7 +152,7 @@
       <Glass radius="phone" label="Selected car" class="panel">
         {#if pictures}
           <CarImage
-            path={carImagePath(car.image, "large", pictures, profile.car_images)}
+            picture={carPicture(car.image, "large", pictures, profile.car_images)}
             alt={carName(car)}
             ratio="16 / 9"
             icon={32}

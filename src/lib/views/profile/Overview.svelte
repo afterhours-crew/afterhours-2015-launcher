@@ -17,7 +17,7 @@
   import PillButton from "$lib/components/PillButton.svelte";
   import ShowMore from "$lib/components/ShowMore.svelte";
   import { featureReady } from "$lib/state/capabilities";
-  import { carImagePath } from "$lib/state/carimages";
+  import { carPicture } from "$lib/state/carimages";
   import { carName, garageList } from "$lib/state/cars";
   import {
     collectionRows,
@@ -204,7 +204,7 @@
       </PanelHeading>
       {#if pictures && active}
         <CarImage
-          path={carImagePath(active.image, "large", pictures, profile.car_images)}
+          picture={carPicture(active.image, "large", pictures, profile.car_images)}
           alt={carName(active)}
           ratio="16 / 9"
           icon={32}
