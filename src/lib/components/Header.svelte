@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import { initials } from "$lib/state/launchbar";
   import { NAV, type View } from "$lib/state/routes";
   import Mark from "./Mark.svelte";
@@ -13,6 +14,7 @@
     avatar = null,
     online = false,
     showNav = true,
+    play,
   }: {
     view: View;
     onNavigate: (view: View) => void;
@@ -22,6 +24,8 @@
     avatar?: string | null;
     online?: boolean;
     showNav?: boolean;
+    /** The compact Play, left of the profile pill, on views without the launch bar. */
+    play?: Snippet;
   } = $props();
   const COLORS = ["style", "speed", "build", "crew", "outlaw", "peach"];
   let fill = $derived(COLORS.includes(avatar ?? "") ? `var(--${avatar})` : "var(--style)");
@@ -39,17 +43,20 @@
   {:else}
     <span></span>
   {/if}
-  <div class="profile ah-glass">
-    {#if showNav}
-      <span class="avatar" class:online style="background: {fill}" aria-hidden="true"
-        >{initials(driverName)}</span
-      >
-      <span class="who">
-        <span class="name">{driverName}</span>
-        {#if subline}<span class="t-data-small sub">{subline}</span>{/if}
-      </span>
-    {/if}
-    <WindowControls />
+  <div class="right">
+    {#if play}{@render play()}{/if}
+    <div class="profile ah-glass">
+      {#if showNav}
+        <span class="avatar" class:online style="background: {fill}" aria-hidden="true"
+          >{initials(driverName)}</span
+        >
+        <span class="who">
+          <span class="name">{driverName}</span>
+          {#if subline}<span class="t-data-small sub">{subline}</span>{/if}
+        </span>
+      {/if}
+      <WindowControls />
+    </div>
   </div>
 </header>
 
@@ -57,10 +64,19 @@
   header {
     position: relative;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 12px 24px;
     padding: var(--header-top) var(--space-6) 0;
+  }
+  /* At the narrowest window the header wraps; Play stays with the profile. */
+  .right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
   }
   .brand {
     display: flex;

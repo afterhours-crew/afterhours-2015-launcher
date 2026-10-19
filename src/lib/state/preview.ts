@@ -34,7 +34,7 @@ export async function sampleAppInfo(): Promise<AppInfo> {
       capabilities: [...SAMPLE_VERSION.capabilities],
       error: null,
     },
-    data_dir: "C:\Users\Driver\AppData\Local\Afterhours2015",
+    data_dir: "C:\\Users\\Driver\\AppData\\Local\\Afterhours2015",
     updater: { endpoint: null, configured: false },
     debug_build: true,
   };

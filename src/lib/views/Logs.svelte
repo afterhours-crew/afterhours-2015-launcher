@@ -72,7 +72,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    padding: var(--space-5) var(--space-6);
+    padding: var(--space-5) var(--space-6) var(--space-6);
     min-height: 0;
     overflow: auto;
   }

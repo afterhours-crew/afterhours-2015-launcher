@@ -93,6 +93,83 @@ describe("launch bar", () => {
     expect(interrupted.stateLine).toContain("interrupted");
   });
 
+  it("gives the header pill the launch bar's action in every state", () => {
+    const cases = [
+      base,
+      { ...base, platform: "other" as const },
+      { ...base, serverReady: false },
+      { ...base, gameChosen: false },
+      { ...base, running: true },
+      { ...base, status: status("failed") },
+      ...(["preparing", "starting", "activation", "ready", "stopping"] as const).map((s) => ({
+        ...base,
+        running: true,
+        status: status(s),
+      })),
+    ];
+    for (const input of cases) {
+      const model = launchBarModel(input);
+      expect(model.pill.action).toBe(model.play.action);
+      expect(model.pill.disabled).toBe(model.play.disabled);
+      expect(model.pill.dot).toBe(model.dot);
+    }
+  });
+
+  it("shows a blue Play pill when it can start, saying what it does", () => {
+    expect(launchBarModel(base).pill).toEqual({
+      kind: "play",
+      label: "Play",
+      action: "start",
+      disabled: false,
+      title: "Play: start your server and the game",
+      dot: null,
+      caption: null,
+    });
+    expect(launchBarModel({ ...base, platform: "other" }).pill).toMatchObject({
+      kind: "play",
+      label: "Serve",
+      title: "Serve: start your server",
+    });
+  });
+
+  it("names the reason on a disabled pill, as tooltip and caption", () => {
+    expect(launchBarModel({ ...base, gameChosen: false }).pill).toMatchObject({
+      kind: "blocked",
+      label: "Play",
+      disabled: true,
+      title: "Choose the game folder",
+      caption: "Choose the game folder",
+    });
+    expect(launchBarModel({ ...base, running: true }).pill).toMatchObject({
+      kind: "blocked",
+      title: "Finishing up",
+    });
+    const failed = launchBarModel({ ...base, status: status("failed", "Game exited.") }).pill;
+    expect(failed).toMatchObject({ kind: "play", disabled: false });
+    expect(failed.caption).toBe("Last session failed · Game exited.");
+  });
+
+  it("names the session state while live and stops when ready", () => {
+    const ready = launchBarModel({ ...base, running: true, status: status("ready") }).pill;
+    expect(ready).toMatchObject({ kind: "live", label: "In game", action: "stop", dot: "ready" });
+    expect(ready.title).toBe("Ready · Press Space in the game · Stop");
+    const serving = launchBarModel({
+      ...base,
+      platform: "other",
+      running: true,
+      status: status("ready"),
+    }).pill;
+    expect(serving.label).toBe("Running");
+    const starting = launchBarModel({ ...base, running: true, status: status("starting") }).pill;
+    expect(starting).toMatchObject({
+      kind: "live",
+      label: "Starting",
+      action: null,
+      disabled: true,
+    });
+    expect(starting.caption).toContain("wait for ready");
+  });
+
   it("detects the platform from the user agent", () => {
     expect(detectPlatform("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")).toBe("windows");
     expect(detectPlatform("Mozilla/5.0 (Macintosh; Intel Mac OS X)")).toBe("other");

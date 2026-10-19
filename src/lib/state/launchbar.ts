@@ -34,6 +34,25 @@ export interface LaunchBarModel {
     reason: string | null;
     busy: boolean;
   };
+  /** The header's compact Play, on every view but the Garage home. */
+  pill: HeaderPill;
+}
+
+/**
+ * The same control as the launch bar's Play, compact: blue Play or Serve
+ * when it can start, a glass pill naming the session state while one is
+ * live (pressing it when ready stops), and a disabled Play saying why.
+ */
+export interface HeaderPill {
+  kind: "play" | "live" | "blocked";
+  label: string;
+  action: "start" | "serve" | "stop" | null;
+  disabled: boolean;
+  /** Tooltip and accessible name: what pressing it does, or why it cannot. */
+  title: string;
+  dot: Dot;
+  /** The state line shown beside the pill; `null` when it says nothing new. */
+  caption: string | null;
 }
 
 const LIVE: ReadonlySet<SessionState> = new Set([
@@ -81,18 +100,31 @@ export function launchBarModel(input: LaunchBarInput): LaunchBarModel {
       ready: serveOnly ? "Server running · Ready" : "Ready · Press Space in the game",
       stopping: "Closing the game, then the server",
     };
+    const line = lines[s.state] ?? s.message;
+    const dot: Dot = s.state === "ready" ? "ready" : s.state === "activation" ? "warn" : "info";
+    const ready = s.state === "ready";
     return {
       eyebrow,
       title,
       summary,
-      stateLine: lines[s.state] ?? s.message,
-      dot: s.state === "ready" ? "ready" : s.state === "activation" ? "warn" : "info",
+      stateLine: line,
+      dot,
       play: {
         label: labels[s.state] ?? "Working",
-        action: s.state === "ready" ? "stop" : null,
-        disabled: s.state !== "ready",
+        action: ready ? "stop" : null,
+        disabled: !ready,
         reason: null,
         busy,
+      },
+      pill: {
+        kind: "live",
+        // While live the pill says where you are; pressing it when ready stops.
+        label: ready ? (serveOnly ? "Running" : "In game") : (labels[s.state] ?? "Working"),
+        action: ready ? "stop" : null,
+        disabled: !ready,
+        title: ready ? `${line} · Stop` : line,
+        dot,
+        caption: line,
       },
     };
   }
@@ -115,18 +147,37 @@ export function launchBarModel(input: LaunchBarInput): LaunchBarModel {
     dot = "info";
   }
 
+  const play: LaunchBarModel["play"] = {
+    label: serveOnly ? "Serve" : "Play",
+    action: reason ? null : idleAction,
+    disabled: reason !== null || input.running,
+    reason,
+    busy: false,
+  };
+  const line = reason ?? stateLine;
+  const lineDot: Dot = reason ? "warn" : dot;
   return {
     eyebrow,
     title,
     summary,
-    stateLine: reason ?? stateLine,
-    dot: reason ? "warn" : dot,
-    play: {
-      label: serveOnly ? "Serve" : "Play",
-      action: reason ? null : idleAction,
-      disabled: reason !== null || input.running,
-      reason,
-      busy: false,
+    stateLine: line,
+    dot: lineDot,
+    play,
+    pill: {
+      kind: play.disabled ? "blocked" : "play",
+      label: play.label,
+      action: play.action,
+      disabled: play.disabled,
+      title:
+        reason ??
+        (play.disabled
+          ? line
+          : serveOnly
+            ? "Serve: start your server"
+            : "Play: start your server and the game"),
+      dot: lineDot,
+      // Idle and ready says nothing worth the space; a failure or a reason does.
+      caption: lineDot ? line : null,
     },
   };
 }

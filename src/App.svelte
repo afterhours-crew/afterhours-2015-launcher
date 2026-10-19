@@ -3,6 +3,7 @@
   import { inTauri } from "$lib/api/tauri";
   import Backdrop from "$lib/components/Backdrop.svelte";
   import Header from "$lib/components/Header.svelte";
+  import HeaderPlay from "$lib/components/HeaderPlay.svelte";
   import LaunchBar from "$lib/components/LaunchBar.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
   import UpdateBanner from "$lib/components/UpdateBanner.svelte";
@@ -84,7 +85,11 @@
     avatar={session.settings.avatar}
     online={isLive(session.status?.state)}
     showNav={!firstRun}
-  />
+  >
+    {#snippet play()}
+      {#if !firstRun && view !== "garage"}<HeaderPlay pill={model.pill} {onPlay} />{/if}
+    {/snippet}
+  </Header>
 
   {#if !inTauri}
     <p class="banner">
@@ -139,7 +144,9 @@
     {:else}
       <Settings />
     {/if}
-    <LaunchBar {model} {onPlay} />
+    <!-- The full launch bar sits on the Garage home's floor only; every other
+         view runs to the window's edge and has the compact Play in the header. -->
+    {#if view === "garage"}<LaunchBar {model} {onPlay} />{/if}
   {/if}
 </div>
 

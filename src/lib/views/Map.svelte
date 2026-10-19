@@ -35,7 +35,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: center;
-    padding: var(--space-5) var(--space-6);
+    padding: var(--space-5) var(--space-6) var(--space-6);
     min-height: 0;
     overflow: auto;
   }
