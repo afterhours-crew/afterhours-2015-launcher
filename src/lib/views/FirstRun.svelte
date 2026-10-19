@@ -117,6 +117,8 @@
     }
   }
 
+  let canGoBack = $derived(step > 0 && !(step === 1 && inFolder !== null));
+
   let canNext = $derived(
     step === 0
       ? gameDir.trim().length > 0 && session.serverReady
@@ -260,11 +262,11 @@
     {/if}
 
     <div class="actions">
-      <PillButton
-        variant="text"
-        onclick={() => (step = Math.max(0, step - 1))}
-        disabled={step === 0 || (step === 1 && inFolder !== null)}>Back</PillButton
-      >
+      <!-- Back only where there is a step to go back to: not on the first one,
+           nor on the file check when the launcher sits in the game folder. -->
+      {#if canGoBack}
+        <PillButton variant="text" onclick={() => (step = Math.max(0, step - 1))}>Back</PillButton>
+      {/if}
       {#if step < steps.length - 1}
         <button type="button" class="next" disabled={!canNext || checking} onclick={next}
           >Next</button
@@ -455,6 +457,7 @@
     padding-top: 4px;
   }
   .next {
+    margin-left: auto;
     min-width: 160px;
     height: 50px;
     padding: 0 26px;
