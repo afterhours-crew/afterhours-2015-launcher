@@ -89,7 +89,7 @@
           <span class="t-label muted" aria-hidden="true"></span>
           <span class="t-label muted" aria-hidden="true"></span>
           <span class="t-label muted right">Score</span>
-          <span class="t-label muted right">Medal cell</span>
+          <span class="t-label muted right">Medal</span>
           {#each categories as row (row.key)}
             <span class="tag" style="background: {row.color}">{row.label}</span>
             <div class="track" aria-hidden="true">

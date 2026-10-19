@@ -25,6 +25,10 @@ export interface Profile {
   counts: Counts;
   garage: Garage | null;
   identity: Driver | null;
+  /**
+   * Where car names came from; `null` when none could be read.
+   */
+  localization: Localization | null;
   reputation: Reputation | null;
   save: Save;
   /**
@@ -77,12 +81,6 @@ export interface Car {
    * Definition GUID as 32 lowercase hexadecimal characters.
    */
   definition: string;
-  /**
-   * The blueprint label from the installed vehicle content, such as
-   * `Ford MustangGT 2015`; not the game's localized name. `null` when the
-   * vehicle content does not list the definition.
-   */
-  display_name: string | null;
   id: string;
   /**
    * Records installed on the car: reachable from it through installed
@@ -97,6 +95,13 @@ export interface Car {
   item_records: number;
   location: CarLocation;
   /**
+   * The game's localized name, read from the installation's text
+   * database: `names.long`. `null` when it did not resolve; the blueprint
+   * name stays in `vehicle.label`.
+   */
+  name: string | null;
+  names: CarNames | null;
+  /**
    * The stored sale price: the cash that selling this car credits.
    */
   sale_price: number;
@@ -110,6 +115,19 @@ export interface Car {
    */
   spare_parts: number;
   vehicle: Vehicle | null;
+}
+/**
+ * A car's three names in one language. A name is `null` when its string ID
+ * is absent from the text database or uses an encoding this reader does
+ * not decode.
+ */
+export interface CarNames {
+  /**
+   * The longest form; a car's `name` repeats it.
+   */
+  long: string | null;
+  medium: string | null;
+  short: string | null;
 }
 /**
  * A vehicle's blueprint from the installed vehicle content. `label` is the
@@ -170,6 +188,12 @@ export interface Item {
   definition: string;
   id: string;
   /**
+   * The game's localized name of a car, read from the installation:
+   * `names.long`. `null` for other items or when it did not resolve.
+   */
+  name: string | null;
+  names: CarNames | null;
+  /**
    * Blueprint from the installed vehicle content, for cars.
    */
   vehicle: Vehicle | null;
@@ -183,6 +207,28 @@ export interface Driver {
   account_id: string;
   display_name: string;
   persona_id: string;
+}
+/**
+ * Where a profile's car names came from.
+ */
+export interface Localization {
+  /**
+   * Car definitions the installation lists.
+   */
+  cars: number;
+  game_directory: string;
+  /**
+   * `argument`, `current-session` or `registry`.
+   */
+  game_directory_from: string;
+  /**
+   * The text database's locale, such as `en_US`.
+   */
+  locale: string;
+  /**
+   * `argument`, `registry` (the game's own registration) or `default`.
+   */
+  locale_from: string;
 }
 /**
  * REP as `nfs_services::reputation` presents it. `level` and the

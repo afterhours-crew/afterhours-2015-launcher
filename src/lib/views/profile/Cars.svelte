@@ -18,7 +18,7 @@
   import { formatCount, formatMoney } from "$lib/state/format";
 
   // Cars (D3): every owned car, garage and warehouse, from the profile's
-  // `cars`. Names are what the profile gives (blueprint labels for now).
+  // `cars`. Names are the game's localized ones, else the blueprint label.
   // Wraps and tuning are not reported, so they are not shown.
   let { profile }: { profile: Profile } = $props();
 

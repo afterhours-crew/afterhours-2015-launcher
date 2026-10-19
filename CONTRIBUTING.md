@@ -19,6 +19,9 @@ pnpm tauri dev
 ```
 
 `AFTERHOURS_EXE=<path>` makes a development build run another server build.
+It must be an `Afterhours` bundle (`cargo build -p nfs-afterhours-bundle` in
+afterhours-2015), not a standalone `nfs-afterhours`, which fails the first
+run's file check because it looks for `nfs-server` next to itself.
 
 ## Checks
 

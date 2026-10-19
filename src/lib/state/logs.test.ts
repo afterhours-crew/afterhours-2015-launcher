@@ -42,6 +42,19 @@ describe("session files", () => {
     expect(game.lines).toBe(2);
   });
 
+  it("describe the stop requests the supervisor and server read", () => {
+    const entries = fileEntries([
+      { name: "stop-server", bytes: 0, lines: 0, truncated: false },
+      { name: "stop", bytes: 0, lines: 0, truncated: false },
+    ]);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      title: "Stop request",
+      group: "deep",
+      names: ["stop", "stop-server"],
+    });
+  });
+
   it("keep files the launcher does not know, under deep dive", () => {
     const entries = fileEntries([{ name: "extra.txt", bytes: 5, lines: 1, truncated: false }]);
     expect(entries[0]).toMatchObject({ title: "extra.txt", group: "deep" });

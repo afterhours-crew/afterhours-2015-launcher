@@ -29,6 +29,7 @@ function bare(): Profile {
     cars: null,
     car_summary: null,
     garage: null,
+    localization: null,
     counts: { ...SAMPLE_PROFILE.counts, items_by_class: null, collectibles: null },
     save: { ...SAMPLE_PROFILE.save, updated_at_utc: null },
   };
@@ -128,7 +129,7 @@ describe("stats", () => {
   it("name the favourite vehicle only when it is one of the cars", () => {
     const tiles = tableTiles(SAMPLE_PROFILE.tables!["GameplayStatsTable"], SAMPLE_PROFILE.cars);
     expect(tiles.find((t) => t.column === "FavoriteVehicleId")!.name).toBe(
-      "Nissan GTRSkylineKPGC10 1971",
+      "NISSAN Skyline GT-R KPGC10 (1971)",
     );
     expect(tiles.find((t) => t.column === "FavoriteVehicleId")!.value).toBe("1000001");
     const other = { FavoriteVehicleId: { value: 5, stored: true } };

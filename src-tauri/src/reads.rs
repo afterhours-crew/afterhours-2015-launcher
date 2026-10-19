@@ -32,10 +32,13 @@ pub const READ_TIMEOUT: Duration = Duration::from_secs(30);
 pub const MAX_SESSION_FILE_BYTES: u64 = 4 * 1024 * 1024;
 
 /// Files a session folder may hold that the window shows. The server
-/// writes each child's output to `<child>.stdout.*` and `<child>.stderr.log`.
-pub const SESSION_FILES: [&str; 10] = [
+/// writes each child's output to `<child>.stdout.*` and `<child>.stderr.log`;
+/// `stop` and `stop-server` are the stop requests a Stop leaves behind.
+pub const SESSION_FILES: [&str; 12] = [
     "status.json",
     "request.json",
+    "stop",
+    "stop-server",
     "prepare.stdout.json",
     "prepare.stderr.log",
     "create-account.stdout.json",

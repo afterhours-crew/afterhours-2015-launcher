@@ -6,9 +6,11 @@
 //!
 //! Release builds always run the copy bundled next to the launcher, which
 //! `build.rs` checked against `server-pin.json`. Development builds may run
-//! another build named by `AFTERHOURS_EXE` instead: an `Afterhours.exe` or an
-//! `nfs-afterhours` from an afterhours-2015 checkout, which takes the same
-//! commands. Release builds ignore the variable, so a leftover development
+//! another build named by `AFTERHOURS_EXE` instead: an `Afterhours.exe` built
+//! from an afterhours-2015 checkout (`cargo build -p nfs-afterhours-bundle`).
+//! A standalone `nfs-afterhours` takes the same commands but, without
+//! `--server`, looks for `nfs-server` next to itself, so its `check` fails
+//! here. Release builds ignore the variable, so a leftover development
 //! setting can never make an installed launcher run a different server
 //! against a tester's saves.
 

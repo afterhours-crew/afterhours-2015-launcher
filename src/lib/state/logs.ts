@@ -75,6 +75,16 @@ export const FILE_INFO: Record<string, { title: string; about: string; group: Fi
     about: "What the launcher was asked to do (start, serve or setup) and with which folders.",
     group: "deep",
   },
+  stop: {
+    title: "Stop request",
+    about: "Left by Stop: the request the supervisor reads to close the game, then the server.",
+    group: "deep",
+  },
+  "stop-server": {
+    title: "Stop request",
+    about: "Left by Stop: the request the supervisor reads to close the game, then the server.",
+    group: "deep",
+  },
 };
 
 export interface FileEntry {

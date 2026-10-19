@@ -40,7 +40,14 @@ and the Map wait for server work. No release has been published yet. See
    Windows builds refuse to compile without it. To run another server build
    while developing, set `AFTERHOURS_EXE` to it; release builds ignore that
    variable. On Linux and macOS there is no bundled server, so development
-   builds need `AFTERHOURS_EXE` pointing at an `nfs-afterhours` build.
+   builds always need `AFTERHOURS_EXE`.
+
+   `AFTERHOURS_EXE` must name a single-executable `Afterhours` build: in an
+   afterhours-2015 checkout, `cargo build -p nfs-afterhours-bundle` writes it
+   to `target/debug/Afterhours.exe`. A standalone `nfs-afterhours` does not
+   work here: without `--server`, which the launcher never passes, it looks
+   for `nfs-server` next to itself, so the first run's file check fails with
+   "No nfs-server executable next to this launcher".
 
 3. The first run asks for the game folder, runs the server's read-only check
    and asks for a driver name. Then the garage opens. Play runs `start` on

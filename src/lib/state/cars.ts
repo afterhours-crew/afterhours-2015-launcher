@@ -3,8 +3,9 @@
 // garage slots 1-4 in order, then the warehouse by item ID. Garage slots
 // are 0-4 in the save and 1-5 on screen, as in the game.
 //
-// Car names are what the profile gives: today the blueprint label (such as
-// "Nissan GTRSkylineKPGC10 1971"), not the game's localized name. Wraps and
+// A car is called by the game's localized name the profile reads from the
+// installation ("NISSAN Skyline GT-R KPGC10 (1971)"), else by its blueprint
+// label ("Nissan GTRSkylineKPGC10 1971"). Search matches either. Wraps and
 // tuning are not reported, so they are not shown.
 
 import type { Car, CarSummary } from "$lib/api/types";
@@ -14,7 +15,7 @@ export type CarFilter = "all" | "garage" | "warehouse";
 export type CarSort = "slot" | "name" | "value";
 
 export function carName(car: Car): string {
-  return car.display_name ?? car.vehicle?.label ?? `Unknown car ${car.definition.slice(0, 8)}`;
+  return car.name ?? car.vehicle?.label ?? `Unknown car ${car.definition.slice(0, 8)}`;
 }
 
 /** The active car is in the garage too: it is slot 1. */
@@ -41,13 +42,13 @@ export function filterCounts(cars: Car[]): Record<CarFilter, number> {
   return { all: cars.length, garage, warehouse: cars.length - garage };
 }
 
-/** Cars matching the filter and a case-insensitive name search. */
+/** Cars matching the filter and a case-insensitive search of either name. */
 export function filterCars(cars: Car[], filter: CarFilter, query: string): Car[] {
   const q = query.trim().toLowerCase();
+  const matches = (car: Car) =>
+    [carName(car), car.vehicle?.label ?? ""].some((n) => n.toLowerCase().includes(q));
   return cars.filter(
-    (car) =>
-      (filter === "all" || (filter === "garage") === inGarage(car)) &&
-      (!q || carName(car).toLowerCase().includes(q)),
+    (car) => (filter === "all" || (filter === "garage") === inGarage(car)) && (!q || matches(car)),
   );
 }
 

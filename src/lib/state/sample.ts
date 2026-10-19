@@ -31,8 +31,10 @@ export const SAMPLE_VERSION: VersionReport = {
 const ACCOUNT = "0f1e2d3c4b5a69788796a5b4c3d2e1f0";
 const SAVE_PATH = `C:\\Users\\Driver\\AppData\\Local\\Afterhours2015\\artifacts\\account\\${ACCOUNT}.sqlite`;
 
+/** A car with its localized `name` (null when it did not resolve) and blueprint `label`. */
 function car(
   id: string,
+  name: string | null,
   label: string | null,
   location: Car["location"],
   slot: number | null,
@@ -43,7 +45,8 @@ function car(
   return {
     id,
     definition: id.padStart(32, "a").slice(0, 32),
-    display_name: label,
+    name,
+    names: name ? { long: name, medium: name, short: name.replace(/ \(\d{4}\)$/, "") } : null,
     vehicle: label
       ? {
           blueprint: `Vehicles/${label.replace(/ /g, "_")}`,
@@ -61,13 +64,33 @@ function car(
 }
 
 export const SAMPLE_CARS: Car[] = [
-  car("1000001", "Nissan GTRSkylineKPGC10 1971", "active", 0, 24, 3, 38_500),
-  car("1000002", "Honda CivicTypeR 2000", "garage", 1, 17, 0, 14_000),
-  car("1000003", "Ford MustangGT 2015", "garage", 2, 12, 1, 31_200),
-  car("1000011", "Sample Coupe 1989", "warehouse", null, 9, 0, 62_000),
-  car("1000012", "Sample Roadster 1994", "warehouse", null, 18, 2, 11_500),
-  car("1000013", "Sample Hatch 2006", "warehouse", null, 4, 0, 3_200),
-  car("1000014", null, "warehouse", null, 0, 0, 0),
+  car(
+    "1000001",
+    "NISSAN Skyline GT-R KPGC10 (1971)",
+    "Nissan GTRSkylineKPGC10 1971",
+    "active",
+    0,
+    24,
+    3,
+    38_500,
+  ),
+  // A name that did not resolve: the screens fall back to the blueprint label.
+  car("1000002", null, "Honda CivicTypeR 2000", "garage", 1, 17, 0, 14_000),
+  car("1000003", "SAMPLE Muscle GT (2015)", "Sample MuscleGT 2015", "garage", 2, 12, 1, 31_200),
+  car("1000011", "SAMPLE Coupe (1989)", "Sample Coupe 1989", "warehouse", null, 9, 0, 62_000),
+  car(
+    "1000012",
+    "SAMPLE Roadster (1994)",
+    "Sample Roadster 1994",
+    "warehouse",
+    null,
+    18,
+    2,
+    11_500,
+  ),
+  car("1000013", "SAMPLE Hatch (2006)", "Sample Hatch 2006", "warehouse", null, 4, 0, 3_200),
+  // A definition the vehicle content does not list: no name, no blueprint.
+  car("1000014", null, null, "warehouse", null, 0, 0, 0),
 ];
 
 export const SAMPLE_PROFILE: Profile = {
@@ -145,6 +168,8 @@ export const SAMPLE_PROFILE: Profile = {
               id: owned.id,
               definition: owned.definition,
               class: "RaceVehicle",
+              name: owned.name,
+              names: owned.names,
               vehicle: owned.vehicle,
             }
           : null,
@@ -154,6 +179,8 @@ export const SAMPLE_PROFILE: Profile = {
       id: SAMPLE_CARS[0]!.id,
       definition: SAMPLE_CARS[0]!.definition,
       class: "RaceVehicle",
+      name: SAMPLE_CARS[0]!.name,
+      names: SAMPLE_CARS[0]!.names,
       vehicle: SAMPLE_CARS[0]!.vehicle,
     },
   },
@@ -192,6 +219,13 @@ export const SAMPLE_PROFILE: Profile = {
   content: {
     directory: "C:\\Users\\Driver\\AppData\\Local\\Afterhours2015\\artifacts\\content\\sample",
     chosen_by: "current-session",
+  },
+  localization: {
+    locale: "en_US",
+    locale_from: "registry",
+    game_directory: "C:\\Games\\Need for Speed",
+    game_directory_from: "current-session",
+    cars: 150,
   },
   warnings: [],
 };

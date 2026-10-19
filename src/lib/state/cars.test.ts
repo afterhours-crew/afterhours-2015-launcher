@@ -15,10 +15,11 @@ import { SAMPLE_CARS, SAMPLE_PROFILE } from "./sample";
 const names = (cars: typeof SAMPLE_CARS) => cars.map(carName);
 
 describe("car names", () => {
-  it("are what the profile gives, then the blueprint label, then the definition", () => {
-    expect(carName(SAMPLE_CARS[0]!)).toBe("Nissan GTRSkylineKPGC10 1971");
-    const labelOnly = { ...SAMPLE_CARS[1]!, display_name: null };
-    expect(carName(labelOnly)).toBe("Honda CivicTypeR 2000");
+  it("are the game's localized name, then the blueprint label, then the definition", () => {
+    expect(carName(SAMPLE_CARS[0]!)).toBe("NISSAN Skyline GT-R KPGC10 (1971)");
+    // The name did not resolve: the blueprint label, never an empty string.
+    expect(SAMPLE_CARS[1]!.name).toBeNull();
+    expect(carName(SAMPLE_CARS[1]!)).toBe("Honda CivicTypeR 2000");
     expect(carName(SAMPLE_CARS[6]!)).toMatch(/^Unknown car [0-9a-f]{8}$/);
   });
 });
@@ -52,12 +53,19 @@ describe("filtering", () => {
     expect(filterCars(SAMPLE_CARS, "garage", "")).toHaveLength(3);
     expect(filterCars(SAMPLE_CARS, "warehouse", "")).toHaveLength(4);
     expect(names(filterCars(SAMPLE_CARS, "all", "  civic "))).toEqual(["Honda CivicTypeR 2000"]);
-    expect(names(filterCars(SAMPLE_CARS, "warehouse", "sample"))).toEqual([
-      "Sample Coupe 1989",
-      "Sample Roadster 1994",
-      "Sample Hatch 2006",
+    // Both the localized name and the blueprint label are searched.
+    expect(names(filterCars(SAMPLE_CARS, "all", "skyline gt-r"))).toEqual([
+      "NISSAN Skyline GT-R KPGC10 (1971)",
     ]);
-    expect(filterCars(SAMPLE_CARS, "garage", "sample")).toEqual([]);
+    expect(names(filterCars(SAMPLE_CARS, "all", "GTRSkyline"))).toEqual([
+      "NISSAN Skyline GT-R KPGC10 (1971)",
+    ]);
+    expect(names(filterCars(SAMPLE_CARS, "warehouse", "sample"))).toEqual([
+      "SAMPLE Coupe (1989)",
+      "SAMPLE Roadster (1994)",
+      "SAMPLE Hatch (2006)",
+    ]);
+    expect(filterCars(SAMPLE_CARS, "garage", "coupe")).toEqual([]);
   });
 });
 
@@ -66,9 +74,9 @@ describe("sorting", () => {
 
   it("puts the garage in slot order before the warehouse", () => {
     expect(names(sortCars(shuffled, "slot")).slice(0, 3)).toEqual([
-      "Nissan GTRSkylineKPGC10 1971",
+      "NISSAN Skyline GT-R KPGC10 (1971)",
       "Honda CivicTypeR 2000",
-      "Ford MustangGT 2015",
+      "SAMPLE Muscle GT (2015)",
     ]);
     // The warehouse keeps the order it was given.
     expect(
@@ -79,7 +87,11 @@ describe("sorting", () => {
   });
 
   it("sorts by name and by sale value", () => {
-    expect(names(sortCars(SAMPLE_CARS, "name"))[0]).toBe("Ford MustangGT 2015");
+    expect(names(sortCars(SAMPLE_CARS, "name")).slice(0, 3)).toEqual([
+      "Honda CivicTypeR 2000",
+      "NISSAN Skyline GT-R KPGC10 (1971)",
+      "SAMPLE Coupe (1989)",
+    ]);
     expect(sortCars(SAMPLE_CARS, "value").map((c) => c.sale_price)).toEqual([
       62_000, 38_500, 31_200, 14_000, 11_500, 3_200, 0,
     ]);
@@ -105,12 +117,12 @@ describe("summaries", () => {
   it("list the garage and sum up the warehouse", () => {
     const list = garageList(SAMPLE_CARS);
     expect(list.garage).toEqual([
-      { slot: "1", name: "Nissan GTRSkylineKPGC10 1971", active: true },
+      { slot: "1", name: "NISSAN Skyline GT-R KPGC10 (1971)", active: true },
       { slot: "2", name: "Honda CivicTypeR 2000", active: false },
-      { slot: "3", name: "Ford MustangGT 2015", active: false },
+      { slot: "3", name: "SAMPLE Muscle GT (2015)", active: false },
     ]);
-    expect(list.warehouse).toMatch(
-      /^\+ 4 in the warehouse: Sample Coupe 1989, Sample Hatch 2006, Sample Roadster 1994 and 1 more$/,
+    expect(list.warehouse).toBe(
+      "+ 4 in the warehouse: SAMPLE Coupe (1989), SAMPLE Hatch (2006), SAMPLE Roadster (1994) and 1 more",
     );
     expect(garageList(SAMPLE_CARS.slice(0, 3)).warehouse).toBeNull();
   });

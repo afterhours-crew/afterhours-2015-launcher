@@ -23,23 +23,29 @@ Checked on 2026-10-19 against a local build of that branch:
 passed all 11 cases, and the app type-checks against types generated from
 those schemas.
 
-The screens are built against four of 1b's contract v1 schemas, copied
-unchanged from `crates/launcher/schema/` at afterhours-2015
-`feature/launcher-contract` 82aa9bc (2026-10-19):
+The screens are built against four of 1b's contract v1 schemas, copied from
+`crates/launcher/schema/` at afterhours-2015 `feature/launcher-car-names`
+bec370d (2026-10-19). Prettier reformats their whitespace; the content is
+unchanged. bec370d is `feature/launcher-contract` plus the game's localized
+car names: each car and garage item has `name` and `names`, the profile has
+`localization`, and the blueprint-label `display_name` is gone (the label
+stays in `vehicle.label`).
 
-| File                       | Describes                                                       |
-| -------------------------- | --------------------------------------------------------------- |
-| `version.schema.json`      | `version --json`: release, records and capabilities             |
-| `profile.schema.json`      | `profile --json`: one save, with its `cars` and `car_summary`   |
-| `profile-list.schema.json` | `profile --list --json`: every save in the data folder          |
-| `sessions.schema.json`     | `sessions --json`: session folders, their files and server logs |
+| File                       | Describes                                                                 |
+| -------------------------- | ------------------------------------------------------------------------- |
+| `version.schema.json`      | `version --json`: release, records and capabilities                       |
+| `profile.schema.json`      | `profile --json`: one save, with its named `cars`, `car_summary` and more |
+| `profile-list.schema.json` | `profile --list --json`: every save in the data folder                    |
+| `sessions.schema.json`     | `sessions --json`: session folders, their files and server logs           |
 
 The pinned v0.3.0 has none of these commands and reports no capabilities,
 so with it the app shows Profile, Cars, Save data and Logs as "Coming
 later", and `pnpm contract` skips their cases while the schemas are
-vendored and the server predates them. Against a local build of 82aa9bc
+vendored and the server predates them. Against a local build of bec370d
 (`AFTERHOURS_EXE=<its Afterhours.exe> node scripts/contract.mjs`) the
-`version`, `sessions` and `profile --list` cases pass with these schemas.
+`version`, `sessions` and `profile --list` cases pass with these schemas,
+and that build's `profile --json` on a real save validates against
+`profile.schema.json`.
 
 `server-pin.json` records `"schemas": "vendored"` while that holds. The first
 pin bump to a release that attaches schemas (`*.schema.json` assets or an

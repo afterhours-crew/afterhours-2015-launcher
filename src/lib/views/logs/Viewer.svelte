@@ -40,7 +40,9 @@
   const PAGE = 1500;
 
   let shown = $derived(logView.session);
-  let groups = $derived(shown ? groupFiles(shown.files) : null);
+  // Only files the launcher describes open here; they are the names
+  // src-tauri/src/reads.rs allows. Others are listed on the dashboard.
+  let groups = $derived(shown ? groupFiles(shown.files.filter((f) => f.name in FILE_INFO)) : null);
   let name = $derived(logView.file ?? "server.stderr.log");
   let file = $derived(logView.text.kind === "ready" ? logView.text.value : null);
   let info = $derived(FILE_INFO[name]);
