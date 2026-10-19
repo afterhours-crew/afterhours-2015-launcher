@@ -5,22 +5,30 @@
 //! The Rust side of the launcher window.
 //!
 //! The window never talks to the game or the server itself. Everything
-//! goes through `nfs-afterhours`, the command-line launcher from the
-//! afterhours-2015 repository: `check --json` for preflight, `status --json`
-//! for the current session, `stop --json` to end it, and `setup`, `serve`
-//! or `start` to run one. That keeps the safety logic (path rules, digests,
+//! goes through `Afterhours.exe`, the single executable published by the
+//! afterhours-2015 repository and bundled here at the exact release pinned
+//! in `server-pin.json`: `check --json` for preflight, `status --json` for
+//! the current session, `stop --json` to end it, and `setup`, `serve` or
+//! `start` to run one. That keeps the safety logic (path rules, digests,
 //! process ownership, routing) in one place, and the session supervisor in
-//! its own process, so closing this window never kills a running game.
+//! its own process.
 //!
-//! [`cli`] locates and runs the command-line launcher and turns its output
-//! into events, [`settings`] stores the few things the window remembers,
-//! and [`detect`] guesses where the game is installed.
+//! [`pin`] and [`server`] decide which executable runs, [`cli`] runs it and
+//! turns its output into events, [`settings`] stores the few things the
+//! window remembers, [`data`] reads the data directory's session records and
+//! copies saves aside, [`updates`] serves the updater's checks, and
+//! [`detect`] guesses where the game is installed.
 
 pub mod cli;
+pub mod data;
 pub mod detect;
+pub mod pin;
+pub mod server;
 pub mod settings;
+pub mod updates;
 
 use std::sync::Mutex;
+use tauri::{Emitter, Manager};
 
 /// State shared by every command: settings and the running session, if any.
 pub struct AppState {
@@ -33,6 +41,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let settings = settings::load(app.handle())?;
             app.manage(AppState {
@@ -41,19 +51,34 @@ pub fn run() {
             });
             Ok(())
         })
+        .on_window_event(|window, event| {
+            // The session's front-end writes its progress to pipes this
+            // process reads, and the supervisor inherits them. Closing the
+            // window while it runs would break those pipes under a live
+            // game, so the window stays until the session is stopped.
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event
+                && let Some(state) = window.try_state::<AppState>()
+                && let Ok(mut guard) = state.session.lock()
+                && guard.as_mut().is_some_and(cli::RunningSession::is_running)
+            {
+                api.prevent_close();
+                let _ = window.emit("close-blocked", ());
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             settings::get_settings,
             settings::save_settings,
             detect::detect_game_dirs,
-            cli::locate_cli,
             cli::run_check,
             cli::session_status,
             cli::start_session,
             cli::stop_session,
-            cli::session_dir,
+            data::recorded,
+            data::open_folder,
+            updates::session_activity,
+            updates::backup_saves,
+            updates::app_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Afterhours launcher");
 }
-
-use tauri::Manager;

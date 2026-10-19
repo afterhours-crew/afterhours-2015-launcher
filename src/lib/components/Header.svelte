@@ -1,6 +1,6 @@
 <script lang="ts">
   import { initials } from "$lib/state/launchbar";
-  import type { View } from "$lib/state/views";
+  import { NAV, type View } from "$lib/state/routes";
   import Mark from "./Mark.svelte";
   import NavPills from "./NavPills.svelte";
   import WindowControls from "./WindowControls.svelte";
@@ -19,11 +19,7 @@
     showNav?: boolean;
   } = $props();
 
-  const items: { id: View; label: string; dot?: string }[] = [
-    { id: "garage", label: "Garage" },
-    { id: "host", label: "Host" },
-    { id: "settings", label: "Settings" },
-  ];
+  const items: { id: View; label: string; dot?: string }[] = NAV;
 </script>
 
 <header data-tauri-drag-region>

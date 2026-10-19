@@ -10,7 +10,10 @@ export type Dot = "ready" | "warn" | "info" | null;
 
 export interface LaunchBarInput {
   platform: Platform;
-  cliReady: boolean;
+  /** The bundled server was found. */
+  serverReady: boolean;
+  /** An update is about to install and close the app. */
+  updating: boolean;
   gameChosen: boolean;
   status: Status | null;
   /** The window itself started a session that has not exited yet. */
@@ -89,7 +92,8 @@ export function launchBarModel(input: LaunchBarInput): LaunchBarModel {
   }
 
   let reason: string | null = null;
-  if (!input.cliReady) reason = "Set up the launcher in Settings";
+  if (!input.serverReady) reason = "Server missing · see Settings › About";
+  else if (input.updating) reason = "Installing an update";
   else if (!input.gameChosen) reason = "Choose the game folder";
 
   let stateLine = serveOnly ? "Server stopped · Play will start it" : "Ready to play";

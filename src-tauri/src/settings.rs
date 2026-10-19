@@ -2,22 +2,22 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! What the window remembers between runs: where the command-line launcher
-//! build is, where the game is, where the data directory is, and the driver
-//! name. Stored as one JSON file in the app's config directory.
+//! What the window remembers between runs: where the game is, where the
+//! data directory is, the driver name, how updates are handled and which
+//! server version last ran. Stored as one JSON file in the app's config
+//! directory. A missing, damaged or unknown file yields defaults.
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, State};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Settings {
-    /// Directory holding `nfs-afterhours` and `nfs-server`, normally the
-    /// `target/release` directory of an afterhours-2015 checkout.
-    pub cli_dir: Option<PathBuf>,
     /// Installed Need for Speed (2015) directory.
     pub game_dir: Option<PathBuf>,
-    /// Launcher data directory; `None` means the CLI's own default.
+    /// Data directory; `None` means the server's own default
+    /// (`%LOCALAPPDATA%\Afterhours2015` on Windows).
     pub data_dir: Option<PathBuf>,
     /// Display name for the first account.
     pub player_name: Option<String>,
@@ -25,6 +25,31 @@ pub struct Settings {
     pub avatar: Option<String>,
     /// The first-run wizard has been completed once.
     pub first_run_done: bool,
+    pub updates: UpdateSettings,
+    /// Server tag of the last session this launcher started. A different
+    /// bundled tag means an update arrived since, and the first start may
+    /// rebuild the content cache.
+    pub last_server_tag: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct UpdateSettings {
+    pub mode: UpdateMode,
+    /// A launcher version the user chose to skip in Ask mode.
+    pub skipped_version: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum UpdateMode {
+    /// Check in the background and ask before installing.
+    #[default]
+    Ask,
+    /// Check in the background and install when no session runs.
+    Auto,
+    /// Only check when asked to.
+    Off,
 }
 
 fn file(app: &AppHandle) -> Result<PathBuf, String> {
@@ -87,17 +112,32 @@ mod tests {
         let path = dir.join("nested").join("settings.json");
         assert_eq!(read(&path), Settings::default());
         let settings = Settings {
-            cli_dir: Some(PathBuf::from("/builds/release")),
             game_dir: Some(PathBuf::from("F:\\EA Games\\Need for Speed")),
             data_dir: None,
             player_name: Some("Driver_01".into()),
             avatar: Some("style".into()),
             first_run_done: true,
+            updates: UpdateSettings {
+                mode: UpdateMode::Auto,
+                skipped_version: Some("0.2.0".into()),
+            },
+            last_server_tag: Some("v0.3.0".into()),
         };
         write(&path, &settings).unwrap();
         assert_eq!(read(&path), settings);
         std::fs::write(&path, b"{ not json").unwrap();
         assert_eq!(read(&path), Settings::default());
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn partial_files_fill_in_defaults_and_ask_is_the_default_mode() {
+        let parsed: Settings = serde_json::from_str(r#"{"player_name":"Nova"}"#).unwrap();
+        assert_eq!(parsed.player_name.as_deref(), Some("Nova"));
+        assert_eq!(parsed.updates.mode, UpdateMode::Ask);
+        let json = serde_json::to_value(UpdateSettings::default()).unwrap();
+        assert_eq!(json["mode"], "ask");
+        let off: UpdateSettings = serde_json::from_str(r#"{"mode":"off"}"#).unwrap();
+        assert_eq!(off.mode, UpdateMode::Off);
     }
 }

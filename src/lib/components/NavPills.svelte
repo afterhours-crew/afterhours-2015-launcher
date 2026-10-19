@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { View } from "$lib/state/views";
+  import type { View } from "$lib/state/routes";
   let {
     current,
     items,

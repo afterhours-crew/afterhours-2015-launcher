@@ -1,9 +1,10 @@
 # Contributing
 
 The launcher is a Tauri 2 desktop app: Rust in `src-tauri/`, Svelte 5 with
-Vite and TypeScript in `src/`. It runs sessions through `nfs-afterhours` from
-the [afterhours-2015](https://github.com/afterhours-crew/afterhours-2015)
-repository and never touches the game or server itself.
+Vite and TypeScript in `src/`. It runs sessions through the `Afterhours.exe`
+published by the [afterhours-2015](https://github.com/afterhours-crew/afterhours-2015)
+repository, bundled at the release pinned in `server-pin.json`, and never
+touches the game or server itself.
 
 ## Setup
 
@@ -13,39 +14,52 @@ platform. Then:
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm sidecar
 pnpm tauri dev
 ```
 
-On Windows start `pnpm tauri dev` from a plain terminal, not from inside an
-IDE: the session supervisor refuses to run inside an existing process job.
+`AFTERHOURS_EXE=<path>` makes a development build run another server build.
 
 ## Checks
 
 ```sh
 pnpm format:check
+pnpm versions
 pnpm check
 pnpm test
+pnpm contract
 cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
 ```
 
-CI runs the same on Linux and Windows and compiles the app without bundling.
+CI runs the same on Linux and Windows, compiles the app and builds the
+unsigned Windows installer.
 
 ## Where things go
 
-| Path                        | Owns                                                   |
-| --------------------------- | ------------------------------------------------------ |
-| `src-tauri/src/cli.rs`      | locating and running `nfs-afterhours`, event streaming |
-| `src-tauri/src/settings.rs` | the settings file                                      |
-| `src-tauri/src/detect.rs`   | guessing the game directory                            |
-| `src/lib/api/`              | types mirroring the CLI's JSON, Tauri command wrappers |
-| `src/lib/state/`            | view models: pure functions with tests                 |
-| `src/lib/components/`       | design-system components                               |
-| `src/lib/views/`            | the screens                                            |
-| `design/`                   | tokens and the design rules                            |
+| Path                        | Owns                                                                  |
+| --------------------------- | --------------------------------------------------------------------- |
+| `server-pin.json`           | the one server release the launcher bundles                           |
+| `src-tauri/src/pin.rs`      | reading the pin and hashing; also compiled into `build.rs`            |
+| `src-tauri/src/server.rs`   | which `Afterhours.exe` runs (bundled, or `AFTERHOURS_EXE` in dev)     |
+| `src-tauri/src/cli.rs`      | running it within deadlines, event streaming                          |
+| `src-tauri/src/data.rs`     | reading the data folder's session records, copying saves aside        |
+| `src-tauri/src/updates.rs`  | what the updater asks of the Rust side                                |
+| `src-tauri/src/settings.rs` | the settings file                                                     |
+| `src-tauri/src/detect.rs`   | guessing the game directory                                           |
+| `schemas/`                  | JSON Schemas of the server's output; `pnpm types` generates from them |
+| `src/lib/api/`              | Tauri command wrappers, `generated/` types (never edit those)         |
+| `src/lib/state/`            | routes, update rules and view models as pure functions, plus stores   |
+| `src/lib/components/`       | design-system components                                              |
+| `src/lib/views/`            | the screens                                                           |
+| `design/`                   | tokens and the design rules                                           |
+| `scripts/`                  | pin, types, contract, version and release-manifest tooling            |
 
 ## Licenses
 
-MPL-2.0 for this repository. Dependencies: Tauri and its plugins (MIT or
-Apache-2.0), Svelte and Vite (MIT), clap-free; fonts Saira Semi Condensed and
-JetBrains Mono through fontsource (SIL OFL 1.1). Review a new dependency's
+MPL-2.0 for this repository. Dependencies: Tauri and its plugins (dialog,
+opener, process, updater; MIT or Apache-2.0), `sha2` (MIT or Apache-2.0),
+Svelte and Vite (MIT), and for tooling only `json-schema-to-typescript`,
+`ajv` and `fflate` (MIT); fonts Saira Semi Condensed and JetBrains Mono
+through fontsource (SIL OFL 1.1). The bundled server is MPL-2.0 and ships with
+its own `LICENSE` and `THIRD-PARTY-NOTICES.txt`. Review a new dependency's
 license before adding it.

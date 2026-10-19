@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api, pickFolder, preflightFromResult } from "$lib/api/tauri";
+  import { api, inTauri, pickFolder, preflightFromResult } from "$lib/api/tauri";
   import type { Preflight } from "$lib/api/types";
   import Field from "$lib/components/Field.svelte";
   import Note from "$lib/components/Note.svelte";
@@ -7,14 +7,12 @@
   import { firstRunChecks, initials, type Platform } from "$lib/state/launchbar";
   import { session } from "$lib/state/session.svelte";
 
-  // Five steps. "Build" is a development-only step: this launcher runs the
-  // command-line launcher from an afterhours-2015 checkout, so it has to be
-  // told where that build is. The remaining four follow the design.
+  // Four steps, as designed. The server is bundled with the launcher, so
+  // there is nothing to locate besides the game.
   let { platform, onDone }: { platform: Platform; onDone: () => void } = $props();
 
-  const steps = ["Build", "Game", "Files", "Driver", "Done"] as const;
+  const steps = ["Game", "Files", "Driver", "Done"] as const;
   let step = $state(0);
-  let cliDir = $state(session.settings.cli_dir ?? "");
   let gameDir = $state(session.settings.game_dir ?? "");
   let detected = $state<string[]>([]);
   let name = $state(session.settings.player_name ?? "Driver_01");
@@ -36,10 +34,6 @@
       .catch(() => {});
   });
 
-  async function browseCli() {
-    const chosen = await pickFolder("Choose the folder with nfs-afterhours and nfs-server");
-    if (chosen) cliDir = chosen;
-  }
   async function browseGame() {
     const chosen = await pickFolder("Choose the Need for Speed (2015) folder");
     if (chosen) gameDir = chosen;
@@ -50,7 +44,7 @@
     checkError = null;
     preflight = null;
     try {
-      await session.save({ cli_dir: cliDir || null, game_dir: gameDir || null });
+      await session.save({ game_dir: gameDir || null });
       const result = await api.runCheck();
       if (result.kind === "error") checkError = result.message;
       else preflight = preflightFromResult(result);
@@ -62,34 +56,31 @@
   }
 
   async function next() {
-    if (step === 0) await session.save({ cli_dir: cliDir || null });
-    if (step === 1) {
+    if (step === 0) {
       await session.save({ game_dir: gameDir || null });
-      step = 2;
+      step = 1;
       await runCheck();
       return;
     }
-    if (step === 3) await session.save({ player_name: name.trim() || "Driver", avatar });
+    if (step === 2) await session.save({ player_name: name.trim() || "Driver", avatar });
     step = Math.min(steps.length - 1, step + 1);
   }
 
   async function finish() {
     saving = true;
-    await session.save({ first_run_done: true });
+    if (inTauri) await session.save({ first_run_done: true });
     saving = false;
     onDone();
   }
 
   let canNext = $derived(
     step === 0
-      ? cliDir.trim().length > 0 && session.cliReady
+      ? gameDir.trim().length > 0 && session.serverReady
       : step === 1
-        ? gameDir.trim().length > 0
+        ? preflight !== null
         : step === 2
-          ? preflight !== null
-          : step === 3
-            ? name.trim().length > 0
-            : true,
+          ? name.trim().length > 0
+          : true,
   );
 </script>
 
@@ -105,37 +96,6 @@
     </ol>
 
     {#if step === 0}
-      <h1 class="t-step-title">Find the launcher build</h1>
-      <p>
-        This is a development build. Point it at the <code>target/release</code> folder of your
-        afterhours-2015 checkout, where <code>nfs-afterhours</code> and <code>nfs-server</code> are built.
-      </p>
-      <Field
-        id="cli"
-        label="Build folder"
-        bind:value={cliDir}
-        mono
-        placeholder="…/afterhours-2015/target/release"
-      >
-        {#snippet trailing()}<PillButton onclick={browseCli}>Browse</PillButton>{/snippet}
-      </Field>
-      <PillButton variant="text" onclick={() => session.save({ cli_dir: cliDir || null })}
-        >Look again</PillButton
-      >
-      {#if cliDir && session.loaded}
-        {#if session.cliReady}
-          <Note kind="ready"
-            ><strong>Found {session.cli.version ?? "the launcher"}</strong> and nfs-server next to it.</Note
-          >
-        {:else}
-          <Note kind="warn"
-            >Not found yet. Build with <code
-              >cargo build --release -p nfs-server -p nfs-afterhours --locked</code
-            >, then look again.</Note
-          >
-        {/if}
-      {/if}
-    {:else if step === 1}
       <h1 class="t-step-title">Find your game</h1>
       <p>
         Point the launcher at your Need for Speed (2015) install. We looked in the usual places
@@ -156,7 +116,13 @@
       >
         {#snippet trailing()}<PillButton onclick={browseGame}>Change</PillButton>{/snippet}
       </Field>
-    {:else if step === 2}
+      {#if session.loaded && inTauri && !session.serverReady}
+        <Note kind="warn"
+          >The bundled server is missing: {session.info?.server.error ??
+            "reinstall the launcher"}</Note
+        >
+      {/if}
+    {:else if step === 1}
       <h1 class="t-step-title">Check the files</h1>
       <p>
         Making sure the game is the supported build and can talk to the rebuilt server. Nothing is
@@ -195,7 +161,7 @@
           {/each}
         </div>
       {/if}
-    {:else if step === 3}
+    {:else if step === 2}
       <h1 class="t-step-title">Your driver</h1>
       <p>This is how you show up on servers. It stays on this PC.</p>
       <div class="driver">
@@ -226,15 +192,17 @@
           >
         </div>
         <div class="tile">
-          <span class="t-label">Server</span><span class="strong">This PC</span>
+          <span class="t-label">Server</span><span class="strong"
+            >{session.serverTag ?? "This PC"}</span
+          >
         </div>
         <div class="tile">
           <span class="t-label">Driver</span><span class="strong">{name}</span>
         </div>
       </div>
       <Note
-        >Live acceptance of the Rust launcher on the real installation is still pending; this build
-        is for development.</Note
+        >This is a preview for testers. Keep your data folder backed up; the launcher copies your
+        saves before any update that changes the server.</Note
       >
     {/if}
 
@@ -279,7 +247,7 @@
     margin: 0;
     padding: 0;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px;
   }
   .steps li {
@@ -307,10 +275,6 @@
   p {
     margin: 0;
     color: var(--ink-soft);
-  }
-  code {
-    font-family: var(--font-mono);
-    font-size: 12px;
   }
   .path {
     display: block;

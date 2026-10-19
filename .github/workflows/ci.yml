@@ -2,8 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main, "codex/**"]
+    branches: [main, "feature/**", "bugfix/**", "docs/**", "codex/**"]
   pull_request:
+  # The pin-bump workflow dispatches this on its branch: pull requests opened
+  # with GITHUB_TOKEN do not trigger pull_request runs themselves.
   workflow_dispatch:
 
 permissions:
@@ -27,7 +29,12 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
-      - run: pnpm tokens && git diff --exit-code -- src/lib/styles/tokens.css
+      - run: pnpm versions
+      - name: Generated files are current
+        run: |
+          pnpm tokens
+          pnpm types
+          git diff --exit-code -- src/lib/styles/tokens.css src/lib/api/generated
       - run: pnpm check
       - run: pnpm test
       - run: pnpm build
@@ -60,6 +67,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # build.rs refuses a Windows build without the pinned, verified server.
+      - name: Bundled server
+        if: runner.os == 'Windows'
+        run: pnpm sidecar
       # The Tauri context macro embeds the built frontend, so build it first.
       - run: pnpm build
       - run: cargo fmt --check
@@ -70,3 +81,49 @@ jobs:
         working-directory: src-tauri
       - name: Compile the app without bundling
         run: pnpm tauri build --no-bundle
+
+  contract:
+    name: Server contract
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Download and verify the pinned Afterhours.exe
+        run: pnpm sidecar
+      - name: Run its JSON commands against temporary data folders
+        run: pnpm contract
+
+  bundle:
+    name: Windows installer
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm sidecar
+      # No updater artifacts: those need the signing key, which only the
+      # release workflow has. Neither is Authenticode-signed.
+      - name: Build the NSIS installer
+        run: pnpm bundle --bundles nsis
+      - uses: actions/upload-artifact@v4
+        with:
+          name: afterhours-launcher-setup-unsigned
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 14

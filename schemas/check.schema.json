@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Preflight",
+  "description": "What `check --json` prints when the installation passes: the read-only preflight record. Vendored from afterhours-2015 v0.3.0 (crates/launcher/src/records.rs) until the server publishes its own schemas.",
+  "type": "object",
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "game_directory": { "type": ["string", "null"] },
+    "data_directory": { "type": "string" },
+    "server_path": { "type": "string" },
+    "server_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "game_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "activation_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "registered_client_path": { "type": ["string", "null"] },
+    "compatibility_name": { "type": ["string", "null"] },
+    "requires_administrator": { "type": "boolean" },
+    "machine_changes": { "type": "array", "items": { "type": "string" } },
+    "directory_write_access": { "type": "string" }
+  },
+  "required": [
+    "version",
+    "game_directory",
+    "data_directory",
+    "server_path",
+    "server_sha256",
+    "game_sha256",
+    "activation_sha256",
+    "registered_client_path",
+    "compatibility_name",
+    "requires_administrator",
+    "machine_changes",
+    "directory_write_access"
+  ],
+  "additionalProperties": false
+}

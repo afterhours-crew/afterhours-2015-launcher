@@ -17,7 +17,8 @@ function status(state: Status["state"], message = "m"): Status {
 
 const base = {
   platform: "windows" as const,
-  cliReady: true,
+  serverReady: true,
+  updating: false,
   gameChosen: true,
   status: null,
   running: false,
@@ -33,9 +34,13 @@ describe("launch bar", () => {
   });
 
   it("says why Play is disabled instead of just disabling it", () => {
-    expect(launchBarModel({ ...base, cliReady: false }).play).toMatchObject({
+    expect(launchBarModel({ ...base, serverReady: false }).play).toMatchObject({
       disabled: true,
-      reason: "Set up the launcher in Settings",
+      reason: "Server missing · see Settings › About",
+    });
+    expect(launchBarModel({ ...base, updating: true }).play).toMatchObject({
+      disabled: true,
+      reason: "Installing an update",
     });
     const noGame = launchBarModel({ ...base, gameChosen: false });
     expect(noGame.play.reason).toBe("Choose the game folder");

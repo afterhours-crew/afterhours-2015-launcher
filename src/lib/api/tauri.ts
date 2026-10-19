@@ -1,12 +1,16 @@
-// Thin wrappers over the Tauri commands in src-tauri/src. Outside Tauri
-// (plain `vite dev` in a browser) every call rejects with a clear message so
-// the shell still renders for styling work.
+// Thin wrappers over the Tauri commands in src-tauri/src and the plugins the
+// window uses. Outside Tauri (plain `vite dev` in a browser) every call
+// rejects with a clear message so the shell still renders for styling work.
 
 import type {
-  CliInfo,
+  Activity,
+  AppInfo,
+  BackupReport,
   CliResult,
+  Folder,
   OutputLine,
   Preflight,
+  Recorded,
   SessionAction,
   Settings,
   Status,
@@ -16,10 +20,10 @@ type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>
 
 export const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+const NEEDS_WINDOW = "This action needs the desktop window; run `pnpm tauri dev`.";
+
 async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-  if (!inTauri) {
-    throw new Error("This action needs the desktop window; run `pnpm tauri dev`.");
-  }
+  if (!inTauri) throw new Error(NEEDS_WINDOW);
   const core = await import("@tauri-apps/api/core");
   return (core.invoke as Invoke)<T>(command, args);
 }
@@ -28,12 +32,15 @@ export const api = {
   getSettings: () => invoke<Settings>("get_settings"),
   saveSettings: (settings: Settings) => invoke<Settings>("save_settings", { settings }),
   detectGameDirs: () => invoke<string[]>("detect_game_dirs"),
-  locateCli: () => invoke<CliInfo>("locate_cli"),
   runCheck: () => invoke<CliResult>("run_check"),
   sessionStatus: () => invoke<CliResult>("session_status"),
   startSession: (action: SessionAction) => invoke<void>("start_session", { action }),
   stopSession: () => invoke<CliResult>("stop_session"),
-  sessionDir: () => invoke<string | null>("session_dir"),
+  recorded: () => invoke<Recorded>("recorded"),
+  openFolder: (which: Folder) => invoke<void>("open_folder", { which }),
+  sessionActivity: () => invoke<Activity>("session_activity"),
+  backupSaves: (from: string, to: string) => invoke<BackupReport>("backup_saves", { from, to }),
+  appInfo: () => invoke<AppInfo>("app_info"),
 };
 
 export async function pickFolder(title: string): Promise<string | null> {
@@ -43,10 +50,14 @@ export async function pickFolder(title: string): Promise<string | null> {
   return typeof chosen === "string" ? chosen : null;
 }
 
-export async function openPath(path: string): Promise<void> {
-  if (!inTauri) return;
-  const { openPath: open } = await import("@tauri-apps/plugin-opener");
-  await open(path);
+/** Open a GitHub page of this project in the browser (scoped in capabilities). */
+export async function openUrl(url: string): Promise<void> {
+  if (!inTauri) {
+    window.open(url, "_blank", "noopener");
+    return;
+  }
+  const { openUrl: open } = await import("@tauri-apps/plugin-opener");
+  await open(url);
 }
 
 export async function windowControl(
@@ -66,6 +77,7 @@ export async function onSessionEvents(handlers: {
   output: (line: OutputLine) => void;
   status: (result: CliResult) => void;
   exit: (info: { action: SessionAction; code: number | null }) => void;
+  closeBlocked: () => void;
 }): Promise<Unlisten> {
   if (!inTauri) return () => {};
   const { listen } = await import("@tauri-apps/api/event");
@@ -75,6 +87,7 @@ export async function onSessionEvents(handlers: {
     listen<{ action: SessionAction; code: number | null }>("session-exit", (e) =>
       handlers.exit(e.payload),
     ),
+    listen("close-blocked", () => handlers.closeBlocked()),
   ]);
   return () => stops.forEach((stop) => stop());
 }
@@ -89,4 +102,52 @@ export function statusFromResult(result: CliResult): Status | null {
 
 export function preflightFromResult(result: CliResult): Preflight | null {
   return result.kind === "ok" ? (result.value as Preflight) : null;
+}
+
+/** An update the plugin found, reduced to what the window uses. */
+export interface FoundUpdate {
+  version: string;
+  currentVersion: string;
+  date: string | null;
+  notes: string;
+  rawJson: Record<string, unknown>;
+  /** Download and verify the installer; nothing changes yet. */
+  download: (onProgress: (downloaded: number, total: number | null) => void) => Promise<void>;
+  /** Install what was downloaded. On Windows the installer closes and restarts the app. */
+  install: () => Promise<void>;
+  close: () => Promise<void>;
+}
+
+/** Ask the update endpoint, bounded by `timeoutMs`. `null` when there is nothing newer. */
+export async function checkForUpdate(timeoutMs: number): Promise<FoundUpdate | null> {
+  if (!inTauri) throw new Error(NEEDS_WINDOW);
+  const { check } = await import("@tauri-apps/plugin-updater");
+  const deadline = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("The update check timed out.")), timeoutMs + 2_000),
+  );
+  const update = await Promise.race([check({ timeout: timeoutMs }), deadline]);
+  if (!update) return null;
+  return {
+    version: update.version,
+    currentVersion: update.currentVersion,
+    date: update.date ?? null,
+    notes: update.body ?? "",
+    rawJson: update.rawJson,
+    download: async (onProgress) => {
+      let downloaded = 0;
+      let total: number | null = null;
+      await update.download((event) => {
+        if (event.event === "Started") total = event.data.contentLength ?? null;
+        if (event.event === "Progress") downloaded += event.data.chunkLength;
+        onProgress(downloaded, total);
+      });
+    },
+    install: async () => {
+      await update.install();
+      // Windows exits inside install; elsewhere the new version needs a restart.
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+      await relaunch();
+    },
+    close: () => update.close(),
+  };
 }

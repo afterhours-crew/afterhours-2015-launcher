@@ -1,0 +1,85 @@
+name: Server pin bump
+
+# Daily, or by hand: if afterhours-crew/afterhours-2015 has published a release
+# newer than server-pin.json, open a pull request that moves the pin, takes
+# the schemas attached to that release and regenerates src/lib/api/generated.
+# CI on that branch runs the new Afterhours.exe's JSON commands against the
+# schemas. A person reviews and merges; nothing here merges or releases.
+
+on:
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: pin-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Check for a newer server
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      BASE: ${{ github.event.repository.default_branch }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Latest server release
+        id: latest
+        run: node scripts/server-pin.mjs latest
+
+      - name: Pull request already open?
+        id: branch
+        if: steps.latest.outputs.tag != ''
+        env:
+          TAG: ${{ steps.latest.outputs.tag }}
+        run: |
+          branch="pin/afterhours-$TAG"
+          echo "name=$branch" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$branch already exists; review its pull request."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Move the pin and regenerate the types
+        if: steps.latest.outputs.tag != '' && steps.branch.outputs.exists == 'false'
+        env:
+          TAG: ${{ steps.latest.outputs.tag }}
+        run: |
+          node scripts/server-pin.mjs bump "$TAG" --summary "$RUNNER_TEMP/pr-body.md"
+          pnpm types
+          pnpm exec prettier --write server-pin.json schemas src/lib/api/generated
+
+      - name: Open the pull request and run CI on it
+        if: steps.latest.outputs.tag != '' && steps.branch.outputs.exists == 'false'
+        env:
+          TAG: ${{ steps.latest.outputs.tag }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add server-pin.json schemas src/lib/api/generated
+          git commit -m "Bundle Afterhours $TAG"
+          git push origin "$BRANCH"
+          gh pr create --base "$BASE" --head "$BRANCH" \
+            --title "Bundle Afterhours $TAG" --body-file "$RUNNER_TEMP/pr-body.md"
+          gh workflow run ci.yml --ref "$BRANCH"

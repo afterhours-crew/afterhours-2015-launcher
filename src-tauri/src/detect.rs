@@ -30,18 +30,16 @@ fn candidates() -> Vec<PathBuf> {
     out
 }
 
-/// Existing candidate directories that contain the game executable.
-pub fn find_installed(extra: &[PathBuf]) -> Vec<PathBuf> {
-    candidates()
-        .into_iter()
-        .chain(extra.iter().cloned())
+/// The directories among `dirs` that contain the game executable.
+pub fn with_game(dirs: impl IntoIterator<Item = PathBuf>) -> Vec<PathBuf> {
+    dirs.into_iter()
         .filter(|dir| dir.join(GAME_EXECUTABLE).is_file())
         .collect()
 }
 
 #[tauri::command]
 pub fn detect_game_dirs() -> Vec<PathBuf> {
-    find_installed(&[])
+    with_game(candidates())
 }
 
 #[cfg(test)]
@@ -57,7 +55,7 @@ mod tests {
         std::fs::create_dir_all(&with).unwrap();
         std::fs::create_dir_all(&without).unwrap();
         std::fs::write(with.join(GAME_EXECUTABLE), b"x").unwrap();
-        let found = find_installed(&[with.clone(), without, base.join("missing")]);
+        let found = with_game([with.clone(), without, base.join("missing")]);
         assert_eq!(found, vec![with]);
         std::fs::remove_dir_all(base).unwrap();
     }

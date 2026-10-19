@@ -3,38 +3,47 @@
   import Backdrop from "$lib/components/Backdrop.svelte";
   import Header from "$lib/components/Header.svelte";
   import LaunchBar from "$lib/components/LaunchBar.svelte";
+  import PillButton from "$lib/components/PillButton.svelte";
+  import UpdateBanner from "$lib/components/UpdateBanner.svelte";
   import { detectPlatform, isLive, launchBarModel } from "$lib/state/launchbar";
+  import { router } from "$lib/state/router.svelte";
   import { session } from "$lib/state/session.svelte";
-  import type { View } from "$lib/state/views";
+  import { updater } from "$lib/state/updater.svelte";
+  import { serverChangeNotice } from "$lib/state/updates";
   import FirstRun from "$lib/views/FirstRun.svelte";
   import Garage from "$lib/views/Garage.svelte";
   import Host from "$lib/views/Host.svelte";
+  import Logs from "$lib/views/Logs.svelte";
+  import Profile from "$lib/views/Profile.svelte";
   import Settings from "$lib/views/Settings.svelte";
+  import World from "$lib/views/World.svelte";
 
   const platform = detectPlatform(navigator.userAgent);
-  let view = $state<View>("garage");
-  let firstRun = $state(false);
+  let noticeDismissed = $state(false);
 
   $effect(() => {
-    session.load().then(() => {
-      firstRun = !session.settings.first_run_done;
-      if (!inTauri) {
-        // Browser preview for styling work: no backend, so no wizard, and
-        // `?view=host` opens a screen directly.
-        firstRun = new URLSearchParams(location.search).get("view") === "firstrun";
-        const wanted = new URLSearchParams(location.search).get("view");
-        if (wanted && ["garage", "host", "settings"].includes(wanted)) {
-          view = wanted as View;
-        }
-      }
-    });
+    void session.load().then(() => updater.start());
   });
+
+  // The wizard runs until it has been completed once; `#/first-run` shows it
+  // in the browser preview.
+  let firstRun = $derived(
+    router.route.firstRun || (inTauri && session.loaded && !session.settings.first_run_done),
+  );
+  let view = $derived(router.route.view);
+
+  let notice = $derived(
+    session.serverTag && !noticeDismissed
+      ? serverChangeNotice(session.settings.last_server_tag, session.serverTag)
+      : null,
+  );
 
   let model = $derived(
     launchBarModel({
       platform,
-      cliReady: session.cliReady,
-      gameChosen: session.settings.game_dir !== null,
+      serverReady: session.serverReady || !inTauri,
+      updating: updater.holdsPlay,
+      gameChosen: session.settings.game_dir !== null || !inTauri,
       status: session.status,
       running: session.running,
     }),
@@ -50,7 +59,7 @@
   <Backdrop dim={firstRun || view !== "garage"} radial={firstRun} />
   <Header
     {view}
-    onNavigate={(v) => (view = v)}
+    onNavigate={(v) => router.go(v)}
     driverName={session.settings.player_name ?? "Driver"}
     online={isLive(session.status?.state)}
     showNav={!firstRun}
@@ -65,17 +74,40 @@
   {#if session.error}
     <p class="banner warn">{session.error}</p>
   {/if}
+  {#if session.closeBlocked}
+    <div class="banner warn row">
+      <span
+        >A session is running. Stop it before closing the launcher: closing now would end your game.</span
+      >
+      <PillButton variant="text" onclick={() => (session.closeBlocked = false)}>OK</PillButton>
+    </div>
+  {/if}
+  {#if !firstRun && notice}
+    <div class="banner row">
+      <span>{notice}</span>
+      <PillButton variant="text" onclick={() => (noticeDismissed = true)}>OK</PillButton>
+    </div>
+  {/if}
+  {#if !firstRun && updater.bannerVisible}
+    <UpdateBanner />
+  {/if}
 
   {#if firstRun}
-    <FirstRun {platform} onDone={() => (firstRun = false)} />
+    <FirstRun {platform} onDone={() => router.go("garage")} />
     <p class="legal">
       Community preservation project. Not affiliated with Electronic Arts or Ghost Games.
     </p>
   {:else}
     {#if view === "garage"}
       <Garage />
+    {:else if view === "profile"}
+      <Profile />
+    {:else if view === "world"}
+      <World />
     {:else if view === "host"}
       <Host />
+    {:else if view === "logs"}
+      <Logs />
     {:else}
       <Settings />
     {/if}
@@ -105,6 +137,13 @@
     border: 1px solid var(--glass-edge);
     color: var(--ink-soft);
     font-size: 13px;
+  }
+  .banner.row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 6px 4px 14px;
   }
   .banner.warn {
     background: var(--warn-soft);

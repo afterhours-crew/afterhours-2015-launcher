@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": ["nsis"],
+    "externalBin": ["binaries/Afterhours"],
+    "resources": {
+      "binaries/afterhours-server/LICENSE": "afterhours-server/LICENSE",
+      "binaries/afterhours-server/THIRD-PARTY-NOTICES.txt": "afterhours-server/THIRD-PARTY-NOTICES.txt",
+      "binaries/afterhours-server/build-info.json": "afterhours-server/build-info.json"
+    }
+  }
+}
