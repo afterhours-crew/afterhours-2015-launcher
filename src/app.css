@@ -55,6 +55,15 @@ a {
   outline-offset: 2px;
 }
 
+/* No scrollbar is drawn anywhere; wheel, trackpad and keyboard still scroll. */
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
 /* Glass: fill, blur, edge and shadow in one class. */
 .ah-glass {
   background: var(--glass);
