@@ -67,7 +67,7 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 12px 24px;
+    gap: 12px 16px;
     padding: var(--header-top) var(--space-6) 0;
   }
   /* At the narrowest window the header wraps; Play stays with the profile. */

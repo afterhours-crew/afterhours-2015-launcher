@@ -1,21 +1,23 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import IconArrowDown from "@tabler/icons-svelte/icons/arrow-down";
+  import IconTerminal2 from "@tabler/icons-svelte/icons/terminal-2";
   import type { OutputLine } from "$lib/api/types";
   import { slideUp } from "$lib/motion";
   import { START, arrived, interrupt, jump, scrolled, type Follow } from "$lib/state/follow";
   import { formatCount } from "$lib/state/format";
+  import { consoleRow } from "$lib/state/logs";
   import { reducedMotion } from "$lib/state/motion";
 
-  // A live log that scrolls inside itself. It follows the newest line until
-  // the reader scrolls up; then it holds their place while lines arrive and
-  // offers "Jump to latest" with how many are new. The log is read, not
-  // navigated, so it is not glass.
+  // A live log in a graphite panel that scrolls inside itself (H6). It
+  // follows the newest line until the reader scrolls up; then it holds
+  // their place while lines arrive and offers "Jump to latest" with how
+  // many are new. Rows read like the log viewer's: time, level, message.
   let {
     lines,
     received = lines.length,
     empty,
     title = "Log",
-    onOpenFolder,
   }: {
     /** The newest lines; the session keeps a bounded number. */
     lines: OutputLine[];
@@ -23,7 +25,6 @@
     received?: number;
     empty: string;
     title?: string;
-    onOpenFolder?: () => void;
   } = $props();
 
   let element: HTMLDivElement | undefined = $state();
@@ -76,44 +77,42 @@
       behavior: reducedMotion() ? "auto" : "smooth",
     });
   }
-
-  const colors: Record<string, string> = {
-    preparing: "var(--speed)",
-    starting: "var(--speed)",
-    activation: "var(--build)",
-    ready: "var(--crew)",
-    stopping: "var(--build)",
-    finished: "var(--crew)",
-    failed: "var(--build)",
-  };
 </script>
 
-<section class="log" aria-label={title}>
+<section class="log ah-glass" aria-label={title}>
   <div class="head">
-    <h2 class="t-label">{title}</h2>
-    {#if onOpenFolder}<button type="button" class="t-data-small link" onclick={onOpenFolder}
-        >Open folder</button
-      >{/if}
+    <IconTerminal2 size={20} stroke={1.6} aria-hidden="true" class="glyph" />
+    <h2 class="t-panel-title">{title}</h2>
+    {#if lines.length > 0}
+      <span class="t-caption" aria-live="polite"
+        >{follow.following ? "Following" : "Paused · you scrolled up"}</span
+      >
+    {/if}
   </div>
-  <div class="lines" bind:this={element} {onscroll} {onwheel}>
+  <div class="lines" role="log" aria-label="{title} lines" bind:this={element} {onscroll} {onwheel}>
     {#if lines.length === 0}
-      <span class="empty">{empty}</span>
+      <p class="empty">{empty}</p>
     {/if}
     {#each lines as line, i (first + i)}
-      {#if line.kind === "status"}
-        <div>
-          <span style="color: {colors[line.state] ?? 'var(--ink-soft)'}">{line.time}</span>
-          {line.state} · {line.message}
-        </div>
-      {:else}
-        <div class="text">{line.text}</div>
-      {/if}
+      {@const row = consoleRow(line)}
+      <div class="row">
+        <span class="soft">{row.time}</span>
+        <span
+          class:soft={!row.tone}
+          class:warn={row.tone === "warn"}
+          class:error={row.tone === "error"}
+          >{#if row.tone}<span class="dot" aria-hidden="true"></span>{/if}{row.level}</span
+        >
+        <span class="message"
+          >{row.message}{#if row.detail}<span class="soft detail">{row.detail}</span>{/if}</span
+        >
+      </div>
     {/each}
   </div>
   {#if !follow.following}
     <button type="button" class="latest" transition:slideUp onclick={toLatest}>
-      Jump to latest
-      {#if follow.unseen > 0}<span class="new">{formatCount(follow.unseen)} new</span>{/if}
+      <IconArrowDown size={14} stroke={2} aria-hidden="true" />
+      Jump to latest{#if follow.unseen > 0}<span>· {formatCount(follow.unseen)} new</span>{/if}
     </button>
   {/if}
 </section>
@@ -122,54 +121,84 @@
   .log {
     position: relative;
     flex: 1 1 auto;
-    min-height: 160px;
+    min-height: 200px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 16px;
     border-radius: var(--radius-panel);
-    background: var(--graphite);
+    overflow: hidden;
   }
   .head {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--graphite-edge);
+  }
+  .head :global(.glyph) {
+    flex: 0 0 auto;
+    color: var(--ink-soft);
   }
   h2 {
+    flex: 1 1 auto;
     margin: 0;
-    color: var(--ink-soft);
-  }
-  .link {
-    color: var(--ink-soft);
-    text-decoration: underline;
   }
   .lines {
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
     overflow-anchor: auto;
-    font-family: var(--font-mono);
+    padding: 8px 0 64px;
+    font-size: 14px;
+    line-height: 1.5;
     font-variant-numeric: tabular-nums;
-    font-size: 11.5px;
-    line-height: 1.8;
-    white-space: pre-wrap;
-    word-break: break-word;
-    color: var(--ink-soft);
     user-select: text;
     -webkit-user-select: text;
   }
-  .text {
-    color: var(--ink-faint);
+  .row {
+    display: grid;
+    grid-template-columns: 70px 92px minmax(0, 1fr);
+    gap: 14px;
+    align-items: baseline;
+    padding: 6px 18px;
+  }
+  .row + .row {
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+  }
+  .message {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .detail {
+    margin-left: 8px;
+  }
+  .soft {
+    color: var(--ink-soft);
+  }
+  .warn {
+    color: var(--warn-ink);
+  }
+  .error {
+    color: var(--style);
+  }
+  .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 8px;
+    border-radius: 50%;
+    background: currentColor;
   }
   .empty {
-    color: var(--ink-faint);
+    margin: 0;
+    padding: 10px 18px;
+    color: var(--ink-soft);
   }
   .latest {
     position: absolute;
     left: 50%;
-    bottom: 16px;
+    bottom: 18px;
     translate: -50% 0;
-    min-height: var(--control-height);
+    height: 38px;
     padding: 0 16px;
     display: inline-flex;
     align-items: center;
@@ -177,18 +206,9 @@
     border-radius: var(--radius-pill);
     background: var(--ink);
     color: var(--on-ink);
-    font-weight: 700;
-    font-size: 12px;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    box-shadow: var(--shadow-panel);
-  }
-  .new {
-    padding: 0 8px;
-    border-radius: var(--radius-pill);
-    background: rgba(18, 16, 21, 0.12);
-    font-variant-numeric: tabular-nums;
-    text-transform: none;
-    letter-spacing: 0;
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   }
 </style>

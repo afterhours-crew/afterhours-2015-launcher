@@ -89,9 +89,9 @@
   {#if candidate && updater.offer?.kind === "offer"}
     <section class="candidate" aria-label="Available update">
       <span class="name"
-        >Afterhours {candidate.version}{#if candidate.date}<span class="t-data">
+        >Afterhours {candidate.version}{#if candidate.date}<span class="t-data then">
             · {candidate.date.slice(0, 10)}</span
-          >{/if}{#if updater.offer.skipped}<span class="t-data"> · skipped</span>{/if}</span
+          >{/if}{#if updater.offer.skipped}<span class="t-data then">· skipped</span>{/if}</span
       >
       {#if serverLine}<p class="t-caption measure">{serverLine}</p>{/if}
       {#if candidate.notes}<pre class="notes">{candidate.notes}</pre>{/if}

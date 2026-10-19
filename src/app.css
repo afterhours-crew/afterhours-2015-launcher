@@ -108,6 +108,12 @@ a {
   min-width: 0;
 }
 
+/* A secondary aside after a name ("· 3 kinds", "× 4"): Svelte trims the
+   leading space of a block, so the gap is a margin. */
+.then {
+  margin-left: 0.3em;
+}
+
 /* Running text stays readable: about 65 characters a line. */
 .measure {
   max-width: 65ch;
@@ -120,7 +126,7 @@ a {
 
 .pill {
   min-height: var(--control-height);
-  padding: 0 16px;
+  padding: 0 14px;
   display: inline-flex;
   align-items: center;
   gap: 6px;

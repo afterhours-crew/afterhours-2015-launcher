@@ -103,7 +103,11 @@
     showNav={!firstRun}
   >
     {#snippet play()}
-      {#if !firstRun && view !== "garage"}<HeaderPlay pill={model.pill} {onPlay} />{/if}
+      {#if !firstRun && view !== "garage"}<HeaderPlay
+          pill={model.pill}
+          {onPlay}
+          caption={view !== "host"}
+        />{/if}
     {/snippet}
   </Header>
 

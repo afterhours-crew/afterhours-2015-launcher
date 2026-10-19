@@ -1,64 +1,62 @@
 <script lang="ts">
   import { staggerIn } from "$lib/motion";
   import type { Glyph as Icon } from "$lib/components/glyph";
+  import IconAlertTriangle from "@tabler/icons-svelte/icons/alert-triangle";
+  import IconCheck from "@tabler/icons-svelte/icons/check";
+  import IconChevronLeft from "@tabler/icons-svelte/icons/chevron-left";
+  import IconChevronRight from "@tabler/icons-svelte/icons/chevron-right";
   import IconDeviceGamepad2 from "@tabler/icons-svelte/icons/device-gamepad-2";
   import IconFileDescription from "@tabler/icons-svelte/icons/file-description";
-  import IconFileText from "@tabler/icons-svelte/icons/file-text";
   import IconPackage from "@tabler/icons-svelte/icons/package";
   import IconRocket from "@tabler/icons-svelte/icons/rocket";
   import IconTerminal2 from "@tabler/icons-svelte/icons/terminal-2";
   import IconUserPlus from "@tabler/icons-svelte/icons/user-plus";
   import type { SessionList } from "$lib/api/types";
-  import DataChip from "$lib/components/DataChip.svelte";
+  import EmptyLine from "$lib/components/EmptyLine.svelte";
   import Glass from "$lib/components/Glass.svelte";
-  import LogPanel from "$lib/components/LogPanel.svelte";
+  import InfoButton from "$lib/components/InfoButton.svelte";
   import Note from "$lib/components/Note.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
-  import Soon from "$lib/components/Soon.svelte";
-  import StatusDot from "$lib/components/StatusDot.svelte";
-  import { formatBytes, formatCount } from "$lib/state/format";
-  import {
-    fileLine,
-    groupFiles,
-    levelShares,
-    sessionChips,
-    sessionHeading,
-    summaryText,
-    warningGroups,
-  } from "$lib/state/logs";
+  import ShowMore from "$lib/components/ShowMore.svelte";
+  import { formatCount, formatSaved } from "$lib/state/format";
+  import { fileFacts, groupFiles, sessionLine, stateWords, summaryText } from "$lib/state/logs";
   import { logView } from "$lib/state/logview.svelte";
   import { records } from "$lib/state/records.svelte";
-  import { session as live } from "$lib/state/session.svelte";
 
-  // Logs dashboard (E1): one session at a time, its files grouped by how
-  // useful they are when something goes wrong.
+  // Logs (H7): one session at a time. "Start here" says what matters in a
+  // line each; the files follow; everything rarely needed (EA Desktop
+  // logs, recordings, crash dumps, raw records) waits behind Show more.
   let { list }: { list: SessionList } = $props();
 
   let shown = $derived(logView.session);
   let count = $derived(list.sessions.length);
-  let heading = $derived(
-    shown ? sessionHeading(shown, Math.min(logView.index, count - 1), count) : null,
-  );
+  let index = $derived(Math.min(logView.index, Math.max(0, count - 1)));
   let groups = $derived(shown ? groupFiles(shown.files) : null);
-  let warnings = $derived(shown ? warningGroups(shown.server_log) : null);
-  let serverLog = $derived(
-    groups?.breaks.find((e) => e.names.includes("server.stderr.log")) ?? null,
-  );
-  let shares = $derived(shown?.server_log ? levelShares(shown.server_log) : []);
+  let files = $derived(groups ? [...groups.start, ...groups.breaks] : []);
+  let words = $derived(stateWords(shown?.state ?? null));
+  let warnings = $derived(shown?.server_log?.levels.warn ?? null);
+  let kinds = $derived(shown?.server_log?.unsupported.length ?? 0);
+  let crashes = $derived(shown?.crash_dumps ?? null);
+  let when = $derived.by(() => {
+    const utc = shown?.started_utc;
+    if (!utc) return "Start unknown";
+    const text = formatSaved(utc, new Date());
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  });
   let note = $state<string | null>(null);
 
-  // Decorative, so drawn in ink; a file the launcher does not describe gets a page.
   const ICONS: Record<string, Icon> = {
+    "Session summary": IconFileDescription,
     "Server log": IconTerminal2,
     "Startup report": IconRocket,
     "Content preparation": IconPackage,
     "Account creation": IconUserPlus,
     "Game console": IconDeviceGamepad2,
   };
-  const shareColor = {
-    info: "rgba(244, 240, 234, 0.35)",
-    warn: "var(--build)",
-    error: "var(--style)",
+  const dots = {
+    ready: "var(--status-ready)",
+    warn: "var(--status-warn)",
+    info: "var(--status-info)",
   };
 
   async function copySummary() {
@@ -84,274 +82,178 @@
 </script>
 
 <div class="layout" use:staggerIn>
-  <Glass dense radius="panel" label="Logs" class="panel">
-    <div class="head">
+  <div class="main">
+    <div class="head" data-enter>
       <span class="title">
         <h1 class="t-view-title">Logs</h1>
-        {#if heading}
-          <StatusDot
-            kind={heading.dot}
-            label={heading.message ? `${heading.state} · ${heading.message}` : heading.state}
-          />
+        {#if shown}
+          <span class="t-data"
+            >{#if words.dot}<span
+                class="dot"
+                style="background: {dots[words.dot]}"
+                aria-hidden="true"
+              ></span>{/if}{sessionLine(shown)}</span
+          >
         {/if}
       </span>
-      {#if heading}
-        <div class="picker ah-glass">
+      {#if shown}
+        <span class="picker" role="group" aria-label="Session {index + 1} of {count}">
           <button
             type="button"
             class="arrow"
             aria-label="Newer session"
-            disabled={logView.index <= 0}
+            disabled={index <= 0}
             onclick={() => logView.step(-1)}
+            ><IconChevronLeft size={16} stroke={1.8} aria-hidden="true" /></button
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"
-              ><path d="M8 2 L4 6 L8 10" fill="none" stroke="currentColor" stroke-width="1.6"
-              ></path></svg
-            >
-          </button>
-          <span class="when">
-            <span class="when-title">{heading.when}</span>
-            <span class="t-data-small soft">{heading.position}</span>
-          </span>
+          <span class="when">{when}</span>
           <button
             type="button"
             class="arrow"
             aria-label="Older session"
-            disabled={logView.index >= count - 1}
+            disabled={index >= count - 1}
             onclick={() => logView.step(1)}
+            ><IconChevronRight size={16} stroke={1.8} aria-hidden="true" /></button
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"
-              ><path d="M4 2 L8 6 L4 10" fill="none" stroke="currentColor" stroke-width="1.6"
-              ></path></svg
-            >
-          </button>
-        </div>
+        </span>
       {/if}
     </div>
 
     {#if !shown || !groups}
-      <p class="caption">No sessions yet. Press Play, and each session's files show up here.</p>
+      <EmptyLine>No sessions yet. Press Play, and each session's files show up here.</EmptyLine>
     {:else}
-      <div class="chips">
-        {#each sessionChips(shown) as chip (chip.text)}
-          <DataChip text={chip.text} tone={chip.tone} />
-        {/each}
-      </div>
       {#each shown.warnings as warning (warning)}<Note>{warning}</Note>{/each}
 
-      <section class="group" aria-labelledby="start-here" use:staggerIn={{ selector: ".card" }}>
-        <div class="group-head">
-          <h2 id="start-here" class="t-panel-title">Start here</h2>
-          <span class="caption">Read these first when something goes wrong.</span>
-        </div>
-        <div class="cards">
-          {#if warnings && serverLog}
-            <button
-              type="button"
-              class="card"
-              onclick={() => logView.open("server.stderr.log", "warn")}
-            >
-              <span class="card-head"
-                ><span class="t-body-strong">Server warnings</span><span class="t-data warn"
-                  >{formatCount(warnings.total)} · {warnings.kinds}
-                  {warnings.kinds === 1 ? "kind" : "kinds"}</span
-                ></span
-              >
-              <span class="caption"
-                >Things the game asked for that your server doesn't answer yet. Usually harmless.
-                Always include them in a bug report.</span
-              >
-              {#if warnings.rows.length > 0}
-                <span class="routes">
-                  {#each warnings.rows as row (row.label)}
-                    <span class="t-data-small route"
-                      ><span>{row.label}</span><span class="soft">{formatCount(row.count)}</span
-                      ></span
-                    >
-                  {/each}
-                  {#if warnings.more}
-                    <span class="t-data-small route"
-                      ><span
-                        >+ {warnings.more.kinds} more {warnings.more.kinds === 1
-                          ? "kind"
-                          : "kinds"}</span
-                      ><span class="soft">{formatCount(warnings.more.count)}</span></span
-                    >
-                  {/if}
-                </span>
+      <Glass radius="panel" label="Start here" class="panel">
+        <h2 class="t-panel-title">Start here</h2>
+        <div class="rows">
+          {#if warnings !== null}
+            <div class="list-row">
+              {#if warnings > 0}
+                <IconAlertTriangle size={20} stroke={1.6} aria-hidden="true" class="icon warn" />
+                <span class="grow"
+                  ><span class="t-body-strong"
+                    >{formatCount(warnings)} {warnings === 1 ? "warning" : "warnings"}</span
+                  >{#if kinds > 0}<span class="t-caption then">
+                      · {kinds} {kinds === 1 ? "kind" : "kinds"}</span
+                    >{/if}</span
+                >
+                <InfoButton
+                  label="About warnings"
+                  text="Things the game asked for that your server doesn't answer yet. Usually harmless. Include them in bug reports."
+                />
+                <PillButton onclick={() => logView.open("server.stderr.log", "warn")}
+                  >View</PillButton
+                >
+              {:else}
+                <IconCheck size={20} stroke={1.6} aria-hidden="true" class="icon ok" />
+                <span class="grow">No warnings this session</span>
               {/if}
-              <span class="t-data-small soft">from server.stderr.log</span>
-            </button>
+            </div>
           {/if}
-          {#each groups.start as entry (entry.title)}
-            <button type="button" class="card" onclick={() => logView.open(entry.names[0]!)}>
-              <span class="card-head"
-                ><span class="t-body-strong">{entry.title}</span><span class="t-data soft"
-                  >{formatBytes(entry.bytes)}</span
-                ></span
-              >
-              <span class="caption">{entry.about}</span>
-              <span class="t-data-small soft">{entry.names.join(", ")}</span>
-            </button>
-          {/each}
-          <div class="card static">
-            <span class="card-head">
-              <span class="t-body-strong">Game crash dumps</span>
-              {#if shown.crash_dumps}
-                <StatusDot
-                  kind={shown.crash_dumps.length ? "warn" : "ready"}
-                  label={shown.crash_dumps.length
-                    ? `${shown.crash_dumps.length} this session`
-                    : "None this session"}
+          {#if shown.message}
+            <div class="list-row">
+              <IconFileDescription size={20} stroke={1.6} aria-hidden="true" class="icon" />
+              <span class="grow">{words.label}: {shown.message}</span>
+            </div>
+          {/if}
+          {#if crashes}
+            <div class="list-row">
+              {#if crashes.length > 0}
+                <IconAlertTriangle size={20} stroke={1.6} aria-hidden="true" class="icon warn" />
+                <span class="grow"
+                  >{crashes.length}
+                  {crashes.length === 1 ? "game crash dump" : "game crash dumps"} this session</span
+                >
+                <InfoButton
+                  label="About crash dumps"
+                  text="When the game crashes it saves a CrashDump file. Attach it to your report; it can hold personal information. {crashes
+                    .map((d) => d.name)
+                    .join(', ')}"
                 />
               {:else}
-                <span class="caption">Not looked for</span>
+                <IconCheck size={20} stroke={1.6} aria-hidden="true" class="icon ok" />
+                <span class="grow">No game crash this session</span>
               {/if}
-            </span>
-            <span class="caption"
-              >When the game crashes it saves a CrashDump file. Attach it to your report.</span
-            >
-            {#each shown.crash_dumps ?? [] as dump (dump.path)}
-              <span class="t-data-small">{dump.name}</span>
-            {/each}
-            {#if list.crash_dump_directory}
-              <span class="t-data-small soft path">{list.crash_dump_directory.path}</span>
+            </div>
+          {/if}
+        </div>
+      </Glass>
+
+      <Glass radius="panel" label="Files" class="panel">
+        <h2 class="t-panel-title">Files</h2>
+        <div class="rows">
+          {#each files as entry (entry.title)}
+            {@const Glyph = ICONS[entry.title] ?? IconFileDescription}
+            <div class="list-row">
+              <Glyph size={20} stroke={1.6} aria-hidden="true" class="icon" />
+              <span class="grow file"
+                ><span class="t-body-strong">{entry.title}</span>
+                <InfoButton label="About {entry.title}" text={entry.about} size={16} /></span
+              >
+              <span class="t-data">{fileFacts(entry)}</span>
+              <PillButton variant="text" onclick={() => logView.open(entry.names[0]!)}
+                >Open</PillButton
+              >
+            </div>
+          {/each}
+        </div>
+        <ShowMore label="More sources" summary="EA Desktop logs, recordings, crash dumps">
+          <div class="rows">
+            {#if list.ea_desktop_logs}
+              <div class="list-row stack">
+                <span>EA Desktop logs <span class="t-caption">· EA account details</span></span>
+                <span class="t-data path">{list.ea_desktop_logs.path}</span>
+                <span class="t-caption"
+                  >Only matters when the launcher stopped at "EA activation needs your attention".</span
+                >
+              </div>
             {/if}
-            <span class="personal">Personal info</span>
+            <div class="list-row stack">
+              <span>Protocol recording <span class="t-caption">· account identity</span></span>
+              <span class="t-data path"
+                >{shown.runs_directory_exists ? shown.runs_directory : "Off for this session"}</span
+              >
+            </div>
+            {#if list.crash_dump_directory}
+              <div class="list-row stack">
+                <span>Game crash dumps <span class="t-caption">· personal information</span></span>
+                <span class="t-data path">{list.crash_dump_directory.path}</span>
+              </div>
+            {/if}
+            {#each groups.deep as entry (entry.title)}
+              <div class="list-row stack">
+                <span>{entry.title}</span>
+                <span class="t-data path">{entry.names.join(", ")}</span>
+              </div>
+            {/each}
+            <div class="list-row stack">
+              <span>Session folder</span>
+              <span class="t-data path">{shown.directory}</span>
+            </div>
           </div>
-        </div>
-      </section>
-
-      <section class="group" aria-labelledby="when-breaks" use:staggerIn={{ selector: ".file" }}>
-        <div class="group-head">
-          <h2 id="when-breaks" class="t-panel-title">When something breaks</h2>
-          <span class="caption">The full story, for when the warnings aren't enough.</span>
-        </div>
-        {#each groups.breaks as entry (entry.title)}
-          {@const Glyph = ICONS[entry.title] ?? IconFileDescription}
-          <button type="button" class="pick file" onclick={() => logView.open(entry.names[0]!)}>
-            <Glyph size={20} stroke={1.6} aria-hidden="true" class="glyph" />
-            <span class="file-body">
-              <span class="file-head"
-                ><span class="t-body-strong">{entry.title}</span><span class="t-data soft"
-                  >{fileLine(entry)}</span
-                ></span
-              >
-              <span class="caption">{entry.about}</span>
-              {#if entry.names.includes("server.stderr.log") && shares.length > 0}
-                <span
-                  class="levels grow-x"
-                  role="img"
-                  aria-label={shares.map((s) => `${formatCount(s.count)} ${s.level}`).join(", ")}
-                >
-                  {#each shares as share (share.level)}
-                    <span style="flex: {share.count} 0 0; background: {shareColor[share.level]}"
-                    ></span>
-                  {/each}
-                </span>
-              {/if}
-            </span>
-          </button>
-        {/each}
-        {#if list.ea_desktop_logs}
-          <div class="pick file static">
-            <IconFileText size={20} stroke={1.6} aria-hidden="true" class="glyph" />
-            <span class="file-body">
-              <span class="file-head"
-                ><span class="t-body-strong">EA Desktop logs</span><span class="personal"
-                  >EA account details</span
-                ></span
-              >
-              <span class="caption"
-                >Only matters when the launcher stopped at "EA activation needs your attention".
-                Written by EA Desktop, not Afterhours.</span
-              >
-              <span class="t-data-small soft path">{list.ea_desktop_logs.path}</span>
-            </span>
-          </div>
-        {/if}
-      </section>
-
-      <section class="group" aria-labelledby="deep-dive">
-        <div class="group-head">
-          <h2 id="deep-dive" class="t-panel-title">Deep dive</h2>
-          <span class="caption">For developers. Big, technical, sometimes personal.</span>
-        </div>
-        <div class="scroll">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col" class="t-label">What</th>
-                <th scope="col" class="t-label">Where</th>
-                <th scope="col" class="t-label">What it may contain</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td class="strong">Protocol recording</td>
-                <td class="t-data-small soft"
-                  >{shown.runs_directory_exists ? shown.runs_directory : "Off for this session"}</td
-                >
-                <td class="soft"
-                  >Every message between game and server. Off by default. Includes account identity.</td
-                >
-              </tr>
-              {#each groups.deep as entry (entry.title)}
-                <tr>
-                  <td class="strong">{entry.title}</td>
-                  <td class="t-data-small soft">{entry.names.join(", ")}</td>
-                  <td class="soft">{entry.about}</td>
-                </tr>
-              {/each}
-              <tr>
-                <td class="strong">Session folder</td>
-                <td class="t-data-small soft path">{shown.directory}</td>
-                <td class="soft">Every file above, as the server wrote it.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+        </ShowMore>
+      </Glass>
+      {#if list.truncated}<span class="t-caption"
+          >Older sessions exist beyond the newest {count}.</span
+        >{/if}
     {/if}
+  </div>
 
-    {#if live.console.length > 0}
-      <section class="group" aria-label="This window's session">
-        <div class="group-head">
-          <h2 class="t-panel-title">Live console</h2>
-          <span class="caption">The session started from this window.</span>
-        </div>
-        <div class="console">
-          <LogPanel lines={live.console} received={live.received} empty="" />
-        </div>
-      </section>
-    {/if}
-  </Glass>
-
-  <aside>
-    <Glass dense radius="phone" label="Report a problem" class="side">
-      <div class="side-head">
-        <h2 class="t-panel-title">Report a problem</h2>
-        <Soon />
-      </div>
-      <span class="caption">
-        Packing the files you pick into one .zip in your data folder comes later. Nothing is ever
-        uploaded.
-      </span>
-      <Note kind="warn">Look before you share. File paths include your Windows user name.</Note>
+  <aside data-enter>
+    <Glass radius="phone" label="Report a problem" class="panel">
+      <h2 class="t-panel-title">Report a problem</h2>
+      <span class="measure"
+        >Copy this session's summary into your report and attach files from its folder. Nothing is
+        uploaded.</span
+      >
       <div class="buttons">
         <PillButton variant="solid" disabled={!shown} onclick={copySummary}>Copy summary</PillButton
         >
-        <PillButton variant="text" disabled={!shown} onclick={openFolder}
-          >Open session folder</PillButton
-        >
+        <PillButton disabled={!shown} onclick={openFolder}>Open folder</PillButton>
       </div>
-      {#if note}<span class="caption" role="status">{note}</span>{/if}
-      <div class="buttons">
-        <PillButton variant="text" onclick={() => records.loadSessions()}>Refresh</PillButton>
-      </div>
-      {#if list.truncated}<span class="caption"
-          >Older sessions exist beyond the newest {count}.</span
-        >{/if}
+      {#if note}<span class="t-caption" role="status">{note}</span>{/if}
+      <span class="t-caption">Paths include your Windows user name. Look before you share.</span>
     </Glass>
   </aside>
 </div>
@@ -363,37 +265,60 @@
     gap: var(--space-5);
     align-items: flex-start;
   }
-  .layout :global(.panel) {
-    flex: 999 1 640px;
+  .main {
+    flex: 999 1 560px;
     min-width: 0;
-    padding: 20px 24px 24px;
+    max-width: 820px;
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: var(--space-5);
+  }
+  .layout :global(.panel) {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  aside {
+    flex: 1 1 300px;
+    max-width: 360px;
+  }
+  aside :global(.panel) {
+    gap: 14px;
   }
   .head {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: flex-end;
     justify-content: space-between;
-    gap: 12px 16px;
+    gap: 12px;
   }
   .title {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    min-width: 0;
   }
   h1,
   h2 {
     margin: 0;
   }
+  h2 {
+    padding-bottom: 6px;
+  }
+  aside h2 {
+    padding: 0;
+  }
+  .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 8px;
+    border-radius: 50%;
+  }
   .picker {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 4px;
-    border-radius: var(--radius-pill);
   }
   .arrow {
     width: 38px;
@@ -408,177 +333,35 @@
   }
   .arrow:disabled {
     color: var(--ink-faint);
-    opacity: 0.5;
     cursor: default;
   }
   .when {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    line-height: 1.15;
-    padding: 0 6px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
-  .when-title {
-    font-weight: 700;
-    font-size: 13px;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-  }
-  .soft {
+  .rows :global(.icon) {
+    flex: 0 0 auto;
     color: var(--ink-soft);
   }
-  .warn {
-    color: var(--warn-ink);
+  .rows :global(.icon.warn) {
+    color: var(--build);
   }
-  .caption {
-    margin: 0;
-    font-size: 13px;
-    line-height: 18px;
-    color: var(--ink-soft);
+  .rows :global(.icon.ok) {
+    color: var(--crew);
   }
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .group-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 4px 12px;
-  }
-  .cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 12px;
-  }
-  .card {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 14px 16px;
-    border-radius: var(--radius-card);
-    background: var(--field);
-    border: 1px solid var(--graphite-edge);
-    text-align: left;
-  }
-  button.card:hover {
-    background: var(--row-hover);
-  }
-  .card.static {
-    cursor: default;
-  }
-  .card-head,
-  .file-head {
-    display: flex;
-    flex-wrap: wrap;
+  .file {
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 4px 12px;
+    gap: 6px;
   }
-  .routes {
-    display: flex;
+  .stack {
     flex-direction: column;
+    align-items: flex-start;
     gap: 2px;
-  }
-  .route {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
+    padding: 10px 0;
   }
   .path {
     overflow-wrap: anywhere;
-  }
-  .personal {
-    align-self: flex-start;
-    padding: 1px 9px;
-    border-radius: var(--radius-pill);
-    background: var(--warn-soft);
-    color: var(--warn-ink);
-    font: 700 10px/16px var(--font-ui);
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-  .file {
-    align-items: flex-start;
-  }
-  .file.static {
-    cursor: default;
-  }
-  .file.static:hover {
-    background: transparent;
-  }
-  .file :global(.glyph) {
-    flex: 0 0 auto;
-    margin: 1px 5px 0;
-    color: var(--ink);
-  }
-  .file-body {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .levels {
-    display: flex;
-    height: 6px;
-    margin-top: 4px;
-    border-radius: 999px;
-    overflow: hidden;
-  }
-  .levels span {
-    min-width: 6px;
-  }
-  .scroll {
-    overflow-x: auto;
-    border-radius: var(--radius-row);
-    background: var(--field);
-  }
-  table {
-    width: 100%;
-    min-width: 560px;
-    border-collapse: collapse;
-    font-size: 14px;
-  }
-  th {
-    text-align: left;
-    padding: 10px 14px;
-    color: var(--ink-soft);
-  }
-  td {
-    padding: 8px 14px;
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
-    vertical-align: top;
-  }
-  .strong {
-    font-weight: 700;
-  }
-  .console {
-    display: flex;
-    min-height: 220px;
-  }
-  aside {
-    flex: 1 1 290px;
-    max-width: 330px;
-  }
-  aside :global(.side) {
-    padding: 20px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-  .side-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
   }
   .buttons {
     display: flex;

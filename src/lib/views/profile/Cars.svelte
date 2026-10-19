@@ -104,7 +104,7 @@
           >
             <span class="name"
               ><span class="t-body-strong">{carName(row.car)}</span>{#if row.count > 1}<span
-                  class="t-caption"
+                  class="t-caption then"
                 >
                   × {row.count}</span
                 >{/if}</span
@@ -134,8 +134,9 @@
       <Glass radius="phone" label="Selected car" class="panel">
         <span class="title">
           <span class="t-caption"
-            >{whereLong(car)}{#if selected.count > 1}
-              · {selected.count} alike{/if}</span
+            >{whereLong(car)}{#if selected.count > 1}<span class="then"
+                >· {selected.count} alike</span
+              >{/if}</span
           >
           <h2 class="t-view-title car-title">{carName(car)}</h2>
         </span>

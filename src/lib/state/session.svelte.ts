@@ -31,6 +31,8 @@ export class Session {
   closeBlocked = $state(false);
   /** Restart with game is stopping the serve session before it starts again. */
   restarting = $state(false);
+  /** When this window started its session; `null` for one started elsewhere. */
+  startedAt = $state<Date | null>(null);
 
   private unlisten: Unlisten | null = null;
 
@@ -54,6 +56,7 @@ export class Session {
         // `?sample&hosting`: a serve session this window started.
         this.status = await sampleStatus();
         this.running = this.status !== null;
+        if (this.running) this.startedAt = new Date(Date.now() - 4 * 60_000);
         // `?sample&feed`: server lines keep arriving, for the live log panels.
         void sampleFeed((line) => this.receive(line));
       }
@@ -111,6 +114,7 @@ export class Session {
     try {
       await api.startSession(action);
       this.running = true;
+      this.startedAt = new Date();
       // The notice about a changed server ends with the first start on it.
       const tag = this.serverTag;
       if (tag && this.settings.last_server_tag !== tag) await this.save({ last_server_tag: tag });

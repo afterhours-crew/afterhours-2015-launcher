@@ -6,7 +6,7 @@
 //
 //   2026-10-18T08:19:41.015Z  WARN nfs_server::diagnostics: unsupported operation received service="lsx" route=Some("QueryFriends")
 
-import type { SessionFile, SessionSummary, ServerLog } from "$lib/api/types";
+import type { OutputLine, SessionFile, SessionSummary, ServerLog } from "$lib/api/types";
 import {
   formatBytes,
   formatCount,
@@ -140,6 +140,15 @@ export function groupFiles(files: SessionFile[]): Record<FileGroup, FileEntry[]>
   return groups;
 }
 
+/** "444 KB · 3,171 lines": a file row's secondary line on the dashboard. */
+export function fileFacts(entry: FileEntry): string {
+  const parts = [formatBytes(entry.bytes)];
+  if (entry.lines != null)
+    parts.push(`${formatCount(entry.lines)} ${entry.lines === 1 ? "line" : "lines"}`);
+  if (entry.truncated) parts.push("cut at 4 MB");
+  return parts.join(" · ");
+}
+
 /** "server.stderr.log · 444 KB · 3,171 lines". */
 export function fileLine(entry: FileEntry): string {
   const parts = [entry.names.join(", "), formatBytes(entry.bytes)];
@@ -218,6 +227,26 @@ export function sessionHeading(
     dot: words.dot,
     message: session.message,
   };
+}
+
+/** "Finished · 3 min · 1,843 lines · 16 warnings · no errors": the dashboard's status line. */
+export function sessionLine(session: SessionSummary): string {
+  const parts = [stateWords(session.state).label];
+  if (session.started_utc && session.ended_utc) {
+    const ms = Date.parse(session.ended_utc) - Date.parse(session.started_utc);
+    if (Number.isFinite(ms) && ms >= 0) parts.push(formatDuration(ms));
+  }
+  const log = session.server_log;
+  if (log) {
+    const count = (n: number, one: string, many: string) =>
+      n === 0 ? `no ${many}` : `${formatCount(n)} ${n === 1 ? one : many}`;
+    parts.push(`${formatCount(log.lines)} ${log.lines === 1 ? "line" : "lines"}`);
+    parts.push(count(log.levels.warn, "warning", "warnings"));
+    parts.push(count(log.levels.error, "error", "errors"));
+  } else {
+    parts.push("no server log");
+  }
+  return parts.join(" · ");
 }
 
 export interface Chip {
@@ -380,6 +409,52 @@ export function parseLogLine(raw: string, index: number): LogLine {
     message: message.trim(),
     fields,
     raw,
+  };
+}
+
+/** Level words for log rows: "Warning", not "WARN". */
+export const LEVEL_WORDS: Record<Level, string> = {
+  error: "Error",
+  warn: "Warning",
+  info: "Info",
+  debug: "Debug",
+  trace: "Trace",
+};
+
+/** One row of a live log: time, a level word, the message and its key fields. */
+export interface ConsoleRow {
+  /** "17:41:02"; empty for a line without a time. */
+  time: string;
+  level: string;
+  tone: "warn" | "error" | null;
+  message: string;
+  /** "service=lsx route=GetBlockList", in the secondary grey. */
+  detail: string;
+}
+
+/**
+ * A line of the session console as a log row. Supervisor status lines keep
+ * their state as the level ("Ready"); server lines are parsed like the
+ * viewer's, and anything else is shown as it came.
+ */
+export function consoleRow(line: OutputLine): ConsoleRow {
+  if (line.kind === "status") {
+    const state = line.state.trim();
+    return {
+      time: line.time,
+      level: state ? `${state.charAt(0).toUpperCase()}${state.slice(1)}` : "",
+      tone: state === "failed" ? "warn" : null,
+      message: line.message,
+      detail: "",
+    };
+  }
+  const parsed = parseLogLine(line.text, 0);
+  return {
+    time: parsed.time?.slice(0, 8) ?? "",
+    level: parsed.level ? LEVEL_WORDS[parsed.level] : "",
+    tone: parsed.level === "warn" || parsed.level === "error" ? parsed.level : null,
+    message: parsed.message,
+    detail: fieldSummary(parsed),
   };
 }
 

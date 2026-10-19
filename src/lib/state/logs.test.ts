@@ -4,8 +4,10 @@ import {
   areaCounts,
   areaOf,
   cleanValue,
+  consoleRow,
   fieldSummary,
   fileEntries,
+  fileFacts,
   fileLine,
   filterLines,
   groupFiles,
@@ -15,6 +17,7 @@ import {
   parseLog,
   parseLogLine,
   sessionChips,
+  sessionLine,
   sessionHeading,
   stateWords,
   summaryText,
@@ -212,6 +215,69 @@ describe("server log lines", () => {
     expect(huge.lines).toHaveLength(20_000);
     expect(huge.cut).toBe(true);
     expect(parseLog("a\r\nb").lines.map((l) => l.raw)).toEqual(["a", "b"]);
+  });
+});
+
+describe("the dashboard's lines", () => {
+  it("sum a session up in one status line", () => {
+    expect(sessionLine(FINISHED!)).toBe("Finished · 7 min · 14 lines · 3 warnings · 1 error");
+    const quiet = {
+      ...FINISHED!,
+      server_log: {
+        ...FINISHED!.server_log!,
+        lines: 1,
+        levels: { ...FINISHED!.server_log!.levels, warn: 0, error: 0 },
+      },
+    };
+    expect(sessionLine(quiet)).toBe("Finished · 7 min · 1 line · no warnings · no errors");
+    expect(sessionLine({ ...FINISHED!, server_log: null, ended_utc: null })).toBe(
+      "Finished · no server log",
+    );
+  });
+
+  it("give a file row its size and lines, without the file names", () => {
+    const [entry] = groupFiles(FINISHED!.files).breaks;
+    expect(fileFacts(entry!)).toBe(fileLine(entry!).split(" · ").slice(1).join(" · "));
+  });
+});
+
+describe("live log rows", () => {
+  it("parse server lines into time, level, message and key fields", () => {
+    const text =
+      '2026-10-18T08:19:41.015Z  WARN nfs_server::diagnostics: unsupported request service="lsx" route=Some("GetBlockList") connection=1';
+    expect(consoleRow({ kind: "text", text })).toEqual({
+      time: "08:19:41",
+      level: "Warning",
+      tone: "warn",
+      message: "unsupported request",
+      detail: "service=lsx route=GetBlockList",
+    });
+  });
+
+  it("keep supervisor status lines, with the state as their level", () => {
+    expect(
+      consoleRow({ kind: "status", time: "17:41:03", state: "ready", message: "Server ready" }),
+    ).toEqual({
+      time: "17:41:03",
+      level: "Ready",
+      tone: null,
+      message: "Server ready",
+      detail: "",
+    });
+    expect(
+      consoleRow({ kind: "status", time: "17:41:09", state: "failed", message: "Game exited" })
+        .tone,
+    ).toBe("warn");
+  });
+
+  it("show other text as it came", () => {
+    expect(consoleRow({ kind: "text", text: "Launch context: F:\\Games" })).toEqual({
+      time: "",
+      level: "",
+      tone: null,
+      message: "Launch context: F:\\Games",
+      detail: "",
+    });
   });
 });
 

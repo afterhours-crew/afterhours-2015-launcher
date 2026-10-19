@@ -2,20 +2,19 @@
   import { staggerIn } from "$lib/motion";
   import { inTauri } from "$lib/api/tauri";
   import Glass from "$lib/components/Glass.svelte";
+  import InfoButton from "$lib/components/InfoButton.svelte";
   import LogPanel from "$lib/components/LogPanel.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
-  import Soon from "$lib/components/Soon.svelte";
-  import StatusDot from "$lib/components/StatusDot.svelte";
+  import { formatDuration } from "$lib/state/format";
   import { hostModel } from "$lib/state/host";
   import { isLive } from "$lib/state/launchbar";
   import { router } from "$lib/state/router.svelte";
   import { session } from "$lib/state/session.svelte";
 
-  // Host: the local server on its own. Serve runs the server without the
-  // game (`serve`), and its console lines show below as they arrive. While
-  // it hosts, Play starts the game in the same session (`play`), or on an
-  // older server restarts it with the game. The server listens on this PC
-  // only; LAN play needs server support.
+  // Host (H6): the local server on its own. Serve runs it without the game
+  // (`serve`); its log fills the view and follows the newest line. While it
+  // hosts, Play starts the game in the same session (`play`), or on an
+  // older server restarts it with the game. The server listens on this PC.
   let model = $derived(
     hostModel({
       serverReady: session.serverReady || !inTauri,
@@ -27,6 +26,21 @@
   let server = $derived(session.info?.server ?? null);
   let running = $derived(isLive(session.status?.state));
 
+  let now = $state(Date.now());
+  $effect(() => {
+    const timer = setInterval(() => (now = Date.now()), 30_000);
+    return () => clearInterval(timer);
+  });
+  let runningFor = $derived(
+    running && session.startedAt ? formatDuration(now - session.startedAt.getTime()) : null,
+  );
+
+  const dots = {
+    ready: "var(--status-ready)",
+    warn: "var(--status-warn)",
+    info: "var(--status-info)",
+  };
+
   function act() {
     if (model.button.action === "stop") void session.stop();
     else if (model.button.action === "serve") void session.start("serve");
@@ -34,133 +48,146 @@
 </script>
 
 <main use:staggerIn>
-  <div class="console" data-enter>
-    <LogPanel
-      title="Server log"
-      lines={session.console}
-      received={session.received}
-      empty={running
-        ? "Waiting for output…"
-        : "Nothing yet. Serve starts your server here, and its output shows up as it runs."}
-    />
-    <div class="below">
-      <span class="caption"
-        >This window's session only. Earlier sessions and their full logs are in Logs.</span
-      >
-      <PillButton variant="text" onclick={() => router.go("logs")}>Open logs</PillButton>
-    </div>
+  <div class="head" data-enter>
+    <h1 class="t-view-title">Host</h1>
+    <span class="chip"
+      >{#if model.dot}<span class="dot" style="background: {dots[model.dot]}" aria-hidden="true"
+        ></span>{/if}{model.state}</span
+    >
+    <PillButton
+      variant={model.button.action === "serve" ? "solid" : "outline"}
+      disabled={model.button.disabled}
+      onclick={act}>{model.button.label}</PillButton
+    >
   </div>
+  {#if model.reason}<p class="t-caption reason" data-enter>{model.reason}</p>{/if}
 
-  <aside>
-    <Glass dense radius="phone" label="Local server" class="side">
-      <h1 class="t-view-title">Local server</h1>
-      <StatusDot kind={model.dot} label={model.state} />
-      <div class="buttons">
-        <PillButton variant="solid" disabled={model.button.disabled} onclick={act}
-          >{model.button.label}</PillButton
+  <div class="body">
+    <div class="console" data-enter>
+      <LogPanel
+        title="Server log"
+        lines={session.console}
+        received={session.received}
+        empty={running
+          ? "Waiting for output…"
+          : "Nothing yet. Serve starts your server here, and its log shows up as it runs."}
+      />
+    </div>
+
+    <aside data-enter>
+      <Glass radius="phone" label="Server" class="side">
+        <h2 class="t-panel-title">Server</h2>
+        <div class="rows">
+          <div class="list-row">
+            <span class="grow">Drivers</span><span class="t-caption">Only you</span>
+          </div>
+          {#if runningFor}
+            <div class="list-row">
+              <span class="grow">Running for</span><span class="t-num">{runningFor}</span>
+            </div>
+          {/if}
+          <div class="list-row">
+            <span class="grow">Version</span><span class="t-num"
+              >{server?.pinned_tag ?? "unknown"}</span
+            >
+          </div>
+          <div class="list-row">
+            <span class="grow">Reachable from</span><span class="t-caption">This PC</span>
+            <InfoButton
+              label="About reaching your server"
+              text="Your server listens on 127.0.0.1, so only this PC can join. Playing over a LAN needs server support."
+            />
+          </div>
+        </div>
+        <button type="button" class="link" onclick={() => router.go("logs")}
+          >Earlier sessions are in Logs</button
         >
-      </div>
-      {#if model.reason}<span class="caption">{model.reason}</span>{/if}
-      <span class="caption">
-        Serve runs the server without the game. Play runs both. Stop ends either.
-      </span>
-
-      <div class="section">
-        <h2 class="t-panel-title">How it listens</h2>
-        <dl class="facts">
-          <dt class="t-label muted">Address</dt>
-          <dd class="t-data">127.0.0.1 · this PC only</dd>
-          <dt class="t-label muted">Drivers</dt>
-          <dd class="t-data">one, you</dd>
-          <dt class="t-label muted">Build</dt>
-          <dd class="t-data">{server?.version_line ?? server?.pinned_tag ?? "unknown"}</dd>
-        </dl>
-        <div class="line"><Soon /><span class="caption">LAN play and who is connected</span></div>
-      </div>
-    </Glass>
-  </aside>
+      </Glass>
+    </aside>
+  </div>
 </main>
 
 <style>
   main {
     position: relative;
     flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding: var(--space-5) var(--space-6) var(--space-6);
+  }
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 16px;
+  }
+  h1 {
+    margin: 0 auto 0 0;
+  }
+  .chip {
+    height: 34px;
+    padding: 0 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: var(--radius-pill);
+    background: var(--graphite);
+    border: 1px solid var(--graphite-edge);
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+  .reason {
+    margin: -8px 0 0;
+    text-align: right;
+  }
+  .body {
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-5);
-    padding: var(--space-5) var(--space-6) var(--space-6);
-    min-height: 0;
-    overflow: auto;
-    align-items: stretch;
   }
-  /* The server log runs the full height of the view and scrolls inside
-     itself; the page around it does not scroll for it. */
   .console {
     flex: 999 1 520px;
-    align-self: stretch;
     min-width: 0;
-    min-height: 320px;
+    min-height: 280px;
     max-height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 8px;
   }
   aside {
-    flex: 1 1 300px;
-    max-width: 380px;
+    flex: 1 1 280px;
+    max-width: 320px;
     align-self: flex-start;
   }
   aside :global(.side) {
-    padding: 20px 18px;
+    padding: 24px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 6px;
   }
-  h1,
   h2 {
     margin: 0;
+    padding-bottom: 6px;
   }
-  .caption {
-    font-size: 13px;
-    line-height: 18px;
+  .link {
+    align-self: flex-start;
+    min-height: 38px;
+    margin-top: 6px;
+    font-size: 14px;
     color: var(--ink-soft);
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
-  .below {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-  .buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .section {
-    padding-top: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .muted {
-    color: var(--ink-soft);
-  }
-  .facts {
-    margin: 0;
-    display: grid;
-    grid-template-columns: 70px minmax(0, 1fr);
-    gap: 4px 12px;
-    align-items: baseline;
-  }
-  .facts dd {
-    margin: 0;
-    overflow-wrap: anywhere;
-  }
-  .line {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  .link:hover {
+    color: var(--ink);
   }
 </style>

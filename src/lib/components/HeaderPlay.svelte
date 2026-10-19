@@ -4,7 +4,16 @@
   // Garage home. Blue when it can start, a glass pill naming the session
   // while one is live (pressing it when ready stops), disabled with the
   // reason as its tooltip and accessible name.
-  let { pill, onPlay }: { pill: HeaderPill; onPlay: (action: PlayAction) => void } = $props();
+  let {
+    pill,
+    onPlay,
+    caption = true,
+  }: {
+    pill: HeaderPill;
+    onPlay: (action: PlayAction) => void;
+    /** Off where the view already shows the session state (Host). */
+    caption?: boolean;
+  } = $props();
   const dots = {
     ready: "var(--status-ready)",
     warn: "var(--status-warn)",
@@ -13,7 +22,7 @@
 </script>
 
 <div class="header-play">
-  {#if pill.caption}
+  {#if caption && pill.caption}
     <span class="caption" title={pill.caption}>{pill.caption}</span>
   {/if}
   <button
@@ -47,7 +56,7 @@
     min-width: 0;
   }
   .caption {
-    max-width: 240px;
+    max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
