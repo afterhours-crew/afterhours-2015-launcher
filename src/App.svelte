@@ -133,6 +133,11 @@
       <PillButton variant="text" onclick={() => (session.closeBlocked = false)}>OK</PillButton>
     </div>
   {/if}
+  {#if session.closing}
+    <p class="banner" role="status" in:toastIn>
+      Stopping your server before the launcher closes. This takes a few seconds.
+    </p>
+  {/if}
   {#if !firstRun && notice}
     <div class="banner row" in:toastIn>
       <span>{notice}</span>

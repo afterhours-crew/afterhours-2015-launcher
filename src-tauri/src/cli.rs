@@ -47,10 +47,10 @@ const MAX_SHORT_OUTPUT: usize = 1024 * 1024;
 
 /// Longest session output line passed on. The server bounds a map frame to
 /// 1 MiB; a longer line is left out whole and a note stands in for it.
-const MAX_SESSION_LINE: usize = 2 * 1024 * 1024;
+pub const MAX_SESSION_LINE: usize = 2 * 1024 * 1024;
 
 /// Result of a short command: either its JSON object or a refusal.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum CliResult {
     Ok { value: serde_json::Value },
@@ -289,15 +289,43 @@ pub fn session_args(settings: &Settings, action: &str) -> Result<Vec<String>, St
     Ok(args)
 }
 
-/// Arguments for starting a session. Session commands print human lines,
-/// or with `events` (servers reporting the `events` capability) one JSON
-/// event record per line. `--json` only changes the final record, so it is
-/// left off and status is polled separately.
-pub fn start_args(settings: &Settings, action: &str, events: bool) -> Result<Vec<String>, String> {
+/// How a session reports to the window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Stream {
+    /// Human console lines on its output; status is polled.
+    Lines,
+    /// One JSON event record per line on its output (`--events`).
+    Events,
+    /// The session API (`--api`): status, console lines and map frames come
+    /// from its event stream; standard output holds only `session` and
+    /// `final`.
+    Api,
+}
+
+impl Stream {
+    /// The best of what the server reports: the API, else events, else lines.
+    pub fn offered(events: bool, api: bool) -> Self {
+        match (api, events) {
+            (true, _) => Stream::Api,
+            (false, true) => Stream::Events,
+            (false, false) => Stream::Lines,
+        }
+    }
+}
+
+/// Arguments for starting a session. `--json` only changes the final
+/// record, so it is left off.
+pub fn start_args(
+    settings: &Settings,
+    action: &str,
+    stream: Stream,
+) -> Result<Vec<String>, String> {
     let mut args = data_dir_args(settings);
     args.extend(session_args(settings, action)?);
-    if events {
-        args.push("--events".into());
+    match stream {
+        Stream::Lines => {}
+        Stream::Events => args.push("--events".into()),
+        Stream::Api => args.push("--api".into()),
     }
     Ok(args)
 }
@@ -416,6 +444,8 @@ pub struct RunningSession {
     pub action: String,
     child: std::process::Child,
     stop_polling: Arc<AtomicBool>,
+    /// Started with `--api`: closing the window stops it instead of waiting.
+    pub api: bool,
 }
 
 impl RunningSession {
@@ -448,31 +478,89 @@ pub async fn session_status(state: State<'_, crate::AppState>) -> Result<CliResu
         .map_err(|e| e.to_string())?
 }
 
+/// `stop --json` for the given settings.
+pub fn stop(settings: &Settings) -> Result<CliResult, String> {
+    let server = server::current()?;
+    let mut args = global_args(settings);
+    args.push("stop".into());
+    run_json(&server.path, &args, STOP_TIMEOUT)
+}
+
+/// Ask the session to stop: through its API when the window follows one,
+/// else with the `stop` command.
 #[tauri::command]
 pub async fn stop_session(state: State<'_, crate::AppState>) -> Result<CliResult, String> {
     let settings = settings_of(&state);
-    let server = server::current()?;
-    let mut args = global_args(&settings);
-    args.push("stop".into());
-    tauri::async_runtime::spawn_blocking(move || run_json(&server.path, &args, STOP_TIMEOUT))
-        .await
-        .map_err(|e| e.to_string())?
+    let endpoint = state.endpoint();
+    tauri::async_runtime::spawn_blocking(move || {
+        match endpoint.and_then(|e| e.command("/v1/stop").ok()) {
+            Some(result) => Ok(result),
+            None => stop(&settings),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// `play --json`: ask the running `serve` session to start the game. The
 /// serving supervisor starts it in the same session, so its progress
 /// arrives as that session's output and statuses; this only returns the
 /// request's record, or the refusal (no serve session, a game already
-/// running).
+/// running). Through the session API when the window follows one.
 #[tauri::command]
 pub async fn play_game(state: State<'_, crate::AppState>) -> Result<CliResult, String> {
     let settings = settings_of(&state);
     let server = server::current()?;
+    let endpoint = state.endpoint();
     let mut args = global_args(&settings);
     args.push("play".into());
-    tauri::async_runtime::spawn_blocking(move || run_json(&server.path, &args, STATUS_TIMEOUT))
+    tauri::async_runtime::spawn_blocking(move || {
+        match endpoint.and_then(|e| e.command("/v1/play").ok()) {
+            Some(result) => Ok(result),
+            None => run_json(&server.path, &args, STATUS_TIMEOUT),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// `api --json`: how to reach the current session's API, when one is live
+/// and serves it; `None` otherwise.
+pub fn api_endpoint(settings: &Settings) -> Result<Option<crate::connection::Endpoint>, String> {
+    let server = server::current()?;
+    let mut args = global_args(settings);
+    args.push("api".into());
+    match run_json(&server.path, &args, STATUS_TIMEOUT)? {
+        CliResult::Ok { value } => {
+            let record: crate::connection::ApiRecord = serde_json::from_value(value)
+                .map_err(|e| format!("The server's API record is malformed: {e}"))?;
+            crate::connection::Endpoint::from_record(&record).map(Some)
+        }
+        CliResult::Error { .. } => Ok(None),
+    }
+}
+
+/// Follow a session that is already running, started by an earlier window
+/// or elsewhere, through its API. `true` when one is followed.
+#[tauri::command]
+pub async fn connect_session(
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+) -> Result<bool, String> {
+    if state.endpoint().is_some() {
+        return Ok(true);
+    }
+    let settings = settings_of(&state);
+    let found = tauri::async_runtime::spawn_blocking(move || api_endpoint(&settings))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())??;
+    match found {
+        Some(endpoint) => {
+            crate::connection::follow(&app, endpoint);
+            Ok(true)
+        }
+        None => Ok(false),
+    }
 }
 
 /// Arguments for `settings --json`: read when both are `None`, else save
@@ -519,14 +607,15 @@ pub async fn world_settings(
 }
 
 /// Start `setup`, `serve` or `start` and stream its output as events.
-/// `events` asks for the JSON event stream; the window passes it when
-/// `version --json` lists the `events` capability.
+/// The window passes what `version --json` lists: `events` for the JSON
+/// event stream, `api` for the session API, which it then prefers.
 #[tauri::command]
 pub fn start_session(
     app: AppHandle,
     state: State<'_, crate::AppState>,
     action: String,
     events: bool,
+    api: bool,
 ) -> Result<(), String> {
     if !["setup", "serve", "start"].contains(&action.as_str()) {
         return Err(format!("Unknown action {action}."));
@@ -539,19 +628,26 @@ pub fn start_session(
     {
         return Err("A session is already running.".into());
     }
-    let args = start_args(&settings, &action, events)?;
+    let stream = Stream::offered(events, api);
+    let args = start_args(&settings, &action, stream)?;
+    // With the API the session reports through it: its standard output
+    // holds only `session` and `final`, and nothing it does depends on a
+    // pipe this window owns.
     let mut child = command(&server.path)
         .args(&args)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(if stream == Stream::Api {
+            Stdio::null()
+        } else {
+            Stdio::piped()
+        })
         .spawn()
         .map_err(|e| format!("Could not start the server: {e}"))?;
     let stdout = child.stdout.take().ok_or("no stdout")?;
-    let stderr = child.stderr.take().ok_or("no stderr")?;
     {
         let app = app.clone();
         std::thread::spawn(move || {
-            pump_stdout(stdout, events, |forward| {
+            pump_stdout(stdout, stream != Stream::Lines, |forward| {
                 let _ = match forward {
                     Forward::Output(line) => app.emit("session-output", &line),
                     Forward::MapFeed(record) => app.emit("map-feed", &record),
@@ -560,7 +656,7 @@ pub fn start_session(
             });
         });
     }
-    {
+    if let Some(stderr) = child.stderr.take() {
         let app = app.clone();
         std::thread::spawn(move || {
             pump_stderr(stderr, |line| {
@@ -573,19 +669,25 @@ pub fn start_session(
         let app = app.clone();
         let stop = Arc::clone(&stop_polling);
         let settings = settings.clone();
-        std::thread::spawn(move || {
-            while !stop.load(Ordering::SeqCst) {
-                if let Ok(result) = status(&settings) {
-                    let _ = app.emit("session-status", &result);
+        if stream == Stream::Api {
+            // The API's event stream brings every status once it is up.
+            std::thread::spawn(move || crate::connection::await_api(&app, &settings, &stop));
+        } else {
+            std::thread::spawn(move || {
+                while !stop.load(Ordering::SeqCst) {
+                    if let Ok(result) = status(&settings) {
+                        let _ = app.emit("session-status", &result);
+                    }
+                    std::thread::sleep(Duration::from_millis(750));
                 }
-                std::thread::sleep(Duration::from_millis(750));
-            }
-        });
+            });
+        }
     }
     *guard = Some(RunningSession {
         action: action.clone(),
         child,
         stop_polling,
+        api: stream == Stream::Api,
     });
     drop(guard);
     // Watch for exit on a thread; the mutex is only held briefly each poll.
@@ -827,26 +929,34 @@ mod tests {
     }
 
     #[test]
-    fn sessions_ask_for_events_only_when_told_to() {
+    fn sessions_use_the_best_stream_the_server_offers() {
         let settings = Settings {
             game_dir: Some(PathBuf::from("/g")),
             data_dir: Some(PathBuf::from("/d")),
             ..Settings::default()
         };
+        assert_eq!(Stream::offered(true, true), Stream::Api);
+        assert_eq!(Stream::offered(false, true), Stream::Api);
+        assert_eq!(Stream::offered(true, false), Stream::Events);
+        assert_eq!(Stream::offered(false, false), Stream::Lines);
         assert_eq!(
-            start_args(&settings, "serve", true).unwrap(),
+            start_args(&settings, "serve", Stream::Api).unwrap(),
+            ["--data-dir", "/d", "serve", "--game-dir", "/g", "--api"]
+        );
+        assert_eq!(
+            start_args(&settings, "serve", Stream::Events).unwrap(),
             ["--data-dir", "/d", "serve", "--game-dir", "/g", "--events"]
         );
         assert_eq!(
-            start_args(&settings, "start", false).unwrap(),
+            start_args(&settings, "start", Stream::Lines).unwrap(),
             ["--data-dir", "/d", "start", "--game-dir", "/g"]
         );
         assert!(
-            !start_args(&settings, "setup", true)
+            !start_args(&settings, "setup", Stream::Api)
                 .unwrap()
                 .contains(&"--json".to_owned())
         );
-        assert!(start_args(&Settings::default(), "serve", true).is_err());
+        assert!(start_args(&Settings::default(), "serve", Stream::Api).is_err());
     }
 
     #[test]

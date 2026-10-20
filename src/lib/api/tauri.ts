@@ -36,9 +36,15 @@ export const api = {
   detectGameDirs: () => invoke<string[]>("detect_game_dirs"),
   runCheck: () => invoke<CliResult>("run_check"),
   sessionStatus: () => invoke<CliResult>("session_status"),
-  /** Start a session; `events` asks for the JSON event stream (capability `events`). */
-  startSession: (action: SessionAction, events: boolean) =>
-    invoke<void>("start_session", { action, events }),
+  /**
+   * Start a session. `api` (capability `api`) has it report through the
+   * session API, else `events` (capability `events`) asks for the JSON
+   * event stream.
+   */
+  startSession: (action: SessionAction, events: boolean, api: boolean) =>
+    invoke<void>("start_session", { action, events, api }),
+  /** Follow a session already running, through its API; whether one is followed. */
+  connectSession: () => invoke<boolean>("connect_session"),
   stopSession: () => invoke<CliResult>("stop_session"),
   /** `play --json`: start the game in the running `serve` session. */
   playGame: () => invoke<CliResult>("play_game"),
@@ -99,6 +105,10 @@ export async function onSessionEvents(handlers: {
   mapFeed: (event: unknown) => void;
   exit: (info: { action: SessionAction; code: number | null }) => void;
   closeBlocked: () => void;
+  /** Closing: the launcher's own server is stopping first. */
+  closing: () => void;
+  /** The server did not stop in time; the window stays open. */
+  closeFailed: (message: string) => void;
 }): Promise<Unlisten> {
   if (!inTauri) return () => {};
   const { listen } = await import("@tauri-apps/api/event");
@@ -110,6 +120,8 @@ export async function onSessionEvents(handlers: {
       handlers.exit(e.payload),
     ),
     listen("close-blocked", () => handlers.closeBlocked()),
+    listen("closing", () => handlers.closing()),
+    listen<string>("close-failed", (e) => handlers.closeFailed(e.payload)),
   ]);
   return () => stops.forEach((stop) => stop());
 }

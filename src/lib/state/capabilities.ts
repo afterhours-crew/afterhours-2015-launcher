@@ -11,7 +11,9 @@ import type { ServerInfo } from "$lib/api/types";
  * each car's in-game pictures) are contract v1's, `world-settings` (traffic
  * and rivals) came with v0.4.0, and `map-images` (decode the game's world map)
  * and `map-feed` (live positions in the event stream, for the Map's
- * markers) are newer (afterhours-2015 #158 and #160).
+ * markers) are newer (afterhours-2015 #158 and #160), and `api` (the
+ * session API the launcher follows its own server through, roadmap track 8)
+ * newest (#163).
  */
 export type Capability =
   | "profile"
@@ -21,7 +23,8 @@ export type Capability =
   | "car-images"
   | "world-settings"
   | "map-images"
-  | "map-feed";
+  | "map-feed"
+  | "api";
 
 export function hasCapability(
   server: Pick<ServerInfo, "capabilities"> | null | undefined,

@@ -118,18 +118,41 @@ comes back to the window, and so do the read-only `profile`,
 of one session folder (`reads.rs`), bounded at the server's 4 MB log limit
 and without following links. A session is the server's own `setup`, `serve` or
 `start` command running as a windowless child; its console lines arrive as
-`session-output` events, `status --json` is polled into `session-status`
-events, and its exit into `session-exit`. The supervisor is a separate
-process, exactly as it is for a terminal user. Because the session writes to
-pipes the window owns, the window will not close while its session runs.
+`session-output` events, its statuses as `session-status` events, and its
+exit as `session-exit`. The supervisor is a separate process, exactly as it
+is for a terminal user.
 
-When `version --json` lists `events`, sessions run with `--events`: the
-server prints one JSON `event` record per line (`schemas/event.schema.json`)
-instead of console text. `cli.rs` turns `status`, `diagnostic`, `session`
-and a failed `final` into the same `session-output` lines the console text
-gave, and forwards `map-feed` records as `map-feed` events. A server
-without `events` (v0.3.0) keeps the console-text path. Lines are bounded
-at 2 MiB; a longer one is left out and noted.
+**Your server, as any server** (roadmap track 8). When `version --json`
+lists `api`, sessions run with `--api`: the supervisor serves the session
+over HTTP on `127.0.0.1` (`GET /v1/status`, `/v1/events`, `POST /v1/stop`,
+`/v1/play`), and the window follows it there, as it would a server on
+another PC. `connection.rs` reads the address and token from `api --json`,
+turns the event stream (statuses, diagnostics, map frames) into the usual
+`session-output`, `session-status` and `map-feed` events, reopens a stream
+that breaks while the session lives, and sends Stop and Play to the API. The
+command's own output then holds only its `session` and `final` lines (why it
+was refused, if it was), so nothing in the session depends on the window:
+
+- **Closing the launcher stops your server.** The window asks the session to
+  stop, shows "Stopping your server before the launcher closes", waits
+  until the session is over (at most 90 seconds), then closes. If the server
+  does not stop in time, the window stays open and says so.
+- **A reopened launcher reconnects.** When a session is still running (an
+  earlier window crashed or was killed), the window follows it through its
+  API, Stop works, and closing stops it as above.
+
+Talking to its own server on `127.0.0.1` is not a network call: nothing
+leaves the PC.
+
+Without `api`, older servers keep the earlier paths. With `events`, sessions
+run with `--events`: the server prints one JSON `event` record per line
+(`schemas/event.schema.json`) instead of console text, and `cli.rs` turns
+`status`, `diagnostic`, `session` and a failed `final` into the same
+`session-output` lines the console text gave and forwards `map-feed`
+records as `map-feed` events; `status --json` is polled. A server without
+`events` (v0.3.0) keeps the console-text path. Lines are bounded at 2 MiB;
+a longer one is left out and noted. These sessions write to pipes the
+window owns, so the window will not close while one runs.
 
 The Map draws the game's own world map from `map-images`. With `map-feed`
 the newest frame of the session's event stream becomes its markers
@@ -191,15 +214,15 @@ against those schemas (`pnpm contract`).
 
 ## Repository layout
 
-| Path                 | What                                                                                                                                                                                                                                                            |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server-pin.json`    | the bundled server: release tag and SHA-256s                                                                                                                                                                                                                    |
-| `schemas/`           | JSON Schemas of the server's `--json` output                                                                                                                                                                                                                    |
-| `src/`               | Svelte app: `App.svelte`, `lib/api` (Tauri commands, generated types), `lib/state` (routes, update rules, view models, stores), `lib/components`, `lib/views`                                                                                                   |
-| `src-tauri/`         | Rust: `pin.rs`, `server.rs` (which executable), `cli.rs` (runs it, streams events), `data.rs` (session records, save backups), `reads.rs` (profile, sessions, session files), `images.rs` (car pictures, asset scope), `updates.rs`, `settings.rs`, `detect.rs` |
-| `scripts/`           | `server-pin.mjs` (fetch, verify, bump), `gen-types.mjs`, `contract.mjs`, `versions.mjs`, `updater-manifest.mjs`, `tokens.mjs`, `release/` (versions, notes and tags of releases)                                                                                |
-| `design/`            | `tokens.json` from the design system, the design rules, the app icon source                                                                                                                                                                                     |
-| `.github/workflows/` | `ci.yml`, `pin-bump.yml` (hourly server check), `prepare-release.yml`, `release-tag.yml`, `release.yml` (`v*` tags; see RELEASING.md)                                                                                                                           |
+| Path                 | What                                                                                                                                                                                                                                                                                                        |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server-pin.json`    | the bundled server: release tag and SHA-256s                                                                                                                                                                                                                                                                |
+| `schemas/`           | JSON Schemas of the server's `--json` output                                                                                                                                                                                                                                                                |
+| `src/`               | Svelte app: `App.svelte`, `lib/api` (Tauri commands, generated types), `lib/state` (routes, update rules, view models, stores), `lib/components`, `lib/views`                                                                                                                                               |
+| `src-tauri/`         | Rust: `pin.rs`, `server.rs` (which executable), `cli.rs` (runs it, streams events), `connection.rs` (its session API, closing), `data.rs` (session records, save backups), `reads.rs` (profile, sessions, session files), `images.rs` (car pictures, asset scope), `updates.rs`, `settings.rs`, `detect.rs` |
+| `scripts/`           | `server-pin.mjs` (fetch, verify, bump), `gen-types.mjs`, `contract.mjs`, `versions.mjs`, `updater-manifest.mjs`, `tokens.mjs`, `release/` (versions, notes and tags of releases)                                                                                                                            |
+| `design/`            | `tokens.json` from the design system, the design rules, the app icon source                                                                                                                                                                                                                                 |
+| `.github/workflows/` | `ci.yml`, `pin-bump.yml` (hourly server check), `prepare-release.yml`, `release-tag.yml`, `release.yml` (`v*` tags; see RELEASING.md)                                                                                                                                                                       |
 
 ## Checks
 

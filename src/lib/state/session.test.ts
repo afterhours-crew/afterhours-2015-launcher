@@ -41,16 +41,21 @@ const ready: Status = sampleHosting(true);
 describe("starting a session", () => {
   beforeEach(() => startSession.mockClear());
 
+  it("asks for the session API when the server reports it", async () => {
+    await sessionWith(["profile", "events", "map-feed", "api"]).start("serve");
+    expect(startSession).toHaveBeenCalledWith("serve", true, true);
+  });
+
   it("asks for the event stream when the server reports events", async () => {
     await sessionWith(["profile", "events", "map-feed"]).start("start");
-    expect(startSession).toHaveBeenCalledWith("start", true);
+    expect(startSession).toHaveBeenCalledWith("start", true, false);
   });
 
   it("keeps the human lines for servers without events", async () => {
     await sessionWith(["profile"]).start("serve");
-    expect(startSession).toHaveBeenCalledWith("serve", false);
+    expect(startSession).toHaveBeenCalledWith("serve", false, false);
     await sessionWith(null).start("setup");
-    expect(startSession).toHaveBeenLastCalledWith("setup", false);
+    expect(startSession).toHaveBeenLastCalledWith("setup", false, false);
   });
 
   it("clears the last session's markers", async () => {

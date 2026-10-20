@@ -12,7 +12,8 @@ export type Capability =
   | "car-images"
   | "map-images"
   | "world-settings"
-  | "map-feed";
+  | "map-feed"
+  | "api";
 
 /**
  * `version --json`.

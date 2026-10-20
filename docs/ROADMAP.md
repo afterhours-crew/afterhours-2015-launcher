@@ -19,7 +19,7 @@ design canvas.
 | 5     | Overlay: the in-game companion window (design C1)                                                                                                                                               | none                                 | Not planned (2026-10-19); nothing is built for it. The live control endpoint it needed is still wanted, for track 3                                                    |
 | 6     | v0.1 tester preview: the first published launcher release                                                                                                                                       | this repository                      | Planned; uses the release machinery from 1c                                                                                                                            |
 | 7     | Live map: the game's own world map decoded from the tester's installation (`map-images`), then a read-only observer feed from the server (players, traffic and rival motion, spawns and clears) | afterhours-2015, then the Map screen | Map with pan and zoom on `feature/map-screen` (server `map-images`: afterhours-2015 #158); live markers on `feature/map-markers` (server `map-feed`: #160)             |
-| 8     | Server connection: the launcher reaches every server, its own included, through the server's HTTP API, as it would a server on another PC; see [Server connection](#server-connection-track-8)  | afterhours-2015, then here           | Step 1, the server's session API (`--api`), on afterhours-2015 `feature/server-api` (#163); step 2, the launcher's switch to it, is next                               |
+| 8     | Server connection: the launcher reaches every server, its own included, through the server's HTTP API, as it would a server on another PC; see [Server connection](#server-connection-track-8)  | afterhours-2015, then here           | Step 1, the session API (`--api`): afterhours-2015 #164; step 2, the launcher following it: `feature/server-connection`; step 3 is next                                |
 
 The launch bar never shows a car. Its left side reads "Playing on", then
 "Your server", then whether it runs: "Offline · this PC only" or
@@ -61,8 +61,8 @@ Steps, in order:
    and schemas as the commands. A random token per session, in `api.json`
    and printed by `api --json`, guards every request; web pages cannot
    reach it.
-2. **Launcher: one server connection.** For its own server the launcher runs
-   `serve --api` (and Play `play`), reads `api --json`, and follows status,
+2. **Launcher: one server connection** (`feature/server-connection`). The
+   launcher runs its sessions with `--api`, reads `api --json`, and follows status,
    console lines and map markers from the event stream; nothing depends on
    the process's pipes. Closing stops the server as decided above; a
    reopened launcher finds a running session and reconnects. Servers without
@@ -178,7 +178,7 @@ the first release (track 6):
   `CREATE_NO_WINDOW` and its output piped to the window.
 - The window refuses to close while its session runs, because the v0.3.0
   server writes progress to pipes the window owns and would stop on a broken
-  pipe. Track 1b's `--events` mode silences the console and survives a
-  broken pipe. Sessions now run with `--events` when the server reports
-  it (track 7's map markers need it); letting the window close while one
-  runs is still to decide.
+  pipe. With a server that reports `api` (track 8), sessions run with
+  `--api` and closing stops the server, waits for it, then closes; this
+  has run against a server session, not with the game or an installed
+  launcher. With older servers the window still refuses to close.

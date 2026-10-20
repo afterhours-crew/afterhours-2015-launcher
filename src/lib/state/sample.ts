@@ -39,6 +39,7 @@ export const SAMPLE_VERSION: VersionReport = {
     "world-settings",
     "map-images",
     "map-feed",
+    "api",
   ],
 };
 

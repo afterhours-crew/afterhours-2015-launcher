@@ -24,6 +24,7 @@
 //! [`WINDOW_STATE_FILE`]).
 
 pub mod cli;
+pub mod connection;
 pub mod data;
 pub mod detect;
 pub mod images;
@@ -33,7 +34,10 @@ pub mod server;
 pub mod settings;
 pub mod updates;
 
-use std::sync::Mutex;
+use std::sync::{
+    Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 use tauri::{Emitter, Manager};
 use tauri_plugin_window_state::StateFlags;
 
@@ -51,6 +55,11 @@ pub struct AppState {
     /// game folder decision.
     pub settings: Mutex<settings::Settings>,
     pub session: Mutex<Option<cli::RunningSession>>,
+    /// The session followed through its API, this window's own or one it
+    /// found running.
+    pub connection: Mutex<Option<connection::Live>>,
+    /// Closing waits for the window's own server to stop.
+    pub closing: AtomicBool,
     /// The folder holding this launcher's executable.
     pub launcher_dir: Option<std::path::PathBuf>,
 }
@@ -65,6 +74,28 @@ impl AppState {
             stored.game_dir.as_deref(),
             std::path::Path::is_file,
         )
+    }
+
+    /// Where the followed session's API answers, if one is followed.
+    pub fn endpoint(&self) -> Option<connection::Endpoint> {
+        self.connection
+            .lock()
+            .ok()?
+            .as_ref()
+            .map(|live| live.endpoint.clone())
+    }
+
+    /// Whether the session this window started still runs, and if so
+    /// whether it reports through the API.
+    pub fn window_session(&self) -> Option<bool> {
+        let mut guard = self.session.lock().ok()?;
+        let running = guard.as_mut()?;
+        running.is_running().then_some(running.api)
+    }
+
+    /// Whether the session this window started still runs.
+    pub fn window_session_runs(&self) -> bool {
+        self.window_session().is_some()
     }
 
     /// The settings in use, with the game folder decision applied.
@@ -97,6 +128,8 @@ pub fn run() {
             app.manage(AppState {
                 settings: Mutex::new(settings),
                 session: Mutex::new(None),
+                connection: Mutex::new(None),
+                closing: AtomicBool::new(false),
                 launcher_dir: detect::launcher_dir(),
             });
             let state = app.state::<AppState>();
@@ -104,17 +137,33 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // The session's front-end writes its progress to pipes this
-            // process reads, and the supervisor inherits them. Closing the
-            // window while it runs would break those pipes under a live
-            // game, so the window stays until the session is stopped.
+            // Closing the launcher stops its own server: it asks the session
+            // to stop through its API, waits until it is over, then closes.
+            // A session started without the API writes to pipes this process
+            // reads, and breaking them could end a live game, so then the
+            // window stays until the session is stopped.
             if let tauri::WindowEvent::CloseRequested { api, .. } = event
                 && let Some(state) = window.try_state::<AppState>()
-                && let Ok(mut guard) = state.session.lock()
-                && guard.as_mut().is_some_and(cli::RunningSession::is_running)
             {
-                api.prevent_close();
-                let _ = window.emit("close-blocked", ());
+                let plan = connection::close_plan(
+                    state.window_session(),
+                    state.endpoint().is_some(),
+                    state.closing.load(Ordering::SeqCst),
+                );
+                match plan {
+                    connection::ClosePlan::Close => {}
+                    connection::ClosePlan::Refuse => {
+                        api.prevent_close();
+                        let _ = window.emit("close-blocked", ());
+                    }
+                    connection::ClosePlan::Wait => api.prevent_close(),
+                    connection::ClosePlan::StopThenClose => {
+                        api.prevent_close();
+                        state.closing.store(true, Ordering::SeqCst);
+                        let _ = window.emit("closing", ());
+                        connection::stop_then_close(window.app_handle().clone());
+                    }
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -126,6 +175,7 @@ pub fn run() {
             cli::start_session,
             cli::stop_session,
             cli::play_game,
+            cli::connect_session,
             cli::world_settings,
             images::car_images,
             images::map_images,

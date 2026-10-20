@@ -31,6 +31,10 @@ export class Session {
   loaded = $state(false);
   /** The window refused to close because its session still runs. */
   closeBlocked = $state(false);
+  /** Closing: the launcher's own server is stopping, then the window closes. */
+  closing = $state(false);
+  /** The window follows a session it did not start, through its API. */
+  adopted = $state(false);
   /** Restart with game is stopping the serve session before it starts again. */
   restarting = $state(false);
   /** When this window started its session; `null` for one started elsewhere. */
@@ -88,6 +92,11 @@ export class Session {
       this.info = await api.appInfo();
       if (this.serverReady) {
         this.setStatus(statusFromResult(await api.sessionStatus()));
+        // A session still running (an earlier window closed or crashed):
+        // follow it through its API, as any server.
+        if (hasCapability(this.info.server, "api") && isLive(this.status?.state)) {
+          this.adopted = await api.connectSession();
+        }
       }
       this.error = null;
     } catch (e) {
@@ -106,6 +115,13 @@ export class Session {
       },
       closeBlocked: () => {
         this.closeBlocked = true;
+      },
+      closing: () => {
+        this.closing = true;
+      },
+      closeFailed: (message) => {
+        this.closing = false;
+        this.error = message;
       },
     });
   }
@@ -133,8 +149,10 @@ export class Session {
     this.received = 0;
     this.mapFeed = null;
     try {
-      // A server with the event stream reports through it, map positions too.
-      await api.startSession(action, hasCapability(this.info?.server, "events"));
+      // The session API, else the event stream: map positions come with either.
+      const server = this.info?.server;
+      await api.startSession(action, hasCapability(server, "events"), hasCapability(server, "api"));
+      this.adopted = false;
       this.running = true;
       this.startedAt = new Date();
       // The notice about a changed server ends with the first start on it.
