@@ -3,9 +3,11 @@ name: CI
 on:
   push:
     branches: [main, "feature/**", "bugfix/**", "docs/**", "codex/**"]
+  # On a release pull request (opened with GITHUB_TOKEN) this run waits for a
+  # person's approval; see RELEASING.md.
   pull_request:
-  # The pin-bump workflow dispatches this on its branch: pull requests opened
-  # with GITHUB_TOKEN do not trigger pull_request runs themselves.
+  # By hand, on any branch. A dispatched run's checks do not count for a pull
+  # request, so it cannot stand in for the pull_request run.
   workflow_dispatch:
 
 permissions:
