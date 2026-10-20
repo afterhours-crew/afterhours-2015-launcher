@@ -6,12 +6,12 @@ describe("capabilities", () => {
   it("are only what the server reports", () => {
     const v1 = { capabilities: ["profile", "sessions", "events"] };
     expect(hasCapability(v1, "profile")).toBe(true);
-    expect(hasCapability(v1, "map")).toBe(false);
-    expect(hasCapability({ capabilities: ["map"] }, "map")).toBe(true);
+    expect(hasCapability(v1, "map-images")).toBe(false);
+    expect(hasCapability({ capabilities: ["map-images"] }, "map-images")).toBe(true);
   });
 
   it("are none for a server without version --json, or no server", () => {
-    expect(hasCapability({ capabilities: null }, "map")).toBe(false);
+    expect(hasCapability({ capabilities: null }, "map-images")).toBe(false);
     expect(hasCapability(null, "profile")).toBe(false);
     expect(hasCapability(undefined, "profile")).toBe(false);
   });
@@ -27,11 +27,12 @@ describe("features", () => {
     expect(ready(null)).toEqual([]);
   });
 
-  it("open Profile, Cars, Save data, car pictures, Logs and World with contract v1", () => {
+  it("open Profile, Cars, Save data, car pictures, Logs, World and Map on the sample server", () => {
     expect(ready({ capabilities: SAMPLE_VERSION.capabilities })).toEqual([
       "car-images",
       "cars",
       "logs",
+      "map",
       "profile",
       "rivals",
       "save-data",
@@ -40,14 +41,17 @@ describe("features", () => {
     ]);
   });
 
-  it("open World traffic only with world-settings, and Map only with map", () => {
+  it("open World traffic only with world-settings, and Map only with map-images", () => {
     const world = ready({ capabilities: ["world-settings"] });
     expect(world).toEqual(["rivals", "traffic", "world-presets"]);
-    expect(ready({ capabilities: ["map"] })).toEqual(["map"]);
+    expect(ready({ capabilities: ["map-images"] })).toEqual(["map"]);
+    expect(ready({ capabilities: ["map-feed"] })).toEqual(["live-map"]);
   });
 
   it("never open Cops or account edits", () => {
-    const everything = { capabilities: ["profile", "sessions", "events", "world-settings", "map"] };
+    const everything = {
+      capabilities: ["profile", "sessions", "events", "world-settings", "map-images", "map-feed"],
+    };
     for (const feature of ["cops", "account-edits"] as const) {
       expect(featureReady(everything, feature)).toBe(false);
     }

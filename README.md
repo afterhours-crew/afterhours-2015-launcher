@@ -13,9 +13,11 @@ the release workflows and the screens are in place. Each screen reads the
 bundled server through its JSON commands; what that server does not report
 yet stays in view, marked "Coming in a future update" the same way on every
 screen (design/README.md).
-The pinned server, afterhours-2015 v0.4.0, reports every capability the
+The pinned server, afterhours-2015 v0.4.1, reports every capability the
 screens use (`profile`, `sessions`, `events`, `play`, `car-images`,
-`world-settings`); Cops, the Map and driver edits wait for server work.
+`world-settings`) except `map-images`, which the Map screen needs and the
+next server release brings. Live map positions, Cops and driver edits wait
+for server work.
 Releases are published on this repository's Releases page. See
 [docs/ROADMAP.md](docs/ROADMAP.md).
 

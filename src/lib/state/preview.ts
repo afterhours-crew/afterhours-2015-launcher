@@ -78,6 +78,8 @@ export async function sampleStatus(): Promise<Status | null> {
 export const sampleImageSrc = import.meta.env.DEV
   ? (path: string): string => {
       if (path.endsWith("-broken.png")) return "data:image/png;base64,broken";
+      const tile = /map-images.*[\\/](\d+)-(\d+)-(\d+)\.png$/.exec(path);
+      if (tile) return sampleMapTile(Number(tile[1]), Number(tile[2]), Number(tile[3]));
       const hues = [205, 330, 45, 150, 265, 20];
       let hash = 0;
       for (const c of path) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
@@ -86,6 +88,37 @@ export const sampleImageSrc = import.meta.env.DEV
       return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
     }
   : null;
+
+/**
+ * `?sample`: one 256-pixel tile of a made-up map in the supported build's
+ * layout (level 1 is 32 tiles a side, each level halves it): land, a bay,
+ * and a road every sixteenth of the map, continuous across tiles and
+ * levels. No game art. Development builds only.
+ */
+function sampleMapTile(level: number, column: number, row: number): string {
+  const side = 64 >> level;
+  const cells = 8;
+  const cell = 256 / cells;
+  let shapes = "";
+  for (let y = 0; y < cells; y += 1) {
+    for (let x = 0; x < cells; x += 1) {
+      const u = (column + (x + 0.5) / cells) / side;
+      const v = (row + (y + 0.5) / cells) / side;
+      const water = (u - 0.48) ** 2 + (v - 0.58) ** 2 < 0.035 || u < 0.08 || v > 0.9;
+      if (water)
+        shapes += `<rect x="${x * cell}" y="${y * cell}" width="${cell}" height="${cell}"/>`;
+    }
+  }
+  let roads = "";
+  for (let k = 1; k < 16; k += 1) {
+    const at = ((k / 16) * side - column) * 256;
+    if (at >= 0 && at <= 256) roads += `M${at} 0V256`;
+    const down = ((k / 16) * side - row) * 256;
+    if (down >= 0 && down <= 256) roads += `M0 ${down}H256`;
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect width="256" height="256" fill="#24262b"/><g fill="#182029">${shapes}</g><path d="${roads}" stroke="rgba(244,240,234,0.28)" stroke-width="3" fill="none"/><text x="8" y="18" font-family="sans-serif" font-size="11" fill="rgba(255,255,255,0.3)">Sample map ${level}-${column}-${row}</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
 
 /** A passing check, so the preview's first run reaches its last step. */
 export async function sampleCheck(): Promise<CliResult> {

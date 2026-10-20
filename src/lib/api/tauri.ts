@@ -42,6 +42,8 @@ export const api = {
   playGame: () => invoke<CliResult>("play_game"),
   /** `car-images --json`: decode each car's pictures into the data folder. */
   carImages: () => invoke<CliResult>("car_images"),
+  /** `map-images --json`: decode the game's world map into the data folder. */
+  mapImages: () => invoke<CliResult>("map_images"),
   /** `settings --json`: read the traffic and rival amounts, or save one of them. */
   worldSettings: (traffic: number | null = null, rivals: string | null = null) =>
     invoke<CliResult>("world_settings", { traffic, rivals }),

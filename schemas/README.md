@@ -13,6 +13,14 @@ replaced this folder with them. Each later pin bump does the same
 (RELEASING.md). Do not edit these files by hand; fix a schema in the server
 repository, where it is generated from the Rust types, and bump the pin.
 
+**Ahead of the next release:** `map-images.schema.json` is new and
+`version.schema.json` adds the `map-images` capability. Both are copied unchanged from
+afterhours-2015 `feature/map-images` (pull request #158), which the Map screen is
+built against. The pin bump to the release that carries it replaces them with the
+released files, which must be identical. Until then the pinned v0.4.1 does not report
+`map-images`, so the Map screen shows its note and the contract check skips the
+`map-images` case.
+
 Before v0.4.0 this folder held hand-made stand-ins for the server branches
 that introduced the JSON contract, plus `status-legacy.schema.json` for
 v0.3.0's older `status --json` shape. The app still reads that shape

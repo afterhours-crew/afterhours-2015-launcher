@@ -18,8 +18,8 @@
 //! window remembers, [`data`] reads the data directory's session records and
 //! copies saves aside, [`updates`] serves the updater's checks, [`reads`]
 //! runs the read-only commands behind the profile and logs screens,
-//! [`images`] runs `car-images` and scopes the asset protocol to its
-//! folder, and [`detect`] guesses where the game is installed. The window's
+//! [`images`] runs `car-images` and `map-images` and scopes the asset
+//! protocol to their folders, and [`detect`] guesses where the game is installed. The window's
 //! size, position and maximized state are remembered separately (see
 //! [`WINDOW_STATE_FILE`]).
 
@@ -128,6 +128,7 @@ pub fn run() {
             cli::play_game,
             cli::world_settings,
             images::car_images,
+            images::map_images,
             data::recorded,
             data::open_folder,
             updates::session_activity,

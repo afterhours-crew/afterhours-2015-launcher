@@ -7,6 +7,7 @@
 
 import type {
   Car,
+  MapImagesReport,
   Preflight,
   Profile,
   ProfileList,
@@ -27,7 +28,45 @@ export const SAMPLE_VERSION: VersionReport = {
   os: "windows",
   game_launch: true,
   records: { profile: 1, "profile-list": 1, sessions: 1, status: 1, version: 1 },
-  capabilities: ["profile", "sessions", "events", "play", "car-images", "world-settings"],
+  capabilities: [
+    "profile",
+    "sessions",
+    "events",
+    "play",
+    "car-images",
+    "world-settings",
+    "map-images",
+  ],
+};
+
+/** Where `map-images` writes the decoded world map, for the current content. */
+export const SAMPLE_MAP_DIR =
+  "C:\\Users\\Driver\\AppData\\Local\\Afterhours2015\\artifacts\\content\\map-images\\5a3b1e0c";
+
+/**
+ * `map-images --json` for the supported build's layout. The preview draws a
+ * made-up grid map for its tiles; no game art.
+ */
+export const SAMPLE_MAP: MapImagesReport = {
+  version: 1,
+  directory: SAMPLE_MAP_DIR,
+  fingerprint: "5a3b1e0c".repeat(8),
+  game_directory: "C:\\Program Files\\EA Games\\Need for Speed",
+  built: false,
+  asset: "UI/Menu/WorldMapTiledTexture",
+  tile_size: 256,
+  full_size: 16384,
+  file_pattern: "{level}-{column}-{row}.png",
+  levels: [
+    { level: 1, tiles_per_side: 32, size: 8192, tiles: 1024 },
+    { level: 2, tiles_per_side: 16, size: 4096, tiles: 256 },
+    { level: 3, tiles_per_side: 8, size: 2048, tiles: 64 },
+  ],
+  world: { min_x: -8192, min_z: -8192, max_x: 8192, max_z: 8192 },
+  files: 1344,
+  formats: { BC3_UNORM: 1344 },
+  missing: [],
+  warnings: [],
 };
 
 /** `settings --json` before anything was saved: original traffic and rivals. */

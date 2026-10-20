@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import Ajv from "ajv";
 import {
+  SAMPLE_MAP,
   SAMPLE_PREFLIGHT,
   SAMPLE_PROFILE,
   SAMPLE_PROFILE_LIST,
@@ -28,6 +29,7 @@ describe("sample records", () => {
     ["check", SAMPLE_PREFLIGHT],
     ["version", SAMPLE_VERSION],
     ["settings", SAMPLE_SETTINGS],
+    ["map-images", SAMPLE_MAP],
     ["profile", SAMPLE_PROFILE],
     ["profile-list", SAMPLE_PROFILE_LIST],
     ["sessions", SAMPLE_SESSIONS],

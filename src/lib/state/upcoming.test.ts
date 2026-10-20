@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NAV } from "./routes";
+import { navItems } from "./routes";
 import { UPCOMING, listSentence, listText } from "./upcoming";
 import { stepValue, typedValue } from "./stepper";
 
@@ -17,8 +17,13 @@ describe("coming in a future update", () => {
     expect(listSentence([])).toBe("");
   });
 
-  it("marks the Map tab, and only it, as coming", () => {
-    expect(NAV.filter((item) => item.upcoming).map((item) => item.id)).toEqual(["map"]);
+  it("marks the Map tab, and only it, as coming until the server can draw the map", () => {
+    const coming = (ready: boolean) =>
+      navItems(() => ready)
+        .filter((item) => item.upcoming)
+        .map((item) => item.id);
+    expect(coming(false)).toEqual(["map"]);
+    expect(coming(true)).toEqual([]);
   });
 });
 

@@ -8,12 +8,20 @@ import type { ServerInfo } from "$lib/api/types";
 /**
  * Capabilities screens wait for. `profile`, `sessions`, `events`, `play`
  * (start the game in a running `serve` session) and `car-images` (decode
- * each car's in-game pictures) are contract v1's;
- * `world-settings` (track 3, traffic density) and `map` (track 7, the live
- * map feed) are expected names no server reports yet.
+ * each car's in-game pictures) are contract v1's, `world-settings` (traffic
+ * and rivals) came with v0.4.0, and `map-images` (decode the game's world map)
+ * is newer. `map-feed` (track 7, live positions for the map) is an expected
+ * name no server reports yet.
  */
 export type Capability =
-  "profile" | "sessions" | "events" | "play" | "car-images" | "world-settings" | "map";
+  | "profile"
+  | "sessions"
+  | "events"
+  | "play"
+  | "car-images"
+  | "world-settings"
+  | "map-images"
+  | "map-feed";
 
 export function hasCapability(
   server: Pick<ServerInfo, "capabilities"> | null | undefined,
@@ -37,7 +45,10 @@ export const FEATURES = {
   traffic: "world-settings",
   rivals: "world-settings",
   "world-presets": "world-settings",
-  map: "map",
+  /** The Map screen: the game's world map. */
+  map: "map-images",
+  /** You, traffic and rivals on the map, live. */
+  "live-map": "map-feed",
   cops: null,
   /** Name, bank and REP edits: track 4's `account set`. */
   "account-edits": null,

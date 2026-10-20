@@ -2,6 +2,8 @@
 // `#/logs/viewer`, `#/settings/about`) keep links working in the desktop window and in the
 // browser preview.
 
+import type { Feature } from "./capabilities";
+
 export const VIEWS = ["garage", "profile", "world", "map", "host", "logs", "settings"] as const;
 export type View = (typeof VIEWS)[number];
 
@@ -28,6 +30,8 @@ export interface Route {
 export interface NavItem {
   id: View;
   label: string;
+  /** The screen needs this feature; without it the tab carries the clock mark. */
+  feature?: Feature;
   /** The screen is coming in a future update: its tab carries the clock mark. */
   upcoming?: boolean;
 }
@@ -36,11 +40,18 @@ export const NAV: NavItem[] = [
   { id: "garage", label: "Garage" },
   { id: "profile", label: "Profile" },
   { id: "world", label: "World" },
-  { id: "map", label: "Map", upcoming: true },
+  { id: "map", label: "Map", feature: "map" },
   { id: "host", label: "Host" },
   { id: "logs", label: "Logs" },
   { id: "settings", label: "Settings" },
 ];
+
+/** The tabs, each marked as coming while `ready` says its feature is not there. */
+export function navItems(ready: (feature: Feature) => boolean): NavItem[] {
+  return NAV.map((item) =>
+    item.feature && !ready(item.feature) ? { ...item, upcoming: true } : item,
+  );
+}
 
 export const SECTION_LABELS: Record<Section, string> = {
   overview: "Overview",

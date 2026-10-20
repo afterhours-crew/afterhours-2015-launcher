@@ -12,10 +12,11 @@
 //
 // Cases for `stop`, `version`, `sessions` and `profile --list` run when a
 // schema of that name exists, so a pin bump that brings the contract v1
-// schemas exercises them without edits here. The `play`, `car-images` and
-// `settings` cases run when the server reports that capability; they use an
-// empty data folder, so there is no serve session to start a game in, no
-// prepared content to read pictures from, and only a scratch settings file. `status` is checked against
+// schemas exercises them without edits here. The `play`, `car-images`,
+// `map-images` and `settings` cases run when the server reports that
+// capability; they use an empty data folder, so there is no serve session to
+// start a game in, no prepared content to read pictures or the map from, and
+// only a scratch settings file. `status` is checked against
 // the schema of the contract the server speaks: v1's
 // `{"version":1,"session":...}` (status.schema.json) when it answers
 // `version --json`, else v0.3.0's `{"state":"none"}` or bare status
@@ -253,6 +254,16 @@ const cases = [
       const dir = dataDir("car-images-empty");
       const line = refusal(["car-images", "--json", "--data-dir", dir, "--game-dir", fakeGame], 4);
       if (readdirSync(dir).length !== 0) throw new Error("car-images wrote into the data folder");
+      return line;
+    },
+  },
+  {
+    name: "map-images --json without prepared content exits 4 and writes nothing",
+    capability: "map-images",
+    run: () => {
+      const dir = dataDir("map-images-empty");
+      const line = refusal(["map-images", "--json", "--data-dir", dir, "--game-dir", fakeGame], 4);
+      if (readdirSync(dir).length !== 0) throw new Error("map-images wrote into the data folder");
       return line;
     },
   },

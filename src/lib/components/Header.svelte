@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { initials } from "$lib/state/launchbar";
-  import { NAV, type NavItem, type View } from "$lib/state/routes";
+  import { featureReady } from "$lib/state/capabilities";
+  import { navItems, type NavItem, type View } from "$lib/state/routes";
+  import { session } from "$lib/state/session.svelte";
   import Mark from "./Mark.svelte";
   import NavPills from "./NavPills.svelte";
   import WindowControls from "./WindowControls.svelte";
@@ -30,7 +32,9 @@
   const COLORS = ["style", "speed", "build", "crew", "outlaw", "peach"];
   let fill = $derived(COLORS.includes(avatar ?? "") ? `var(--${avatar})` : "var(--style)");
 
-  const items: (NavItem & { dot?: string })[] = NAV;
+  let items: (NavItem & { dot?: string })[] = $derived(
+    navItems((feature) => featureReady(session.info?.server, feature)),
+  );
 </script>
 
 <header data-tauri-drag-region>

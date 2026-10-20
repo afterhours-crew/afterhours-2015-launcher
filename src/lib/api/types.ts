@@ -6,6 +6,7 @@ export type { State as SessionState, Status, StatusReport } from "./generated/st
 export type { Preflight } from "./generated/check";
 export type { VersionReport } from "./generated/version";
 export type { SettingsReport } from "./generated/settings";
+export type { MapImagesReport } from "./generated/map-images";
 export type {
   Car,
   CarImage,
