@@ -13,10 +13,10 @@ the release workflows and the screens are in place. Each screen reads the
 bundled server through its JSON commands; what that server does not report
 yet stays in view, marked "Coming in a future update" the same way on every
 screen (design/README.md).
-With v0.3.0, which reports no capabilities, that is Profile, Cars, car
-pictures, Save data, the Logs dashboard and World's traffic and rivals
-(`world-settings`, on afterhours-2015's launcher branches); Cops and the Map
-wait for server work. No release has been published yet. See
+The pinned server, afterhours-2015 v0.4.0, reports every capability the
+screens use (`profile`, `sessions`, `events`, `play`, `car-images`,
+`world-settings`); Cops, the Map and driver edits wait for server work.
+Releases are published on this repository's Releases page. See
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Run it

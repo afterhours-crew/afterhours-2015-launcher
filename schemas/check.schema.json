@@ -1,21 +1,57 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Preflight",
-  "description": "What `check --json` prints when the installation passes: the read-only preflight record. Vendored from afterhours-2015 v0.3.0 (crates/launcher/src/records.rs) until the server publishes its own schemas.",
-  "type": "object",
+  "description": "`check` output.",
   "properties": {
-    "version": { "type": "integer", "const": 1 },
-    "game_directory": { "type": ["string", "null"] },
-    "data_directory": { "type": "string" },
-    "server_path": { "type": "string" },
-    "server_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "game_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
-    "activation_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
-    "registered_client_path": { "type": ["string", "null"] },
-    "compatibility_name": { "type": ["string", "null"] },
-    "requires_administrator": { "type": "boolean" },
-    "machine_changes": { "type": "array", "items": { "type": "string" } },
-    "directory_write_access": { "type": "string" }
+    "activation_sha256": {
+      "description": "SHA-256 of the installed activation helper; `null` when not checked.",
+      "type": ["string", "null"]
+    },
+    "compatibility_name": {
+      "description": "File name the server runs under so the game accepts it (`start` only).",
+      "type": ["string", "null"]
+    },
+    "data_directory": {
+      "type": "string"
+    },
+    "directory_write_access": {
+      "description": "`checked during setup`: `check` itself writes nothing.",
+      "type": "string"
+    },
+    "game_directory": {
+      "type": ["string", "null"]
+    },
+    "game_sha256": {
+      "description": "SHA-256 of the installed `NFS16.exe`; `null` when no game was checked.",
+      "type": ["string", "null"]
+    },
+    "machine_changes": {
+      "description": "Always empty: the launcher changes no machine-wide setting.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "registered_client_path": {
+      "description": "The existing EA client registration the game uses, read-only.",
+      "type": ["string", "null"]
+    },
+    "requires_administrator": {
+      "description": "Always `false`: the launcher never needs administrator rights.",
+      "type": "boolean"
+    },
+    "server_path": {
+      "type": "string"
+    },
+    "server_sha256": {
+      "description": "SHA-256 of the server executable, lowercase hexadecimal.",
+      "type": "string"
+    },
+    "version": {
+      "const": 1,
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    }
   },
   "required": [
     "version",
@@ -31,5 +67,6 @@
     "machine_changes",
     "directory_write_access"
   ],
-  "additionalProperties": false
+  "title": "Preflight",
+  "type": "object"
 }
