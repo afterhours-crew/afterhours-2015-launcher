@@ -19,6 +19,7 @@
   import PiiBadge from "$lib/components/PiiBadge.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
   import ShowMore from "$lib/components/ShowMore.svelte";
+  import Checkbox from "$lib/components/Checkbox.svelte";
   import Toggle from "$lib/components/Toggle.svelte";
   import { formatCount, formatSaved } from "$lib/state/format";
   import { fileFacts, groupFiles, sessionLine, stateWords } from "$lib/state/logs";
@@ -335,10 +336,9 @@
           <legend class="t-label">Include</legend>
           {#each items as item (item.id)}
             <label class="check">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={included.has(item.id)}
-                onchange={(e) => (picks[pickKey(item.id)] = e.currentTarget.checked)}
+                onchange={(checked) => (picks[pickKey(item.id)] = checked)}
               />
               <span class="grow">{item.label}</span>
               {#if item.personal}<PiiBadge holds={item.personal.holds} />{/if}
@@ -471,12 +471,6 @@
     gap: 12px;
     min-height: 44px;
     cursor: pointer;
-  }
-  .check input {
-    width: 18px;
-    height: 18px;
-    flex: 0 0 auto;
-    accent-color: var(--ink);
   }
   .check .grow {
     flex: 1 1 auto;
