@@ -1,14 +1,17 @@
 name: Server pin bump
 
-# Daily, or by hand: if afterhours-crew/afterhours-2015 has published a release
-# newer than server-pin.json, open a pull request that moves the pin, takes
-# the schemas attached to that release and regenerates src/lib/api/generated.
-# CI on that branch runs the new Afterhours.exe's JSON commands against the
-# schemas. A person reviews and merges; nothing here merges or releases.
+# Hourly, or by hand: if afterhours-crew/afterhours-2015 has published a
+# release newer than server-pin.json, open the release pull request that moves
+# the pin, takes the schemas attached to that release, regenerates
+# src/lib/api/generated and sets the next launcher version (the patch, or the
+# minor when launcher changes are waiting; RELEASING.md). Its description
+# holds the draft notes. CI on that branch runs the new Afterhours.exe's JSON
+# commands against the schemas. A person reviews and merges; merging tags the
+# release (release-tag.yml), and nothing here merges or publishes.
 
 on:
   schedule:
-    - cron: "23 5 * * *"
+    - cron: "17 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -33,6 +36,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.repository.default_branch }}
+          # The release notes cover the history since the previous tag.
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -59,27 +64,33 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Move the pin and regenerate the types
+      - name: Move the pin, regenerate the types and set the version
+        id: prepare
         if: steps.latest.outputs.tag != '' && steps.branch.outputs.exists == 'false'
         env:
           TAG: ${{ steps.latest.outputs.tag }}
         run: |
-          node scripts/server-pin.mjs bump "$TAG" --summary "$RUNNER_TEMP/pr-body.md"
+          node scripts/server-pin.mjs bump "$TAG" --summary "$RUNNER_TEMP/pin.md"
           pnpm types
           pnpm exec prettier --write server-pin.json schemas src/lib/api/generated
+          node scripts/release/cli.mjs prepare --for-pin --pin-summary "$RUNNER_TEMP/pin.md" --body "$RUNNER_TEMP/pr-body.md"
+          node scripts/versions.mjs
+          cat "$RUNNER_TEMP/pr-body.md" >> "$GITHUB_STEP_SUMMARY"
 
+      # Pull requests opened with GITHUB_TOKEN start no pull_request runs, so
+      # CI is dispatched on the branch; its checks count for the merge.
       - name: Open the pull request and run CI on it
         if: steps.latest.outputs.tag != '' && steps.branch.outputs.exists == 'false'
         env:
-          TAG: ${{ steps.latest.outputs.tag }}
-          BRANCH: ${{ steps.branch.outputs.name }}
+          BRANCH: ${{ steps.prepare.outputs.branch }}
+          TITLE: ${{ steps.prepare.outputs.title }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$BRANCH"
-          git add server-pin.json schemas src/lib/api/generated
-          git commit -m "Bundle Afterhours $TAG"
+          git add server-pin.json schemas src/lib/api/generated \
+            package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+          git commit -m "$TITLE"
           git push origin "$BRANCH"
-          gh pr create --base "$BASE" --head "$BRANCH" \
-            --title "Bundle Afterhours $TAG" --body-file "$RUNNER_TEMP/pr-body.md"
+          gh pr create --base "$BASE" --head "$BRANCH" --title "$TITLE" --body-file "$RUNNER_TEMP/pr-body.md"
           gh workflow run ci.yml --ref "$BRANCH"

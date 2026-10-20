@@ -1,0 +1,67 @@
+name: Tag release
+
+# When CI passes on the main commit that changed the launcher version (a
+# merged release pull request), tag that commit v<version> and start Release
+# on the tag, which builds the unpublished draft. A tag pushed with
+# GITHUB_TOKEN starts no workflow by itself, hence the explicit dispatch.
+# Nothing here publishes. See RELEASING.md.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Full SHA of the main commit to tag; CI must have passed on it"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-tag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Tag a merged release
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      BASE: ${{ github.event.repository.default_branch }}
+      COMMIT: ${{ inputs.commit || github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Is this the commit that changed the version?
+        id: select
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then ci=--require-ci; else ci=; fi
+          node scripts/release/cli.mjs tag --commit "$COMMIT" $ci
+      - name: Tag it and build the draft
+        if: steps.select.outputs.tag != ''
+        env:
+          TAG: ${{ steps.select.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$COMMIT" -m "Afterhours Launcher ${TAG#v}"
+          git push origin "refs/tags/$TAG"
+          gh workflow run release.yml --ref "$BASE" -f tag="$TAG"
+          echo "Tagged $COMMIT as $TAG and started Release." >> "$GITHUB_STEP_SUMMARY"

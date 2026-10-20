@@ -177,9 +177,9 @@ against those schemas (`pnpm contract`).
 | `schemas/`           | JSON Schemas of the server's `--json` output                                                                                                                                                                                                                    |
 | `src/`               | Svelte app: `App.svelte`, `lib/api` (Tauri commands, generated types), `lib/state` (routes, update rules, view models, stores), `lib/components`, `lib/views`                                                                                                   |
 | `src-tauri/`         | Rust: `pin.rs`, `server.rs` (which executable), `cli.rs` (runs it, streams events), `data.rs` (session records, save backups), `reads.rs` (profile, sessions, session files), `images.rs` (car pictures, asset scope), `updates.rs`, `settings.rs`, `detect.rs` |
-| `scripts/`           | `server-pin.mjs` (fetch, verify, bump), `gen-types.mjs`, `contract.mjs`, `versions.mjs`, `updater-manifest.mjs`, `tokens.mjs`                                                                                                                                   |
+| `scripts/`           | `server-pin.mjs` (fetch, verify, bump), `gen-types.mjs`, `contract.mjs`, `versions.mjs`, `updater-manifest.mjs`, `tokens.mjs`, `release/` (versions, notes and tags of releases)                                                                                |
 | `design/`            | `tokens.json` from the design system, the design rules, the app icon source                                                                                                                                                                                     |
-| `.github/workflows/` | `ci.yml`, `pin-bump.yml` (daily server check), `release.yml` (`v*` tags)                                                                                                                                                                                        |
+| `.github/workflows/` | `ci.yml`, `pin-bump.yml` (hourly server check), `prepare-release.yml`, `release-tag.yml`, `release.yml` (`v*` tags; see RELEASING.md)                                                                                                                           |
 
 ## Checks
 

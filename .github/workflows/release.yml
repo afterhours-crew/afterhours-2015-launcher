@@ -1,19 +1,30 @@
 name: Release
 
 # A `v*` tag builds the signed-for-updates NSIS installer and attaches it,
-# its .sig and latest.json to a draft release. The owner tests the draft and
+# its .sig and latest.json to a draft release, with the notes reviewed in the
+# release pull request that merged the tagged commit. Tag release
+# (release-tag.yml) dispatches this for the tags it creates, since a tag
+# pushed with GITHUB_TOKEN starts no workflow. The owner tests the draft and
 # publishes it; only then does the updater endpoint
 # (releases/latest/download/latest.json) offer it. See RELEASING.md.
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing version tag to build the draft for, such as v0.3.0"
+        required: true
+        type: string
 
 permissions:
   contents: write
+  # Reads the release pull request's notes.
+  pull-requests: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -25,9 +36,11 @@ jobs:
       run:
         shell: bash
     env:
-      TAG: ${{ github.ref_name }}
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -57,6 +70,15 @@ jobs:
 
       - run: pnpm test
 
+      - name: Release notes
+        id: notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node scripts/release/cli.mjs notes --commit "$(git rev-parse HEAD)" --out "$RUNNER_TEMP/notes.md"
+          delimiter="NOTES_$(node -p 'require("crypto").randomBytes(16).toString("hex")')"
+          { echo "body<<$delimiter"; cat "$RUNNER_TEMP/notes.md"; echo "$delimiter"; } >> "$GITHUB_OUTPUT"
+
       - name: Install pinned toolchain
         run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
@@ -70,20 +92,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
+          tagName: ${{ env.TAG }}
           releaseName: Afterhours Launcher __VERSION__
-          releaseBody: |
-            Afterhours Launcher __VERSION__ for Windows, bundling the Afterhours server ${{ steps.pin.outputs.tag }}.
-
-            Two downloads, the same launcher: the `-setup.exe` installs it and keeps it up to date; the `-portable.zip` runs without installing but only tells you about updates.
-
-            Install: download the `-setup.exe` below and run it as your normal user. It installs for you only and needs no administrator rights. The installer is not code-signed yet, so Windows SmartScreen may warn; choose More info, then Run anyway.
-
-            Without installing: download the `-portable.zip`, extract it anywhere (the game folder works) and run `Afterhours Launcher.exe`. That copy tells you about updates and opens their download page, but does not install them.
-
-            The `.sig` and `latest.json` files are for the launcher's updater; you don't need to download them.
-
-            Installed launchers update from Settings › Updates. An update never installs while a session runs, and your saves are copied to the data folder's `backups` before an update that changes the server.
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           prerelease: false
           uploadUpdaterJson: true

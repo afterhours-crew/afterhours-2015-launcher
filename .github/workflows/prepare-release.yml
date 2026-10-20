@@ -1,0 +1,80 @@
+name: Prepare release
+
+# By hand: open the release pull request for launcher changes merged since the
+# previous release. It sets the next version by the rule in RELEASING.md
+# (launcher changes bump the minor) and drafts the notes in its description.
+# A newer server comes through the Server pin bump workflow instead. Merging
+# tags the release (release-tag.yml); nothing here merges or publishes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "auto follows the rule; minor or major overrides it"
+        required: true
+        type: choice
+        options: [auto, minor, major]
+        default: auto
+      dry_run:
+        description: "Only show the notes and the version change in the run summary"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      BASE: ${{ github.event.repository.default_branch }}
+      BUMP: ${{ inputs.bump }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Set the version and draft the notes
+        id: prepare
+        run: |
+          node scripts/release/cli.mjs prepare --bump "$BUMP" --body "$RUNNER_TEMP/pr-body.md"
+          node scripts/versions.mjs
+          cat "$RUNNER_TEMP/pr-body.md" >> "$GITHUB_STEP_SUMMARY"
+          git diff
+
+      # Pull requests opened with GITHUB_TOKEN start no pull_request runs, so
+      # CI is dispatched on the branch; its checks count for the merge.
+      - name: Open the release pull request and run CI on it
+        if: ${{ !inputs.dry_run }}
+        env:
+          BRANCH: ${{ steps.prepare.outputs.branch }}
+          TITLE: ${{ steps.prepare.outputs.title }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+          git commit -m "$TITLE"
+          git push origin "$BRANCH"
+          gh pr create --base "$BASE" --head "$BRANCH" --title "$TITLE" --body-file "$RUNNER_TEMP/pr-body.md"
+          gh workflow run ci.yml --ref "$BRANCH"

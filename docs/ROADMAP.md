@@ -62,15 +62,18 @@ one note says so.
 
 ```text
 afterhours-2015 release vX.Y.Z           Afterhours-windows-x64.zip, SHA256SUMS.txt, *.schema.json
-        │  daily or manual "Server pin bump" workflow
+        │  hourly or manual "Server pin bump" workflow
+        │  (launcher changes: manual "Prepare release")
         ▼
-pin-bump pull request                     server-pin.json, schemas/, src/lib/api/generated
+release pull request                      server-pin.json, schemas/, src/lib/api/generated,
+                                          the version (patch for a server, minor for
+                                          launcher changes), draft notes in its description
         │  CI: contract job runs the new Afterhours.exe's JSON commands against the schemas
-        │  a person reviews and merges (never automatic)
+        │  a person reviews the notes and merges (never automatic)
         ▼
-launcher tag vA.B.C                       version fields bumped; the tag must match them
-        │  "Release" workflow: NSIS installer, updater signature, draft release,
-        │  latest.json naming the bundled server
+launcher tag vA.B.C                       "Tag release" once CI passes on the merge commit
+        │  "Release" workflow: NSIS installer, updater signature, draft release
+        │  with the reviewed notes, latest.json naming the bundled server
         ▼
 published release                         the owner validates the draft and publishes it
         │  releases/latest/download/latest.json
