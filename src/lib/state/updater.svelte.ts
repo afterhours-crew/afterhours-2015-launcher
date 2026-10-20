@@ -4,7 +4,7 @@
 // unless the user asked for it; nothing here ever blocks Play, except the
 // few seconds of the install itself, when the app is about to close.
 
-import { api, checkForUpdate, inTauri, type FoundUpdate } from "$lib/api/tauri";
+import { api, checkForUpdate, inTauri, openUrl, type FoundUpdate } from "$lib/api/tauri";
 import type { BackupReport, UpdateMode } from "$lib/api/types";
 import { session } from "./session.svelte";
 import {
@@ -15,6 +15,8 @@ import {
   backgroundChecks,
   backupPlan,
   candidateServer,
+  downloadPage,
+  effectiveMode,
   evaluateCandidate,
   installGate,
   nextStep,
@@ -51,6 +53,8 @@ export class Updater {
   backup = $state<BackupReport | null>(null);
   /** Later: no banner for this candidate until the next check the user asks for. */
   dismissed = $state(false);
+  /** A no-install copy opened the download page of this candidate. */
+  opened = $state(false);
 
   private found: FoundUpdate | null = null;
   private downloaded = false;
@@ -61,6 +65,14 @@ export class Updater {
 
   get busy(): boolean {
     return ["checking", "downloading", "installing"].includes(this.phase);
+  }
+
+  /**
+   * Whether this copy can install updates. A copy from the no-install ZIP
+   * cannot: it offers the new version's download page instead.
+   */
+  get canInstall(): boolean {
+    return !(session.info?.updater.portable ?? false);
   }
 
   /** Play is held only while the installer is about to take over. */
@@ -111,6 +123,7 @@ export class Updater {
       if (this.found && this.found !== found) await this.found.close().catch(() => {});
       this.found = found;
       this.downloaded = false;
+      this.opened = false;
       if (!found) {
         this.reset("current");
         return;
@@ -170,7 +183,7 @@ export class Updater {
 
   private async decide(manual: boolean): Promise<void> {
     if (!this.offer) return;
-    const mode = session.settings.updates.mode;
+    const mode = effectiveMode(session.settings.updates.mode, this.canInstall);
     if (mode === "auto") this.gate = await this.readGate();
     this.step = nextStep({
       mode,
@@ -178,6 +191,7 @@ export class Updater {
       gate: this.gate,
       dismissed: this.dismissed,
       manual,
+      canInstall: this.canInstall,
     });
     if (this.step === "install") await this.install();
     else if (this.step === "wait") this.waitForSession();
@@ -197,6 +211,7 @@ export class Updater {
    * A running session makes it wait and try again every minute.
    */
   async install(): Promise<void> {
+    if (!this.canInstall) return;
     if (!this.found || this.offer?.kind !== "offer" || !this.candidate?.server) return;
     if (this.phase === "downloading" || this.phase === "installing") return;
     this.wantInstall = true;
@@ -232,6 +247,42 @@ export class Updater {
       this.message = this.downloaded
         ? `The update did not install: ${text(e)}`
         : `The update could not be downloaded: ${text(e)}`;
+    }
+  }
+
+  /**
+   * No-install copy: open the new version's release page. When it bundles a
+   * different server, copy the saves first, as an install would, and not
+   * while a session runs. Replacing the files is then the user's.
+   */
+  async download(): Promise<void> {
+    if (this.canInstall || this.offer?.kind !== "offer" || !this.candidate?.server) return;
+    const page = downloadPage(this.candidate.version);
+    if (!page) return;
+    const plan = backupPlan(session.serverTag ?? "", this.candidate.server);
+    if (plan.required) {
+      const gate = await this.readGate();
+      if (!gate.allowed) {
+        this.phase = "error";
+        this.message = `Stop your session first: your saves are copied before you download a launcher with server ${plan.to}.`;
+        return;
+      }
+      try {
+        this.backup = await api.backupSaves(plan.from, plan.to);
+      } catch (e) {
+        this.phase = "error";
+        this.message = `Your saves could not be copied, so the download page was not opened: ${text(e)}`;
+        return;
+      }
+    }
+    try {
+      await openUrl(page);
+      this.phase = "available";
+      this.message = null;
+      this.opened = true;
+    } catch (e) {
+      this.phase = "error";
+      this.message = `The download page did not open: ${text(e)}. It is ${page}`;
     }
   }
 

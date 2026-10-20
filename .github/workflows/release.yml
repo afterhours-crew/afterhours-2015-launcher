@@ -77,12 +77,21 @@ jobs:
 
             Install: download the `-setup.exe` below and run it as your normal user. It installs for you only and needs no administrator rights. The installer is not code-signed yet, so Windows SmartScreen may warn; choose More info, then Run anyway.
 
+            Without installing: download the `-portable.zip`, extract it anywhere (the game folder works) and run `Afterhours Launcher.exe`. That copy tells you about updates and opens their download page, but does not install them.
+
             Installed launchers update from Settings › Updates. An update never installs while a session runs, and your saves are copied to the data folder's `backups` before an update that changes the server.
           releaseDraft: true
           prerelease: false
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
           args: --bundles nsis
+
+      - name: Attach the no-install ZIP
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          zip=$(node scripts/portable-zip.mjs --exe src-tauri/target/release/afterhours-launcher.exe --out "$RUNNER_TEMP/portable" | tail -n 1)
+          gh release upload "$TAG" "$zip" --clobber
 
       - name: Name the bundled server in latest.json
         env:

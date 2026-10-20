@@ -74,11 +74,23 @@ wait for server work. No release has been published yet. See
 `pnpm bundle` builds the per-user NSIS installer without updater artifacts
 (those need the signing key; see [RELEASING.md](RELEASING.md)).
 
+### Without installing
+
+Each release also has `Afterhours_<version>_x64-portable.zip`:
+`Afterhours Launcher.exe`, the pinned `Afterhours.exe` beside it, the
+licences and `portable.txt`. Its marker tells the launcher it was not
+installed (`src-tauri/src/updates.rs`). That copy still checks for updates,
+but cannot install them: it offers Ask me and Off, and **Download** opens the
+new version's release page, after copying the saves when the bundled server
+changes. `node scripts/portable-zip.mjs --exe <launcher.exe> --out <folder>`
+builds it from a release build, on Windows, after `pnpm sidecar`. The
+preview shows that copy with `?sample&noinstall`.
+
 ### A copy in the game folder
 
 The launcher executable and its bundled `Afterhours.exe` can also be copied
 into the game folder, next to `NFS16.exe`, the way the terminal
-`Afterhours.exe` is placed. That copy uses the game it sits in: the first
+`Afterhours.exe` is placed; the no-install ZIP can be unzipped there. That copy uses the game it sits in: the first
 run skips "Find your game" and goes straight to the file check, and
 Settings shows the folder without offering another one (run the launcher
 from somewhere else to pick a different install). Its own folder is tried
@@ -116,11 +128,13 @@ downgrade, and stay quiet offline. The rules are in
 [docs/ROADMAP.md](docs/ROADMAP.md#updater-rules).
 
 World's traffic and rivals are the server's `settings --json`
-(`world-settings`): multipliers of the game's own amounts, read when World
-opens and after a session ends, and saved on click for the next session
-(`--traffic <percent>`, `--rivals 0|original`). A running session keeps the
-values it started with, so the controls rest while one runs and the server
-refuses a save. The scale and what a saved value shows as are
+(`world-settings`): traffic as a multiple of the game's own amount, up to the
+server's maximum, and rivals as a number from 0 to 15 or Auto. They are read
+when World opens and after a session ends, and saved on change
+(`--traffic <percent>`, `--rivals <count>|original`). A server that reports
+`live` applies a save to a running session within about a second; on older
+servers a running session keeps the values it started with, so the controls
+rest while one runs. The scale and what a saved value shows as are
 `src/lib/state/world.ts`.
 
 Car pictures come from the server too. When `version --json` lists

@@ -44,7 +44,12 @@ export async function sampleAppInfo(): Promise<AppInfo> {
     game_in_launcher_folder: new URLSearchParams(window.location.search).has("portable")
       ? "C:\\Games\\Need for Speed"
       : null,
-    updater: { endpoint: null, configured: false },
+    // `&noinstall`: a copy from the no-install ZIP.
+    updater: {
+      endpoint: null,
+      configured: false,
+      portable: new URLSearchParams(window.location.search).has("noinstall"),
+    },
     debug_build: true,
     user_name: "Driver",
   };

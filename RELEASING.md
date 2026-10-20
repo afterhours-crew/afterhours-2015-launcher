@@ -102,7 +102,9 @@ Never edit `server-pin.json` by hand to match a file.
 3. The "Release" workflow checks the versions and the signing setup, fetches
    and contract-checks the pinned server, builds the NSIS installer, signs the
    updater artifact and attaches `Afterhours_<version>_x64-setup.exe`, its
-   `.sig` and `latest.json` to a **draft** release. It then checks
+   `.sig` and `latest.json` to a **draft** release. It then adds the
+   no-install ZIP, `Afterhours_<version>_x64-portable.zip`, built from the
+   same launcher with the verified server beside it. Finally it checks
    `latest.json` (version, download URLs, the signed version) and adds the
    bundled server to it, which installed launchers require before they offer
    the update.
@@ -110,6 +112,9 @@ Never edit `server-pin.json` by hand to match a file.
 4. Validate the draft. At least:
    - Install it as an ordinary user on Windows; it installs per user without
      administrator rights. Note any SmartScreen warning.
+   - Unzip the no-install ZIP into an empty folder and run
+     `Afterhours Launcher.exe`. Settings → Updates says the copy runs without
+     installing and offers Ask me and Off only.
    - Settings → About shows the new launcher version, the pinned server and
      "Matches the pin".
    - `latest.json` has `server.tag` and a `windows-x86_64` entry whose

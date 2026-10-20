@@ -8,19 +8,20 @@
   import ShowMore from "$lib/components/ShowMore.svelte";
   import { session } from "$lib/state/session.svelte";
   import { updater } from "$lib/state/updater.svelte";
+  import { effectiveMode, offeredModes } from "$lib/state/updates";
   import About from "./About.svelte";
 
   // Updates (H9): when the launcher installs updates, which version this is
   // and Check now. The rules live behind ⓘ; build details behind Show more.
   let { aboutOpen = false }: { aboutOpen?: boolean } = $props();
 
-  const MODES: { value: UpdateMode; label: string }[] = [
-    { value: "ask", label: "Ask me" },
-    { value: "auto", label: "Automatic" },
-    { value: "off", label: "Off" },
-  ];
+  const LABELS: Record<UpdateMode, string> = { ask: "Ask me", auto: "Automatic", off: "Off" };
 
-  let mode = $derived(session.settings.updates.mode);
+  // A copy from the no-install ZIP cannot install, so it has no Automatic.
+  let modes = $derived(
+    offeredModes(updater.canInstall).map((value) => ({ value, label: LABELS[value] })),
+  );
+  let mode = $derived(effectiveMode(session.settings.updates.mode, updater.canInstall));
   let candidate = $derived(updater.candidate);
   let open = $state(false);
   $effect.pre(() => {
@@ -66,11 +67,13 @@
       Updates
       <InfoButton
         label="About updates"
-        text="Ask me checks in the background and asks before installing. Automatic installs when no session runs and restarts the launcher. Off checks only when you press Check now. Updates never install during a session, never go back a version, and copy your saves first when the bundled server changes."
+        text={updater.canInstall
+          ? "Ask me checks in the background and asks before installing. Automatic installs when no session runs and restarts the launcher. Off checks only when you press Check now. Updates never install during a session, never go back a version, and copy your saves first when the bundled server changes."
+          : "Ask me checks in the background and tells you when a new version is out. Off checks only when you press Check now. Download opens the new version's page; when it bundles a different server, your saves are copied first."}
       />
     </span>
     <Segmented
-      options={MODES}
+      options={modes}
       value={mode}
       label="Updates"
       onchange={(next) => void updater.setMode(next)}
@@ -98,11 +101,19 @@
       <div class="actions">
         <PillButton variant="text" onclick={() => void updater.skip()}>Skip this version</PillButton
         >
-        <PillButton
-          variant="solid"
-          disabled={updater.busy || updater.phase === "waiting"}
-          onclick={() => void updater.install()}>Update</PillButton
-        >
+        {#if updater.canInstall}
+          <PillButton
+            variant="solid"
+            disabled={updater.busy || updater.phase === "waiting"}
+            onclick={() => void updater.install()}>Update</PillButton
+          >
+        {:else}
+          <PillButton
+            variant="solid"
+            disabled={updater.busy}
+            onclick={() => void updater.download()}>Download</PillButton
+          >
+        {/if}
       </div>
     </section>
   {/if}
@@ -110,12 +121,28 @@
   {#if updater.message && ["refused", "waiting", "error"].includes(updater.phase)}
     <div class="note"><Note kind="warn">{updater.message}</Note></div>
   {/if}
+  {#if updater.opened}
+    <div class="note">
+      <Note kind="ready"
+        >Download the ZIP, close the launcher, then replace the files in its folder with the new
+        ones. Your saves are not in that folder.</Note
+      >
+    </div>
+  {/if}
+  {#if !updater.canInstall}
+    <div class="note">
+      <Note
+        >This copy runs without installing, so it cannot update itself. When a new version is out,
+        it opens the download page; the installer from that page updates by itself.</Note
+      >
+    </div>
+  {/if}
   {#if updater.backup?.folder}
     <div class="note">
       <Note kind="ready">Saves copied to <span class="t-data">{updater.backup.folder}</span>.</Note>
     </div>
   {/if}
-  {#if session.info && !session.info.updater.configured}
+  {#if session.info && !session.info.updater.configured && updater.canInstall}
     <div class="note">
       <Note
         >This build has no update signing key, so it can look for updates but not install them.

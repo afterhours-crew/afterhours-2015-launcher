@@ -161,7 +161,9 @@ export type Step = "nothing" | "banner" | "install" | "wait";
 /**
  * What the window does with an offer. Ask shows a banner unless the user
  * said Later or skipped this version; Auto installs when the gate allows and
- * otherwise waits; Off only reacts to a check the user asked for.
+ * otherwise waits; Off only reacts to a check the user asked for. A copy
+ * that cannot install (the no-install ZIP) treats Auto as Ask: its banner
+ * offers the download page.
  */
 export function nextStep(input: {
   mode: UpdateMode;
@@ -169,13 +171,37 @@ export function nextStep(input: {
   gate: Gate | null;
   dismissed: boolean;
   manual: boolean;
+  canInstall: boolean;
 }): Step {
   if (input.offer.kind !== "offer") return "nothing";
   if (input.manual) return "banner";
   if (input.mode === "off") return "nothing";
-  if (input.mode === "auto") return input.gate?.allowed ? "install" : "wait";
+  if (input.mode === "auto" && input.canInstall) {
+    return input.gate?.allowed ? "install" : "wait";
+  }
   if (input.offer.skipped || input.dismissed) return "nothing";
   return "banner";
+}
+
+const VERSION = /^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})(-[0-9A-Za-z.-]{1,64})?$/;
+
+/**
+ * The release page of launcher `version`, where a no-install copy sends its
+ * user for the new ZIP. `null` for anything that is not a plain version, so
+ * the page is always this repository's.
+ */
+export function downloadPage(version: string): string | null {
+  return VERSION.test(version) ? `${RELEASES_URL}/tag/v${version}` : null;
+}
+
+/** The modes Settings offers: a copy that cannot install has no Automatic. */
+export function offeredModes(canInstall: boolean): UpdateMode[] {
+  return canInstall ? ["ask", "auto", "off"] : ["ask", "off"];
+}
+
+/** The mode a copy acts on: Automatic saved by an installed copy is Ask here. */
+export function effectiveMode(mode: UpdateMode, canInstall: boolean): UpdateMode {
+  return !canInstall && mode === "auto" ? "ask" : mode;
 }
 
 export function backgroundChecks(mode: UpdateMode): boolean {
