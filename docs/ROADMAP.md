@@ -68,6 +68,7 @@ afterhours-2015 release vX.Y.Z           Afterhours-windows-x64.zip, SHA256SUMS.
 release pull request                      server-pin.json, schemas/, src/lib/api/generated,
                                           the version (patch for a server, minor for
                                           launcher changes), draft notes in its description
+        │  a person approves its CI run (GitHub holds runs on workflow-opened pull requests)
         │  CI: contract job runs the new Afterhours.exe's JSON commands against the schemas
         │  a person reviews the notes and merges (never automatic)
         ▼
