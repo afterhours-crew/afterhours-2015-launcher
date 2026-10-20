@@ -89,10 +89,15 @@ Steps, in order:
    after a restart. `GET /v1/info` reports the game-facing addresses.
 5. **Server: play against a server** (afterhours-2015 #172). `play --server
 <url>` runs on the player's PC whatever the server's address: the game
-   checks, launcher services on `127.0.0.1:3216` relayed to the server, the
-   game started and routed to the server's redirector by the lease, and the
-   game's progress reported. `start` becomes `serve` plus `play` against
-   `127.0.0.1`, the same path.
+   checks, the game started and routed by the lease to `127.0.0.1`, where
+   a local relay forwards the redirector connection to the server, launcher
+   services on `127.0.0.1:3216` relayed the same way, and the game's
+   progress reported. The game's backend host is a 10-byte field that holds
+   `127.0.0.1` but not a typical network address (observed in the lease's
+   field layout), so the game is never given the server's address directly;
+   the server's own redirector reply and QoS give it the addresses it
+   listens on. `start` becomes `serve` plus `play` against `127.0.0.1`, the
+   same path.
 6. **Launcher: servers by address** (`feature/server-address`). Settings →
    General → Your server: "This PC" (started and stopped by the launcher),
    or another PC's server by address and token, checked before it is
