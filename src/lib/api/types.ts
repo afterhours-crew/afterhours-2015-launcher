@@ -116,7 +116,12 @@ export interface AppInfo {
   data_dir: string | null;
   /** The launcher's own folder when it holds the game: then the game folder in use. */
   game_in_launcher_folder: string | null;
-  updater: { endpoint: string | null; configured: boolean };
+  updater: {
+    endpoint: string | null;
+    configured: boolean;
+    /** Running from the no-install ZIP: updates open their download page. */
+    portable: boolean;
+  };
   debug_build: boolean;
   /** The signed-in user's name, for "Hide my user name"; `null` when unknown. */
   user_name: string | null;

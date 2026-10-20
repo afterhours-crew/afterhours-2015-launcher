@@ -61,11 +61,15 @@
         <PillButton variant="text" onclick={() => void updater.skip()}>Skip this version</PillButton
         >
         <PillButton variant="outline" onclick={() => updater.later()}>Later</PillButton>
-        <PillButton
-          variant="solid"
-          disabled={updater.phase === "waiting"}
-          onclick={() => void updater.install()}>Update</PillButton
-        >
+        {#if updater.canInstall}
+          <PillButton
+            variant="solid"
+            disabled={updater.phase === "waiting"}
+            onclick={() => void updater.install()}>Update</PillButton
+          >
+        {:else}
+          <PillButton variant="solid" onclick={() => void updater.download()}>Download</PillButton>
+        {/if}
       {/if}
     </div>
   </section>

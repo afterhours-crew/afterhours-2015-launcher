@@ -14,7 +14,7 @@
 
 use crate::{cli, data, server};
 use serde::Serialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, State};
 
 /// `status --json` as the server answered it.
@@ -123,6 +123,18 @@ pub struct UpdaterInfo {
     pub endpoint: Option<String>,
     /// A public key is configured; builds without one cannot install updates.
     pub configured: bool,
+    /// This copy runs from the no-install ZIP: it checks for updates but
+    /// cannot install them, so it offers their download page instead.
+    pub portable: bool,
+}
+
+/// Shipped next to the launcher in the no-install ZIP, never by the
+/// installer. Its presence marks a copy that was not installed.
+pub const PORTABLE_MARKER: &str = "portable.txt";
+
+/// Whether the launcher in `launcher_dir` is a no-install copy.
+pub fn is_portable(launcher_dir: Option<&Path>) -> bool {
+    launcher_dir.is_some_and(|dir| dir.join(PORTABLE_MARKER).is_file())
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -157,9 +169,13 @@ fn updater_info(app: &AppHandle) -> UpdaterInfo {
     let configured = config
         .and_then(|c| c["pubkey"].as_str())
         .is_some_and(|key| !key.trim().is_empty());
+    let launcher_dir = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(Path::to_path_buf));
     UpdaterInfo {
         endpoint,
         configured,
+        portable: is_portable(launcher_dir.as_deref()),
     }
 }
 
@@ -196,6 +212,34 @@ mod tests {
 
     fn config() -> serde_json::Value {
         serde_json::from_str(CONFIG).unwrap()
+    }
+
+    #[test]
+    fn only_a_copy_with_the_marker_beside_it_is_a_no_install_copy() {
+        let dir = std::env::temp_dir().join(format!("ah-portable-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        assert!(!super::is_portable(Some(&dir)), "installed: no marker");
+        assert!(!super::is_portable(None));
+        std::fs::create_dir_all(dir.join(super::PORTABLE_MARKER)).unwrap();
+        assert!(
+            !super::is_portable(Some(&dir)),
+            "a folder is not the marker"
+        );
+        std::fs::remove_dir(dir.join(super::PORTABLE_MARKER)).unwrap();
+        std::fs::write(dir.join(super::PORTABLE_MARKER), "no-install copy").unwrap();
+        assert!(super::is_portable(Some(&dir)));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn the_marker_ships_only_in_the_zip() {
+        // The installer must never carry it: an installed copy would then
+        // stop installing updates.
+        let windows: serde_json::Value = serde_json::from_str(WINDOWS).unwrap();
+        assert!(!windows.to_string().contains(super::PORTABLE_MARKER));
+        assert!(!CONFIG.contains(super::PORTABLE_MARKER));
+        let marker = include_str!("../../packaging/portable.txt");
+        assert!(marker.contains("Afterhours Launcher.exe"));
     }
 
     #[test]

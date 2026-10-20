@@ -4,9 +4,12 @@ import {
   backgroundChecks,
   backupPlan,
   candidateServer,
+  downloadPage,
+  effectiveMode,
   evaluateCandidate,
   installGate,
   nextStep,
+  offeredModes,
   serverChangeNotice,
   type Candidate,
   type Offer,
@@ -184,7 +187,15 @@ describe("what happens next", () => {
   const open = { allowed: true } as const;
   const shut = { allowed: false, reason: "live-session", message: "m" } as const;
   const step = (input: Partial<Parameters<typeof nextStep>[0]>) =>
-    nextStep({ mode: "ask", offer, gate: open, dismissed: false, manual: false, ...input });
+    nextStep({
+      mode: "ask",
+      offer,
+      gate: open,
+      dismissed: false,
+      manual: false,
+      canInstall: true,
+      ...input,
+    });
 
   it("asks in Ask mode unless dismissed or skipped", () => {
     expect(step({})).toBe("banner");
@@ -213,6 +224,38 @@ describe("what happens next", () => {
     expect(
       step({ offer: { kind: "refused", reason: "server-downgrade", message: "m" }, mode: "auto" }),
     ).toBe("nothing");
+  });
+
+  it("never installs from a no-install copy: Auto asks, with the download page", () => {
+    for (const gate of [open, shut, null]) {
+      expect(step({ mode: "auto", gate, canInstall: false })).toBe("banner");
+    }
+    expect(step({ mode: "auto", canInstall: false, dismissed: true })).toBe("nothing");
+    expect(step({ mode: "ask", canInstall: false })).toBe("banner");
+    expect(step({ mode: "off", canInstall: false })).toBe("nothing");
+    expect(step({ mode: "off", canInstall: false, manual: true })).toBe("banner");
+  });
+});
+
+describe("a copy that runs without installing", () => {
+  it("offers the release page of the new version, and only for a plain version", () => {
+    expect(downloadPage("0.2.0")).toBe(
+      "https://github.com/afterhours-crew/afterhours-2015-launcher/releases/tag/v0.2.0",
+    );
+    expect(downloadPage("1.0.0-rc.1")).toBe(
+      "https://github.com/afterhours-crew/afterhours-2015-launcher/releases/tag/v1.0.0-rc.1",
+    );
+    for (const bad of ["", "v0.2.0", "0.2", "0.2.0/../../evil", "0.2.0?x=1", "01.2.0"]) {
+      expect(downloadPage(bad)).toBeNull();
+    }
+  });
+
+  it("offers Ask and Off, and acts on a saved Automatic as Ask", () => {
+    expect(offeredModes(true)).toEqual(["ask", "auto", "off"]);
+    expect(offeredModes(false)).toEqual(["ask", "off"]);
+    expect(effectiveMode("auto", false)).toBe("ask");
+    expect(effectiveMode("auto", true)).toBe("auto");
+    expect(effectiveMode("off", false)).toBe("off");
   });
 });
 

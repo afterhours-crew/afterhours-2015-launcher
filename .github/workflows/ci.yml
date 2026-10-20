@@ -127,3 +127,12 @@ jobs:
           path: src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
           retention-days: 14
+      # The same build as the no-install ZIP the release attaches.
+      - name: Build the no-install ZIP
+        run: node scripts/portable-zip.mjs --exe src-tauri/target/release/afterhours-launcher.exe --out "${{ runner.temp }}/portable"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: afterhours-launcher-portable-unsigned
+          path: ${{ runner.temp }}/portable/*.zip
+          if-no-files-found: error
+          retention-days: 14
