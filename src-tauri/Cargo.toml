@@ -1,6 +1,6 @@
 [package]
 name = "afterhours-launcher"
-version = "0.1.2"
+version = "0.3.0"
 description = "Graphical launcher for the Afterhours 2015 local server and game"
 edition = "2024"
 rust-version = "1.98"
