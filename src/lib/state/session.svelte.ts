@@ -2,7 +2,15 @@
 // current session status and the session console.
 
 import { api, inTauri, onSessionEvents, statusFromResult, type Unlisten } from "$lib/api/tauri";
-import type { AppInfo, MapFeed, OutputLine, SessionAction, Settings, Status } from "$lib/api/types";
+import type {
+  AppInfo,
+  MapFeed,
+  OutputLine,
+  RemoteServer,
+  SessionAction,
+  Settings,
+  Status,
+} from "$lib/api/types";
 import { emptySettings } from "$lib/api/types";
 import { hasCapability } from "./capabilities";
 import { isLive } from "./launchbar";
@@ -131,6 +139,19 @@ export class Session {
       this.info = await api.appInfo();
     } catch (e) {
       this.error = message(e);
+    }
+  }
+
+  /**
+   * Use the server on another PC (checked first), or this PC's own again
+   * with `null`; then follow the chosen one when a session runs there.
+   */
+  async useServer(server: RemoteServer | null): Promise<void> {
+    this.settings = await api.setServer(server);
+    this.adopted = false;
+    this.setStatus(statusFromResult(await api.sessionStatus()));
+    if (this.info && hasCapability(this.info.server, "api") && isLive(this.status?.state)) {
+      this.adopted = await api.connectSession();
     }
   }
 

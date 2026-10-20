@@ -61,6 +61,16 @@ export interface Settings {
   first_run_done: boolean;
   updates: UpdateSettings;
   last_server_tag: string | null;
+  /** Your server on another PC on your network; `null` is this PC's own. */
+  server: RemoteServer | null;
+}
+
+/** A server on another PC: what its `api --json` prints there. */
+export interface RemoteServer {
+  /** `http://<IPv4 address>:<port>`. */
+  url: string;
+  /** Its API token, 64 lowercase hexadecimal characters. */
+  token: string;
 }
 
 export type OutputLine =
@@ -144,5 +154,6 @@ export function emptySettings(): Settings {
     first_run_done: false,
     updates: { mode: "ask", skipped_version: null },
     last_server_tag: null,
+    server: null,
   };
 }

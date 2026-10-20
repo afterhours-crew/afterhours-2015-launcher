@@ -477,6 +477,13 @@ pub async fn run_check(state: State<'_, crate::AppState>) -> Result<CliResult, S
 #[tauri::command]
 pub async fn session_status(state: State<'_, crate::AppState>) -> Result<CliResult, String> {
     let settings = settings_of(&state);
+    if let Some(remote) = settings.server.clone() {
+        return tauri::async_runtime::spawn_blocking(move || {
+            remote_command(&remote, "GET", "/v1/status")
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    }
     tauri::async_runtime::spawn_blocking(move || status(&settings))
         .await
         .map_err(|e| e.to_string())?
@@ -514,6 +521,9 @@ pub async fn stop_session(state: State<'_, crate::AppState>) -> Result<CliResult
 #[tauri::command]
 pub async fn play_game(state: State<'_, crate::AppState>) -> Result<CliResult, String> {
     let settings = settings_of(&state);
+    // Playing against another PC's server comes with `play --server`
+    // (afterhours-2015 #172); its own `play` would start the game there.
+    local_only(&settings, "Playing")?;
     let server = server::current()?;
     let endpoint = state.endpoint();
     let mut args = global_args(&settings);
@@ -526,6 +536,28 @@ pub async fn play_game(state: State<'_, crate::AppState>) -> Result<CliResult, S
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// One request to your server on another PC, as the window's command
+/// result: there are no local commands to fall back to.
+pub fn remote_command(
+    remote: &crate::settings::RemoteServer,
+    method: &str,
+    path: &str,
+) -> Result<CliResult, String> {
+    let endpoint = crate::connection::Endpoint::remote(remote)?;
+    Ok(endpoint.request(method, path)?.into_result())
+}
+
+/// Refused for a server on another PC: what only this PC's own server does.
+fn local_only(settings: &Settings, what: &str) -> Result<(), String> {
+    match &settings.server {
+        Some(remote) => Err(format!(
+            "{what} needs your server on this PC; this launcher uses the one at {}.",
+            remote.url
+        )),
+        None => Ok(()),
+    }
 }
 
 /// `api --json`: how to reach the current session's API, when one is live
@@ -555,9 +587,16 @@ pub async fn connect_session(
         return Ok(true);
     }
     let settings = settings_of(&state);
-    let found = tauri::async_runtime::spawn_blocking(move || api_endpoint(&settings))
-        .await
-        .map_err(|e| e.to_string())??;
+    let found = tauri::async_runtime::spawn_blocking(move || match &settings.server {
+        // Another PC's server is followed whenever it answers.
+        Some(remote) => {
+            let endpoint = crate::connection::Endpoint::remote(remote)?;
+            Ok(crate::connection::answers(&endpoint).then_some(endpoint))
+        }
+        None => api_endpoint(&settings),
+    })
+    .await
+    .map_err(|e| e.to_string())??;
     match found {
         Some(endpoint) => {
             crate::connection::follow(&app, endpoint);
@@ -632,7 +671,14 @@ pub async fn world_settings(
     let args = settings_args(&settings, traffic, rivals.as_deref())?;
     let change = settings_change(traffic, rivals.as_deref())?;
     let endpoint = state.endpoint();
+    let remote = settings.server.clone();
     tauri::async_runtime::spawn_blocking(move || {
+        if let Some(remote) = remote {
+            let endpoint = crate::connection::Endpoint::remote(&remote)?;
+            return endpoint
+                .settings(change.as_ref())
+                .ok_or_else(|| format!("Your server at {} does not answer.", remote.url));
+        }
         match endpoint.and_then(|e| e.settings(change.as_ref())) {
             Some(result) => Ok(result),
             None => run_json(&server.path, &args, STATUS_TIMEOUT),
@@ -657,6 +703,7 @@ pub fn start_session(
         return Err(format!("Unknown action {action}."));
     }
     let settings = settings_of(&state);
+    local_only(&settings, "Starting a server")?;
     let server = server::current()?;
     let mut guard = state.session.lock().map_err(|_| "session state poisoned")?;
     if let Some(running) = guard.as_mut()

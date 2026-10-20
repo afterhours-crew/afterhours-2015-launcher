@@ -93,10 +93,13 @@ Steps, in order:
    game started and routed to the server's redirector by the lease, and the
    game's progress reported. `start` becomes `serve` plus `play` against
    `127.0.0.1`, the same path.
-6. **Launcher: servers by address.** A list with "This PC" (started and
-   stopped by the launcher) and others added by address and pairing code.
-   Every screen goes through the chosen server's API, and Play runs
-   `play --server`; the process-pipe and command fallbacks go once the
+6. **Launcher: servers by address** (`feature/server-address`). Settings →
+   General → Your server: "This PC" (started and stopped by the launcher),
+   or another PC's server by address and token, checked before it is
+   saved. With another PC, status, console, map markers, World, Profile and
+   Stop go through that server's API, closing the launcher leaves it
+   running, and starting a server or Play are refused until `play
+--server` exists; the process-pipe and command fallbacks go once the
    pinned release has these.
 7. **Live check.** The whole flow against this PC's network address, then
    against a second PC.

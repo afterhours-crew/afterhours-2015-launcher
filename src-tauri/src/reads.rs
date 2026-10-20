@@ -177,7 +177,19 @@ pub async fn profile(
     state: State<'_, crate::AppState>,
     account_id: Option<String>,
 ) -> Result<cli::CliResult, String> {
-    let args = profile_args(&settings_of(&state), account_id.as_deref())?;
+    let settings = settings_of(&state);
+    let args = profile_args(&settings, account_id.as_deref())?;
+    if let Some(remote) = settings.server.clone() {
+        // Another PC's server shows the save it selects.
+        let endpoint = crate::connection::Endpoint::remote(&remote)?;
+        return tauri::async_runtime::spawn_blocking(move || {
+            endpoint
+                .profile(READ_TIMEOUT)
+                .ok_or_else(|| format!("Your server at {} does not answer.", remote.url))
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    }
     let Some(endpoint) = state.endpoint().filter(|_| account_id.is_none()) else {
         return run_read(args).await;
     };

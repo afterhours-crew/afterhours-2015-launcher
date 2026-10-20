@@ -11,6 +11,7 @@ import type {
   OutputLine,
   Preflight,
   Recorded,
+  RemoteServer,
   SessionAction,
   SessionFileText,
   Settings,
@@ -33,6 +34,11 @@ async function invoke<T>(command: string, args?: Record<string, unknown>): Promi
 export const api = {
   getSettings: () => invoke<Settings>("get_settings"),
   saveSettings: (settings: Settings) => invoke<Settings>("save_settings", { settings }),
+  /**
+   * Use the server on another PC (its API is asked first, with that token),
+   * or this PC's own again with `null`.
+   */
+  setServer: (server: RemoteServer | null) => invoke<Settings>("set_server", { server }),
   detectGameDirs: () => invoke<string[]>("detect_game_dirs"),
   runCheck: () => invoke<CliResult>("run_check"),
   sessionStatus: () => invoke<CliResult>("session_status"),

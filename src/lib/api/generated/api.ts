@@ -10,7 +10,8 @@ export interface ApiRecord {
   id: string;
   /**
    * Send as `Authorization: Bearer <token>` with every request. 64
-   * lowercase hexadecimal characters, new for every session.
+   * lowercase hexadecimal characters, kept in the data directory's
+   * `api-token` across sessions until that file is deleted.
    */
   token: string;
   /**

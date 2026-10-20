@@ -60,9 +60,9 @@ pub struct Endpoint {
 }
 
 impl Endpoint {
-    /// Accept only what the server writes today: `http://127.0.0.1:<port>`
-    /// and a 64-character lowercase hexadecimal token. Other computers are
-    /// not reached yet.
+    /// Accept what a server prints: `http://<IPv4 address>:<port>` (its
+    /// own `127.0.0.1`, or the address another PC's server listens on) and
+    /// a 64-character lowercase hexadecimal token.
     pub fn from_record(record: &ApiRecord) -> Result<Self, String> {
         if record.version != 1 {
             return Err(format!(
@@ -74,8 +74,19 @@ impl Endpoint {
             .url
             .strip_prefix("http://")
             .and_then(|rest| rest.parse().ok())
-            .filter(|a: &SocketAddr| a.ip().is_loopback() && a.port() != 0)
-            .ok_or_else(|| format!("The session API is not on this PC: {}.", record.url))?;
+            .filter(|a: &SocketAddr| match a.ip() {
+                std::net::IpAddr::V4(ip) => {
+                    !ip.is_unspecified() && !ip.is_multicast() && !ip.is_broadcast()
+                }
+                std::net::IpAddr::V6(_) => false,
+            })
+            .filter(|a| a.port() != 0)
+            .ok_or_else(|| {
+                format!(
+                    "A server's address is http://<IPv4 address>:<port>, not {}.",
+                    record.url
+                )
+            })?;
         let token_ok = record.token.len() == 64
             && record
                 .token
@@ -89,6 +100,22 @@ impl Endpoint {
             address,
             token: record.token.clone(),
         })
+    }
+
+    /// Your server on another PC, as saved in the settings. Its session is
+    /// not known until it answers, so `id` is empty.
+    pub fn remote(server: &crate::settings::RemoteServer) -> Result<Self, String> {
+        Self::from_record(&ApiRecord {
+            version: 1,
+            id: String::new(),
+            url: server.url.trim().trim_end_matches('/').to_owned(),
+            token: server.token.trim().to_owned(),
+        })
+    }
+
+    /// Whether this is this PC's own server.
+    pub fn is_local(&self) -> bool {
+        self.address.ip().is_loopback()
     }
 
     /// A request head; a body, when there is one, is JSON.
@@ -434,7 +461,7 @@ fn has_ended(last_status: &Option<String>) -> bool {
 }
 
 /// Whether a session's API still answers.
-fn answers(endpoint: &Endpoint) -> bool {
+pub fn answers(endpoint: &Endpoint) -> bool {
     endpoint
         .request("GET", "/v1/status")
         .is_ok_and(|r| r.status == 200)
@@ -473,8 +500,10 @@ pub fn follow(app: &AppHandle, endpoint: Endpoint) {
         {
             *current = None;
         }
-        // The end state, also for a session this window did not start.
+        // The end state, also for a session this window did not start; a
+        // server on another PC reports its own through its API.
         if !stop.load(Ordering::SeqCst)
+            && endpoint.is_local()
             && let Ok(result) = cli::status(&state.settings())
         {
             let _ = app.emit("session-status", &result);
@@ -601,12 +630,29 @@ mod tests {
     }
 
     #[test]
-    fn only_a_loopback_api_with_a_well_formed_token_is_reached() {
+    fn a_server_is_an_ipv4_address_with_a_well_formed_token() {
         let endpoint = Endpoint::from_record(&record("http://127.0.0.1:53111", TOKEN)).unwrap();
         assert_eq!(endpoint.address.to_string(), "127.0.0.1:53111");
+        assert!(endpoint.is_local());
+        // Another PC's server on the network is reached the same way.
+        let other = Endpoint::from_record(&record("http://192.168.1.5:53111", TOKEN)).unwrap();
+        assert!(!other.is_local());
+        let saved = crate::settings::RemoteServer {
+            url: " http://192.168.1.5:61000/ ".into(),
+            token: format!(
+                "{TOKEN}
+"
+            ),
+        };
+        let remote = Endpoint::remote(&saved).unwrap();
+        assert_eq!(remote.address.to_string(), "192.168.1.5:61000");
+        assert_eq!((remote.id.as_str(), remote.token.as_str()), ("", TOKEN));
         for url in [
             "https://127.0.0.1:53111",
-            "http://192.168.1.5:53111",
+            "http://0.0.0.0:53111",
+            "http://255.255.255.255:53111",
+            "http://224.0.0.1:53111",
+            "http://[::1]:53111",
             "http://example.com:80",
             "http://127.0.0.1:0",
             "http://127.0.0.1",

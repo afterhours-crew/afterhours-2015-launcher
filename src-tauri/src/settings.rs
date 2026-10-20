@@ -31,6 +31,19 @@ pub struct Settings {
     /// bundled tag means an update arrived since, and the first start may
     /// rebuild the content cache.
     pub last_server_tag: Option<String>,
+    /// Your server on another PC on your network, reached through its API;
+    /// `None` is this PC's own server, which the launcher starts and stops.
+    pub server: Option<RemoteServer>,
+}
+
+/// A server on another PC: what its `api --json` prints there.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RemoteServer {
+    /// `http://<IPv4 address>:<port>`, started there with `serve
+    /// --server-only --api --listen <address> --api-port <port>`.
+    pub url: String,
+    /// Its API token: 64 lowercase hexadecimal characters.
+    pub token: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -132,6 +145,48 @@ pub fn save_settings(
     Ok(saved)
 }
 
+/// Use the server on another PC at `server` (checked first: its API must
+/// answer with that token), or this PC's own server again with `None`.
+/// Refused while this window's own session runs.
+#[tauri::command]
+pub async fn set_server(
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+    server: Option<RemoteServer>,
+) -> Result<Settings, String> {
+    if state.window_session_runs() {
+        return Err("Stop your server on this PC first.".into());
+    }
+    if let Some(remote) = &server {
+        let endpoint = crate::connection::Endpoint::remote(remote)?;
+        let info =
+            tauri::async_runtime::spawn_blocking(move || endpoint.request("GET", "/v1/info"))
+                .await
+                .map_err(|e| e.to_string())??;
+        if info.status != 200 {
+            return Err(info.message());
+        }
+    }
+    let saved = {
+        let mut current = state
+            .settings
+            .lock()
+            .map_err(|_| "settings state poisoned")?;
+        let next = Settings {
+            server,
+            ..current.clone()
+        };
+        write(&file(&app)?, &next)?;
+        *current = next;
+        effective(&current, &state.game_folder(&current))
+    };
+    // Follow the chosen server from now on.
+    if let Ok(mut connection) = state.connection.lock() {
+        *connection = None;
+    }
+    Ok(saved)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,9 +208,16 @@ mod tests {
                 skipped_version: Some("0.2.0".into()),
             },
             last_server_tag: Some("v0.3.0".into()),
+            server: Some(RemoteServer {
+                url: "http://192.168.1.20:61000".into(),
+                token: "a".repeat(64),
+            }),
         };
         write(&path, &settings).unwrap();
         assert_eq!(read(&path), settings);
+        // Files from before this setting use this PC's own server.
+        std::fs::write(&path, br#"{"first_run_done": true}"#).unwrap();
+        assert_eq!(read(&path).server, None);
         std::fs::write(&path, b"{ not json").unwrap();
         assert_eq!(read(&path), Settings::default());
         std::fs::remove_dir_all(dir).unwrap();

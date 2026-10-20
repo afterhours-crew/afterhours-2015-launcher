@@ -153,6 +153,17 @@ was refused, if it was), so nothing in the session depends on the window:
 Talking to its own server on `127.0.0.1` is not a network call: nothing
 leaves the PC.
 
+**Your server on another PC** (Settings → General → Your server). Start it
+there with `Afterhours.exe serve --server-only --api --listen <its address>
+--api-port <port>` and enter that address and the token its `api --json`
+prints; the launcher asks the server's API before saving them. From then on
+the window follows that server exactly as it follows its own: status,
+console, map markers, World and Profile come from its API and Stop stops it,
+but closing the launcher leaves it running. There is no command to fall back
+to for another PC, so an unreachable server says so. Starting a server and
+Play need this PC's server until `play --server` (afterhours-2015 #172)
+starts the game here against another PC; "Use this PC" switches back.
+
 Without `api`, older servers keep the earlier paths. With `events`, sessions
 run with `--events`: the server prints one JSON `event` record per line
 (`schemas/event.schema.json`) instead of console text, and `cli.rs` turns

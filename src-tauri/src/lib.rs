@@ -148,9 +148,10 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event
                 && let Some(state) = window.try_state::<AppState>()
             {
+                // Only this PC's own server is stopped on close.
                 let plan = connection::close_plan(
                     state.window_session(),
-                    state.endpoint().is_some(),
+                    state.endpoint().is_some_and(|e| e.is_local()),
                     state.closing.load(Ordering::SeqCst),
                 );
                 match plan {
@@ -172,6 +173,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             settings::get_settings,
             settings::save_settings,
+            settings::set_server,
             detect::detect_game_dirs,
             cli::run_check,
             cli::session_status,

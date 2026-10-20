@@ -26,7 +26,10 @@ is built against; its `event.schema.json` is identical to #160's.
 `version.schema.json` comes unchanged (formatted by Prettier) from
 `feature/api-settings-profile` (pull request #166, commit 5827de8, stacked on
 #164), whose `api` capability also names the settings and profile routes; every
-other schema there is identical to #164's. The pin bump to
+other schema there is identical to #164's. `api.schema.json` now comes
+unchanged (formatted by Prettier) from `feature/listen-address` (pull request
+#175, commit 5e3ffe0, stacked on #169 and #166): its `token` is kept across
+sessions. The pin bump to
 the release that carries them replaces them with the released files, which must
 be identical. Until then the pinned v0.4.1 reports none of `map-images`,
 `map-feed` and `api`, so the Map screen shows its note, sessions use `--events`,
