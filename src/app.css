@@ -194,6 +194,15 @@ a {
   white-space: nowrap;
 }
 
+/* Layout: every view centres its content in the window, so it stays in the
+   middle as the window is resized. Single-column views keep their narrower
+   columns; side-by-side views (a main panel with a side panel) and the
+   launch bar stay within this width. A view's scrolling area stays full
+   width, so the wheel works anywhere over it. */
+:root {
+  --page-wide: 1232px;
+}
+
 /* Motion: short, ease-out, no bounce (timing in src/lib/state/motion.ts).
    The reduced-motion rule above turns every transition and animation off. */
 :root {

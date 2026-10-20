@@ -19,7 +19,9 @@
 //! copies saves aside, [`updates`] serves the updater's checks, [`reads`]
 //! runs the read-only commands behind the profile and logs screens,
 //! [`images`] runs `car-images` and scopes the asset protocol to its
-//! folder, and [`detect`] guesses where the game is installed.
+//! folder, and [`detect`] guesses where the game is installed. The window's
+//! size, position and maximized state are remembered separately (see
+//! [`WINDOW_STATE_FILE`]).
 
 pub mod cli;
 pub mod data;
@@ -33,6 +35,15 @@ pub mod updates;
 
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
+use tauri_plugin_window_state::StateFlags;
+
+/// Where the window's size, position and maximized state are kept between
+/// runs, beside `settings.json` in the app's config directory. Not part of
+/// [`settings::Settings`]: the window saves those whole, from its own copy.
+/// The window starts hidden and is shown once restored, so it never jumps
+/// from the default size; a remembered position that is on no connected
+/// monitor any more is left to the system.
+pub const WINDOW_STATE_FILE: &str = "window.json";
 
 /// State shared by every command: settings and the running session, if any.
 pub struct AppState {
@@ -70,7 +81,18 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED)
+                .with_filename(WINDOW_STATE_FILE)
+                .build(),
+        )
         .setup(|app| {
+            // Created hidden and already restored by the window-state plugin.
+            if let Some(window) = app.get_webview_window("main") {
+                window.show()?;
+                window.set_focus()?;
+            }
             let settings = settings::load(app.handle())?;
             app.manage(AppState {
                 settings: Mutex::new(settings),
