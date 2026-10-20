@@ -179,6 +179,8 @@ the first release (track 6):
 - The window refuses to close while its session runs, because the v0.3.0
   server writes progress to pipes the window owns and would stop on a broken
   pipe. With a server that reports `api` (track 8), sessions run with
-  `--api` and closing stops the server, waits for it, then closes; this
-  has run against a server session, not with the game or an installed
-  launcher. With older servers the window still refuses to close.
+  `--api` and closing stops the server, waits for it, then closes. The
+  connection's follow-and-stop path ran end to end against a real
+  `serve --server-only --api` session (2026-10-20); closing the desktop
+  window has not been tried in the app, and nothing ran with the game.
+  With older servers the window still refuses to close.

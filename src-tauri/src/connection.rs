@@ -369,6 +369,15 @@ fn send(app: &AppHandle, event: WindowEvent) {
     };
 }
 
+/// Whether the last status the stream sent is a session's end.
+fn has_ended(last_status: &Option<String>) -> bool {
+    last_status
+        .as_deref()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok())
+        .and_then(|status| status["state"].as_str().map(str::to_owned))
+        .is_some_and(|state| matches!(state.as_str(), "finished" | "failed" | "interrupted"))
+}
+
 /// Whether a session's API still answers.
 fn answers(endpoint: &Endpoint) -> bool {
     endpoint
@@ -396,7 +405,7 @@ pub fn follow(app: &AppHandle, endpoint: Endpoint) {
                 read_stream(reader, &mut last_status, |event| send(&app, event));
             }
             // The stream ends with the session; one that broke is reopened.
-            if stop.load(Ordering::SeqCst) || !answers(&endpoint) {
+            if stop.load(Ordering::SeqCst) || has_ended(&last_status) || !answers(&endpoint) {
                 break;
             }
             std::thread::sleep(Duration::from_millis(500));
@@ -829,8 +838,30 @@ mod tests {
         eprintln!("states {states:?}, {} events", events.len());
         assert_eq!(states.first().map(String::as_str), Some("ready"));
         assert_eq!(states.last().map(String::as_str), Some("finished"));
-        assert!(!answers(&endpoint), "the API is gone with the session");
+        assert!(has_ended(&last), "the follower knows the session ended");
+        // The supervisor closes its listener as it exits, just after the stream.
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while answers(&endpoint) {
+            assert!(Instant::now() < deadline, "the API outlived its session");
+            std::thread::sleep(Duration::from_millis(100));
+        }
         assert_eq!(cli::api_endpoint(&settings).unwrap(), None);
+    }
+
+    #[test]
+    fn a_followed_session_ends_with_its_last_status() {
+        let mut last = None;
+        assert!(!has_ended(&last));
+        for (state, ended) in [
+            ("ready", false),
+            ("stopping", false),
+            ("finished", true),
+            ("failed", true),
+            ("interrupted", true),
+        ] {
+            window_events("status", &status_event(state, "m"), &mut last);
+            assert_eq!(has_ended(&last), ended, "{state}");
+        }
     }
 
     #[test]

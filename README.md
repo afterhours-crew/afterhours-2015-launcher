@@ -233,7 +233,11 @@ cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings &
 ```
 
 CI runs these on Linux and Windows, compiles the app, runs the contract check
-and builds the Windows installer as an unsigned artifact. See
+and builds the Windows installer as an unsigned artifact. One Rust test is
+ignored by default because it needs a running server session: it follows a
+real `--api` session and stops it through the API (see
+`a_real_session_is_followed_and_stopped_through_its_api` in
+`src-tauri/src/connection.rs` for how to run it). See
 [CONTRIBUTING.md](CONTRIBUTING.md), [RELEASING.md](RELEASING.md) and
 [AGENTS.md](AGENTS.md).
 

@@ -4,17 +4,20 @@
 
 //! The Rust side of the launcher window.
 //!
-//! The window never talks to the game or the server itself. Everything
-//! goes through `Afterhours.exe`, the single executable published by the
-//! afterhours-2015 repository and bundled here at the exact release pinned
-//! in `server-pin.json`: `check --json` for preflight, `status --json` for
-//! the current session, `stop --json` to end it, and `setup`, `serve` or
-//! `start` to run one. That keeps the safety logic (path rules, digests,
-//! process ownership, routing) in one place, and the session supervisor in
-//! its own process.
+//! The window never talks to the game itself. Everything goes through
+//! `Afterhours.exe`, the single executable published by the afterhours-2015
+//! repository and bundled here at the exact release pinned in
+//! `server-pin.json`: `check --json` for preflight, `status --json` for the
+//! current session, `stop --json` to end it, and `setup`, `serve` or `start`
+//! to run one. A server that reports `api` serves its session over HTTP on
+//! this PC, and the window follows and stops it there, as it would a server
+//! on another PC. That keeps the safety logic (path rules, digests, process
+//! ownership, routing) in one place, and the session supervisor in its own
+//! process.
 //!
 //! [`pin`] and [`server`] decide which executable runs, [`cli`] runs it and
-//! turns its output into events, [`settings`] stores the few things the
+//! turns its output into events, [`connection`] follows a session through
+//! its API and stops it when the window closes, [`settings`] stores the few things the
 //! window remembers, [`data`] reads the data directory's session records and
 //! copies saves aside, [`updates`] serves the updater's checks, [`reads`]
 //! runs the read-only commands behind the profile and logs screens,
