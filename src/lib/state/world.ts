@@ -9,7 +9,12 @@ import type { SettingsReport, Status } from "$lib/api/types";
 import { isLive } from "./launchbar";
 import { listSentence } from "./upcoming";
 
-/** The traffic scale: Off, then 1x to 5x. */
+/**
+ * The traffic scale: Off, then 1x to 5x, shown up to the server's maximum.
+ * Servers stop at 3x: at 5x the game itself crashed (a fixed client pool
+ * ran out, afterhours-crew/afterhours-2015#136), so 4x and 5x are not
+ * planned and not shown. A server that ever allows them shows them.
+ */
 export const MULTIPLIERS: readonly number[] = [0, 1, 2, 3, 4, 5];
 
 /** The most roaming rivals the launcher offers; the server accepts more. */
@@ -33,29 +38,20 @@ const label = (multiplier: number) =>
   multiplier === 0 ? "Off" : multiplier === 1 ? "Default" : `${multiplier}x`;
 
 /**
- * Traffic: Off is 0 %, Default is the game's own 100 % and Nx is N × 100 %.
- * Steps above the server's maximum
- * show as coming in a future update, and become pickable by themselves when
- * the server allows them. A saved amount off the scale ("150 %") is an
+ * Traffic: Off is 0 %, Default is the game's own 100 % and Nx is N × 100 %,
+ * up to the server's maximum. A saved amount off the scale ("150 %") is an
  * extra, selected choice until a step is picked.
  */
 export function trafficRow(report: SettingsReport): Row {
-  const options: Choice[] = MULTIPLIERS.map((m) => ({
-    value: String(m * 100),
-    label: label(m),
-    ...(m * 100 > report.max_traffic_percent ? { upcoming: true } : {}),
-  }));
+  const options: Choice[] = MULTIPLIERS.filter((m) => m * 100 <= report.max_traffic_percent).map(
+    (m) => ({ value: String(m * 100), label: label(m) }),
+  );
   const selected = String(report.traffic_percent);
-  if (!options.some((o) => o.value === selected && !o.upcoming)) {
+  if (!options.some((o) => o.value === selected)) {
     options.push({ value: `custom:${selected}`, label: `${report.traffic_percent} %` });
     return { options, selected: `custom:${selected}` };
   }
   return { options, selected };
-}
-
-/** Whether a traffic step is above what the server allows yet. */
-export function trafficUpcoming(report: SettingsReport): boolean {
-  return report.max_traffic_percent < MULTIPLIERS.at(-1)! * 100;
 }
 
 export interface RivalField {
@@ -149,7 +145,6 @@ export function worldUpcoming(
   if (!capabilityReported)
     return listSentence(["traffic settings", "roaming rival settings", "cops"]);
   const items: string[] = [];
-  if (!report || trafficUpcoming(report)) items.push("traffic up to 5x");
   if (!rivalsAboveOriginal(report)) items.push("more roaming rivals than the game's own");
   items.push("cops");
   return items.length > 1 ? listSentence(items) : null;

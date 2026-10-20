@@ -35,7 +35,7 @@ export const SAMPLE_SETTINGS: SettingsReport = {
   version: 1,
   traffic_percent: 100,
   rival_limit: null,
-  max_traffic_percent: 500,
+  max_traffic_percent: 300,
   max_rivals: 15,
   rivals_above_original: true,
   live: true,

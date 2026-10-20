@@ -9,7 +9,6 @@ import {
   rivalsAboveOriginal,
   saveArgs,
   trafficRow,
-  trafficUpcoming,
   worldLock,
   worldTiming,
   worldUpcoming,
@@ -29,10 +28,10 @@ const report = (patch: Partial<SettingsReport> = {}): SettingsReport => ({
   ...patch,
 });
 
-/** A record from a server with live changes, 5x traffic and up to 15 rivals (077b812). */
+/** A record from a server with live changes, 3x traffic and up to 15 rivals (8bf7b23). */
 const liveReport = (patch: Partial<SettingsReport> = {}): SettingsReport =>
   report({
-    max_traffic_percent: 500,
+    max_traffic_percent: 300,
     max_rivals: 15,
     rivals_above_original: true,
     live: true,
@@ -46,28 +45,28 @@ const older = (): SettingsReport => {
 };
 
 describe("traffic", () => {
-  it("shows Off to 5x, with the steps above the server's maximum coming later", () => {
+  it("shows Off, Default, 2x and 3x: the server's maximum, with nothing beyond it", () => {
     expect(trafficRow(report())).toEqual({
       options: [
         { value: "0", label: "Off" },
         { value: "100", label: "Default" },
         { value: "200", label: "2x" },
         { value: "300", label: "3x" },
-        { value: "400", label: "4x", upcoming: true },
-        { value: "500", label: "5x", upcoming: true },
       ],
       selected: "100",
     });
-    expect(trafficUpcoming(report())).toBe(true);
   });
 
-  it("makes 4x and 5x pickable by themselves when the server allows them", () => {
-    const row = trafficRow(report({ max_traffic_percent: 500 }));
-    expect(row.options.map((o) => o.label)).toEqual(["Off", "Default", "2x", "3x", "4x", "5x"]);
-    expect(row.options.some((o) => o.upcoming)).toBe(false);
-    expect(trafficUpcoming(report({ max_traffic_percent: 500 }))).toBe(false);
-    const partly = trafficRow(report({ max_traffic_percent: 450 }));
-    expect(partly.options.filter((o) => o.upcoming).map((o) => o.label)).toEqual(["5x"]);
+  it("shows more steps only if a server ever allows them", () => {
+    expect(trafficRow(report({ max_traffic_percent: 500 })).options.map((o) => o.label)).toEqual([
+      "Off",
+      "Default",
+      "2x",
+      "3x",
+      "4x",
+      "5x",
+    ]);
+    expect(trafficRow(report({ max_traffic_percent: 200 })).options).toHaveLength(3);
   });
 
   it("selects a saved step", () => {
@@ -79,7 +78,7 @@ describe("traffic", () => {
     const row = trafficRow(report({ traffic_percent: 150 }));
     expect(row.selected).toBe("custom:150");
     expect(row.options.at(-1)).toEqual({ value: "custom:150", label: "150 %" });
-    expect(row.options).toHaveLength(7);
+    expect(row.options).toHaveLength(5);
   });
 });
 
@@ -177,8 +176,13 @@ describe("what this server can do", () => {
     expect(rivalHelp(report())).toContain("coming in a future update");
   });
 
-  it("offers 5x and up to 15 rivals when the server allows them", () => {
-    expect(trafficRow(liveReport()).options.some((o) => o.upcoming)).toBe(false);
+  it("offers 3x and up to 15 rivals on the live server", () => {
+    expect(trafficRow(liveReport()).options.map((o) => o.label)).toEqual([
+      "Off",
+      "Default",
+      "2x",
+      "3x",
+    ]);
     expect(rivalField(liveReport())).toEqual({ value: null, max: 15 });
   });
 });
@@ -188,13 +192,9 @@ describe("the World view's coming note", () => {
     expect(worldUpcoming(false, null)).toBe("Traffic settings, roaming rival settings and cops.");
   });
 
-  it("lists what the settings cannot do yet", () => {
-    expect(worldUpcoming(true, report())).toBe(
-      "Traffic up to 5x, more roaming rivals than the game's own and cops.",
-    );
-    expect(worldUpcoming(true, report({ max_traffic_percent: 500 }))).toBe(
-      "More roaming rivals than the game's own and cops.",
-    );
+  it("lists what the settings cannot do yet, and never traffic above 3x", () => {
+    expect(worldUpcoming(true, report())).toBe("More roaming rivals than the game's own and cops.");
+    expect(worldUpcoming(true, null)).toBe("More roaming rivals than the game's own and cops.");
   });
 
   it("gives no note when only Cops is coming: its row already says so", () => {

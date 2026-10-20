@@ -56,7 +56,8 @@ and that build's `profile --json` on a real save validates against
 `profile.schema.json`.
 
 `settings.schema.json` comes from afterhours-2015 `feature/ai-amounts`
-077b812 (2026-10-19): up to 500 % traffic, up to 15 rivals, and two new
+8bf7b23 (afterhours-crew/afterhours-2015#136, 2026-10-20). It allows up to
+300 % traffic (more crashed the game) and up to 15 rivals, and has two new
 fields. `rivals_above_original` says a count above the game's own adds
 rivals. `live` says a running session applies a save within about a second.
 Earlier development builds such as 0bad8f6 print neither, so the app treats
