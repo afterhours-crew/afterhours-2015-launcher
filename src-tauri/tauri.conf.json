@@ -55,7 +55,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdDMzE3MjJFMEFCNTI3OTMKUldTVEo3VUtMbkl4ZkQ1ZHhpVllNTlVCQTIrYXdMeDZ0bW00ZUZ6VGk4ZUhLaU1xODhBU0wzN2kK",
       "endpoints": [
         "https://github.com/afterhours-crew/afterhours-2015-launcher/releases/latest/download/latest.json"
       ],

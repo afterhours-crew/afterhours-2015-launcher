@@ -13,6 +13,11 @@ is not Authenticode code signing, which was decided against for now
 (2026-10-19): the installer stays unsigned and SmartScreen may warn. The
 updater key is still mandatory.
 
+**Done on 2026-10-20:** minisign key ID `7C31722E0AB52793`. Its public key is
+in `tauri.conf.json`, pinned by a test in `src-tauri/src/updates.rs`, and the
+two repository secrets are set. The steps below are for replacing it, which
+strands every installed launcher.
+
 1. On a trusted machine, outside this repository:
 
    ```sh
@@ -38,6 +43,9 @@ updater key is still mandatory.
    gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/afterhours-launcher.key
    gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD
    ```
+
+   In PowerShell, which has no `<`, pipe the file instead:
+   `Get-Content -Raw "$env:USERPROFILE\.tauri\afterhours-launcher.key" | gh secret set TAURI_SIGNING_PRIVATE_KEY`.
 
 ### Workflow permissions
 

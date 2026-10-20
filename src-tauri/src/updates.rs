@@ -265,6 +265,17 @@ mod tests {
     }
 
     #[test]
+    fn the_updater_trusts_the_owners_key() {
+        // Installed launchers accept only updates signed with this key
+        // (minisign key ID 7C31722E0AB52793, created 2026-10-20). Changing
+        // it strands every installed launcher: see RELEASING.md.
+        assert_eq!(
+            config()["plugins"]["updater"]["pubkey"],
+            "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdDMzE3MjJFMEFCNTI3OTMKUldTVEo3VUtMbkl4ZkQ1ZHhpVllNTlVCQTIrYXdMeDZ0bW00ZUZ6VGk4ZUhLaU1xODhBU0wzN2kK"
+        );
+    }
+
+    #[test]
     fn the_updater_configuration_is_what_the_plugin_accepts() {
         let updater = config()["plugins"]["updater"].clone();
         // The plugin's own deserializer, as it runs when the app starts.
