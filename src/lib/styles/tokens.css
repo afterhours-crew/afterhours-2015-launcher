@@ -6,6 +6,8 @@
   --shade-dim: rgba(14,12,17,0.62);
   --hover: rgba(255,255,255,0.10);
   --row-hover: rgba(255,255,255,0.05);
+  --window-close: #C42B1C;
+  --window-close-press: #A8261A;
   --selected: var(--graphite-raised);
   --selected-edge: var(--graphite-ring);
   --field: var(--graphite-raised);
