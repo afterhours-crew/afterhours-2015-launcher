@@ -102,10 +102,13 @@
     min-height: 0;
     overflow: auto;
     align-items: flex-start;
+    justify-content: center;
   }
   .floor {
     flex: 999 1 480px;
     min-width: 0;
+    /* With the side panel, no wider than the shared page width. */
+    max-width: calc(var(--page-wide) - 360px - var(--space-5));
     align-self: stretch;
     display: flex;
     flex-direction: column;

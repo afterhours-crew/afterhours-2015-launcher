@@ -29,6 +29,11 @@
 
 <style>
   footer {
+    /* Within the Garage's centred width, so its two ends stay near the middle. */
+    box-sizing: border-box;
+    width: 100%;
+    max-width: calc(var(--page-wide) + 2 * var(--space-6));
+    margin-inline: auto;
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;

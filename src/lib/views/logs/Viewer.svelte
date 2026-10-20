@@ -246,6 +246,9 @@
 
 <style>
   .viewer {
+    width: 100%;
+    max-width: var(--page-wide);
+    margin-inline: auto;
     flex: 1 1 auto;
     min-height: 0;
     display: flex;

@@ -200,8 +200,12 @@
 
 <style>
   .layout {
+    width: 100%;
+    max-width: var(--page-wide);
+    margin-inline: auto;
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     gap: var(--space-5);
     align-items: flex-start;
   }
