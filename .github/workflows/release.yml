@@ -75,9 +75,13 @@ jobs:
           releaseBody: |
             Afterhours Launcher __VERSION__ for Windows, bundling the Afterhours server ${{ steps.pin.outputs.tag }}.
 
+            Two downloads, the same launcher: the `-setup.exe` installs it and keeps it up to date; the `-portable.zip` runs without installing but only tells you about updates.
+
             Install: download the `-setup.exe` below and run it as your normal user. It installs for you only and needs no administrator rights. The installer is not code-signed yet, so Windows SmartScreen may warn; choose More info, then Run anyway.
 
             Without installing: download the `-portable.zip`, extract it anywhere (the game folder works) and run `Afterhours Launcher.exe`. That copy tells you about updates and opens their download page, but does not install them.
+
+            The `.sig` and `latest.json` files are for the launcher's updater; you don't need to download them.
 
             Installed launchers update from Settings › Updates. An update never installs while a session runs, and your saves are copied to the data folder's `backups` before an update that changes the server.
           releaseDraft: true
