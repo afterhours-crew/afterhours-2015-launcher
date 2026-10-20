@@ -1,20 +1,45 @@
+<script lang="ts" module>
+  import { ALL_LAYERS, type MapLayers } from "$lib/state/mapfeed";
+
+  // Which layers show, kept while the window is open.
+  const layers = $state<MapLayers>({ ...ALL_LAYERS });
+</script>
+
 <script lang="ts">
   import { untrack } from "svelte";
+  import EmptyLine from "$lib/components/EmptyLine.svelte";
   import { staggerIn } from "$lib/motion";
   import Glass from "$lib/components/Glass.svelte";
   import MapCanvas from "$lib/components/MapCanvas.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
+  import Toggle from "$lib/components/Toggle.svelte";
   import ViewNote from "$lib/components/ViewNote.svelte";
   import { featureReady } from "$lib/state/capabilities";
+  import { isLive } from "$lib/state/launchbar";
+  import { feedMarkers, feedRings, layerCounts, shownMarkers } from "$lib/state/mapfeed";
   import { current, records } from "$lib/state/records.svelte";
   import { router } from "$lib/state/router.svelte";
   import { session } from "$lib/state/session.svelte";
 
   // Map (track 7): the game's own world map, decoded from the player's
   // installation by the server's `map-images` the first time the view opens.
-  // Live positions of you, traffic and rivals need the server's position
-  // feed, which is still to come; until then the layers list says so.
+  // A server with `map-feed` also reports where you, traffic and rivals are,
+  // in the session's event stream; the newest frame becomes the markers and
+  // the Layers switches pick what shows. Without it the layers list says the
+  // live positions are coming.
   let ready = $derived(featureReady(session.info?.server, "map"));
+  let live = $derived(featureReady(session.info?.server, "live-map"));
+  let identity = $derived.by(() => {
+    const driver = current(records.profile)?.identity;
+    return driver?.display_name
+      ? { persona_id: driver.persona_id, display_name: driver.display_name }
+      : null;
+  });
+  let markers = $derived(live ? feedMarkers(session.mapFeed, identity) : []);
+  let counts = $derived(layerCounts(markers));
+  let shown = $derived(shownMarkers(markers, layers));
+  let rings = $derived(live && layers.ring ? feedRings(session.mapFeed) : []);
+  let playing = $derived(isLive(session.status?.state));
   let map = $derived(current(records.map));
   let load = $derived(records.map);
   let noContent = $derived(load.kind === "error" && load.exit === 4);
@@ -27,11 +52,16 @@
   });
 
   const LAYERS = [
-    { name: "You", hint: "Where you are and which way you face" },
-    { name: "Traffic", hint: "Every traffic car around you" },
-    { name: "Rivals", hint: "Roaming rivals" },
-    { name: "Spawn ring", hint: "Where traffic appears and clears" },
-  ];
+    { key: "you", kind: "you", name: "You", hint: "Where you are and which way you face" },
+    { key: "traffic", kind: "traffic", name: "Traffic", hint: "Every traffic car around you" },
+    { key: "rivals", kind: "rival", name: "Rivals", hint: "Roaming rivals" },
+    {
+      key: "ring",
+      kind: null,
+      name: "Spawn ring",
+      hint: "Where traffic appears and clears, roughly",
+    },
+  ] as const;
 </script>
 
 {#if !ready}
@@ -57,7 +87,7 @@
       <div class="panel" data-enter>
         <Glass label="Map of Ventura Bay" class="map-panel">
           {#if map}
-            <MapCanvas report={map} />
+            <MapCanvas report={map} markers={shown} {rings} />
           {:else if load.kind === "error"}
             <div class="state">
               {#if noContent}
@@ -90,16 +120,35 @@
         <Glass radius="phone" label="Map layers" class="side">
           <h2 class="t-panel-title">Layers</h2>
           <div class="rows">
-            {#each LAYERS as layer (layer.name)}
+            {#each LAYERS as layer (layer.key)}
               <div class="list-row">
+                {#if live}
+                  <span class="key {layer.key}" aria-hidden="true"></span>
+                {/if}
                 <span class="grow">
-                  <span class="name">{layer.name}</span>
+                  <span class="name" id="layer-{layer.key}">{layer.name}</span>
                   <span class="t-caption">{layer.hint}</span>
                 </span>
+                {#if live}
+                  {#if layer.kind}
+                    <span class="t-num count" aria-label="{counts[layer.kind]} on the map"
+                      >{counts[layer.kind]}</span
+                    >
+                  {/if}
+                  <Toggle bind:checked={layers[layer.key]} labelledby="layer-{layer.key}" />
+                {/if}
               </div>
             {/each}
           </div>
-          <ViewNote>Live positions of you, traffic and rivals.</ViewNote>
+          {#if !live}
+            <ViewNote>Live positions of you, traffic and rivals.</ViewNote>
+          {:else if markers.length === 0}
+            <EmptyLine>
+              {playing
+                ? "Cars show here once you drive out of the garage."
+                : "Cars show here while you play on your server."}
+            </EmptyLine>
+          {/if}
           {#if map}
             <p class="t-caption about">
               The game's own map{#if across}, {across} km across{/if}, read from your installation.
@@ -211,6 +260,28 @@
   }
   .name {
     font-weight: 600;
+  }
+  /* Each layer's key matches its marker on the map. */
+  .key {
+    flex: 0 0 auto;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--ink-soft);
+  }
+  .key.you {
+    background: var(--crew);
+  }
+  .key.rivals {
+    background: var(--speed);
+  }
+  .key.ring {
+    background: transparent;
+    border: 1.5px dashed var(--ink-soft);
+  }
+  .count {
+    min-width: 2ch;
+    text-align: right;
   }
   .about {
     margin: 0;

@@ -36,7 +36,9 @@ export const api = {
   detectGameDirs: () => invoke<string[]>("detect_game_dirs"),
   runCheck: () => invoke<CliResult>("run_check"),
   sessionStatus: () => invoke<CliResult>("session_status"),
-  startSession: (action: SessionAction) => invoke<void>("start_session", { action }),
+  /** Start a session; `events` asks for the JSON event stream (capability `events`). */
+  startSession: (action: SessionAction, events: boolean) =>
+    invoke<void>("start_session", { action, events }),
   stopSession: () => invoke<CliResult>("stop_session"),
   /** `play --json`: start the game in the running `serve` session. */
   playGame: () => invoke<CliResult>("play_game"),
@@ -93,6 +95,8 @@ export type Unlisten = () => void;
 export async function onSessionEvents(handlers: {
   output: (line: OutputLine) => void;
   status: (result: CliResult) => void;
+  /** A `map-feed` record of the session's event stream, unchecked. */
+  mapFeed: (event: unknown) => void;
   exit: (info: { action: SessionAction; code: number | null }) => void;
   closeBlocked: () => void;
 }): Promise<Unlisten> {
@@ -101,6 +105,7 @@ export async function onSessionEvents(handlers: {
   const stops = await Promise.all([
     listen<OutputLine>("session-output", (e) => handlers.output(e.payload)),
     listen<CliResult>("session-status", (e) => handlers.status(e.payload)),
+    listen<unknown>("map-feed", (e) => handlers.mapFeed(e.payload)),
     listen<{ action: SessionAction; code: number | null }>("session-exit", (e) =>
       handlers.exit(e.payload),
     ),

@@ -12,12 +12,14 @@
     panBy,
     pickLevel,
     placeMarkers,
+    placeRings,
     scaleBar,
     scaleRange,
     tilePath,
     visibleTiles,
     zoomAt,
     type MapMarker,
+    type MapRing,
     type MapView,
     type PlacedTile,
     type Point,
@@ -26,14 +28,17 @@
   // The game's world map from `map-images`, tiled: drag to pan, the wheel
   // or a double click to zoom, keys too (+, -, arrows, 0 to show the whole
   // map). Underneath, the coarsest level covers the view while the finer
-  // tiles for the current zoom load on top. Markers are placed through the
-  // world box the server reported; without it none are drawn.
+  // tiles for the current zoom load on top. Markers and rings are placed
+  // through the world box the server reported; without it none are drawn.
   let {
     report,
     markers = [],
+    rings = [],
   }: {
     report: MapImagesReport;
     markers?: readonly MapMarker[];
+    /** Spawn rings around drivers, drawn under the markers and labelled approximate. */
+    rings?: readonly MapRing[];
   } = $props();
 
   let width = $state(0);
@@ -55,6 +60,7 @@
     ready && level && level.level !== base?.level ? visibleTiles(level, shown, viewport) : [],
   );
   let placed = $derived(ready ? placeMarkers(markers, report.world, shown, viewport) : []);
+  let circles = $derived(ready ? placeRings(rings, report.world, shown, viewport) : []);
   let bar = $derived(report.world && ready ? scaleBar(report.world, shown.scale, 140) : null);
   let fitted = $derived(shown.scale <= range[0] + 0.5);
 
@@ -163,6 +169,23 @@
     {/each}
   {/each}
 
+  {#each circles as ring (ring.id)}
+    {@const size = ring.outer * 2}
+    {@const inner = (ring.inner / ring.outer) * 100}
+    <span
+      class="ring"
+      style="left: {ring.left}px; top: {ring.top}px; width: {size}px; height: {size}px; --inner: {inner}%"
+      aria-hidden="true"
+    ></span>
+    {#if ring.outer >= 56}
+      <span
+        class="ring-label t-data-small ah-on-art"
+        style="left: {ring.left}px; top: {ring.top - ring.outer}px"
+        aria-hidden="true">Spawn ring (approximate)</span
+      >
+    {/if}
+  {/each}
+
   {#each placed as marker (marker.id)}
     <span
       class="marker {marker.kind}"
@@ -259,6 +282,29 @@
   }
   .marker.rival {
     background: var(--speed);
+  }
+  /* Where traffic appears (beyond the inner radius) and clears (past the
+     outer one): a band between the two, its outer edge dashed. */
+  .ring {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 1.5px dashed rgba(190, 191, 197, 0.55);
+    background: radial-gradient(
+      circle closest-side,
+      transparent var(--inner),
+      rgba(190, 191, 197, 0.1) var(--inner),
+      rgba(190, 191, 197, 0.1) 100%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+  .ring-label {
+    position: absolute;
+    transform: translate(-50%, calc(-100% - 4px));
+    white-space: nowrap;
+    color: var(--ink-soft);
+    pointer-events: none;
   }
   .heading {
     position: absolute;

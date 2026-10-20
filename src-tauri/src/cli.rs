@@ -13,6 +13,13 @@
 //! front-end command, which runs the supervisor as a separate process, so
 //! the process tree is exactly what a terminal user gets.
 //!
+//! When the server reports the `events` capability the window asks for
+//! `--events`: stdout is then a stream of JSON `event` records instead of
+//! human lines. `status`, `diagnostic`, `session` and `final` records become
+//! the same `session-output` lines the human stream gave, and `map-feed`
+//! records (where the cars are) are forwarded whole as `map-feed` events.
+//! Servers without `events` keep the human-line path.
+//!
 //! Every child runs without a console window of its own (`CREATE_NO_WINDOW`
 //! on Windows): its output is piped here.
 
@@ -37,6 +44,10 @@ pub const CHECK_TIMEOUT: Duration = Duration::from_secs(120);
 
 /// Most output kept from one short command, per stream.
 const MAX_SHORT_OUTPUT: usize = 1024 * 1024;
+
+/// Longest session output line passed on. The server bounds a map frame to
+/// 1 MiB; a longer line is left out whole and a note stands in for it.
+const MAX_SESSION_LINE: usize = 2 * 1024 * 1024;
 
 /// Result of a short command: either its JSON object or a refusal.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,6 +92,165 @@ pub fn parse_line(line: &str) -> OutputLine {
     }
 }
 
+/// What one stdout line of a session becomes for the window.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Forward {
+    /// A `session-output` console line.
+    Output(OutputLine),
+    /// A `map-feed` record, forwarded whole as a `map-feed` event.
+    MapFeed(serde_json::Value),
+    /// Nothing to show: a successful `final`, or an event kind this
+    /// launcher does not read (readers ignore what they do not know).
+    Skip,
+}
+
+/// `HH:MM:SS` from a record's UTC time (`YYYY-MM-DDTHH:MM:SSZ`, or the old
+/// launcher's longer ISO 8601 form): the human stream's line prefix.
+fn clock_of(utc: Option<&str>) -> Option<String> {
+    let time = utc?.split_once('T')?.1.get(..8)?;
+    let bytes = time.as_bytes();
+    let shape = bytes.iter().enumerate().all(|(i, b)| {
+        if i == 2 || i == 5 {
+            *b == b':'
+        } else {
+            b.is_ascii_digit()
+        }
+    });
+    shape.then(|| time.to_owned())
+}
+
+/// Read one line of an `--events` stream (`schemas/event.schema.json`).
+/// `status`, `diagnostic`, `session` and a failed `final` become the
+/// console lines the human stream printed; a line that is not an event
+/// record is shown as text rather than lost.
+pub fn parse_event(line: &str) -> Forward {
+    let trimmed = line.trim_end();
+    let value: serde_json::Value = match serde_json::from_str(trimmed) {
+        Ok(value @ serde_json::Value::Object(_)) => value,
+        _ if trimmed.is_empty() => return Forward::Skip,
+        _ => {
+            return Forward::Output(OutputLine::Text {
+                text: trimmed.to_owned(),
+            });
+        }
+    };
+    let text = |key: &str| value.get(key).and_then(serde_json::Value::as_str);
+    match text("event") {
+        Some("map-feed") => Forward::MapFeed(value),
+        Some("status") => {
+            let status = &value["status"];
+            let field = |key: &str| status.get(key).and_then(serde_json::Value::as_str);
+            let (Some(state), Some(message)) = (field("state"), field("message")) else {
+                return Forward::Skip;
+            };
+            match clock_of(field("utc")).or_else(|| clock_of(text("utc"))) {
+                Some(time) => Forward::Output(OutputLine::Status {
+                    time,
+                    state: state.to_owned(),
+                    message: message.to_owned(),
+                }),
+                None => Forward::Output(OutputLine::Text {
+                    text: format!("{state} : {message}"),
+                }),
+            }
+        }
+        Some("diagnostic") => match text("text") {
+            Some(line) => Forward::Output(OutputLine::Text {
+                text: line.to_owned(),
+            }),
+            None => Forward::Skip,
+        },
+        Some("session") => match text("session_directory") {
+            Some(dir) => Forward::Output(OutputLine::Text {
+                text: format!("Session logs: {dir}"),
+            }),
+            None => Forward::Skip,
+        },
+        // The refusal the human stream printed on stderr.
+        Some("final") => match text("message") {
+            Some(message) => Forward::Output(OutputLine::Text {
+                text: message.to_owned(),
+            }),
+            None => Forward::Skip,
+        },
+        _ => Forward::Skip,
+    }
+}
+
+/// Call `each` for every line of `reader`, without its line ending. A line
+/// longer than `max` bytes is skipped whole and reported as `None`; the
+/// rest of the stream goes on.
+pub fn read_lines(reader: impl Read, max: usize, mut each: impl FnMut(Option<String>)) {
+    let mut reader = BufReader::new(reader);
+    let mut line = Vec::new();
+    let mut overlong = false;
+    loop {
+        let (used, ended) = match reader.fill_buf() {
+            Ok([]) => {
+                if overlong {
+                    each(None);
+                } else if !line.is_empty() {
+                    each(Some(text_of(&line)));
+                }
+                return;
+            }
+            Ok(buffer) => {
+                let end = buffer.iter().position(|b| *b == b'\n');
+                let chunk = &buffer[..end.unwrap_or(buffer.len())];
+                if !overlong && line.len() + chunk.len() > max {
+                    overlong = true;
+                    line = Vec::new();
+                } else if !overlong {
+                    line.extend_from_slice(chunk);
+                }
+                (chunk.len() + usize::from(end.is_some()), end.is_some())
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => return,
+        };
+        reader.consume(used);
+        if ended {
+            each((!overlong).then(|| text_of(&line)));
+            line.clear();
+            overlong = false;
+        }
+    }
+}
+
+fn text_of(line: &[u8]) -> String {
+    let text = String::from_utf8_lossy(line);
+    text.strip_suffix('\r').unwrap_or(&text).to_owned()
+}
+
+/// What stands in for a line longer than `MAX_SESSION_LINE`.
+fn left_out() -> OutputLine {
+    OutputLine::Text {
+        text: format!(
+            "A line of more than {} MiB was left out.",
+            MAX_SESSION_LINE / (1024 * 1024)
+        ),
+    }
+}
+
+/// Read a session's stdout: event records with `--events`, human lines
+/// without.
+pub fn pump_stdout(reader: impl Read, events: bool, mut forward: impl FnMut(Forward)) {
+    read_lines(reader, MAX_SESSION_LINE, |line| {
+        forward(match line {
+            None => Forward::Output(left_out()),
+            Some(line) if events => parse_event(&line),
+            Some(line) => Forward::Output(parse_line(&line)),
+        });
+    });
+}
+
+/// Read a session's stderr: every line is text, in either mode.
+pub fn pump_stderr(reader: impl Read, mut forward: impl FnMut(OutputLine)) {
+    read_lines(reader, MAX_SESSION_LINE, |line| {
+        forward(line.map_or_else(left_out, |text| OutputLine::Text { text }));
+    });
+}
+
 /// Global arguments every JSON invocation shares.
 pub fn global_args(settings: &Settings) -> Vec<String> {
     let mut args = vec!["--json".to_owned()];
@@ -115,6 +285,19 @@ pub fn session_args(settings: &Settings, action: &str) -> Result<Vec<String>, St
     {
         args.push("--player-name".into());
         args.push(name.trim().to_owned());
+    }
+    Ok(args)
+}
+
+/// Arguments for starting a session. Session commands print human lines,
+/// or with `events` (servers reporting the `events` capability) one JSON
+/// event record per line. `--json` only changes the final record, so it is
+/// left off and status is polled separately.
+pub fn start_args(settings: &Settings, action: &str, events: bool) -> Result<Vec<String>, String> {
+    let mut args = data_dir_args(settings);
+    args.extend(session_args(settings, action)?);
+    if events {
+        args.push("--events".into());
     }
     Ok(args)
 }
@@ -336,11 +519,14 @@ pub async fn world_settings(
 }
 
 /// Start `setup`, `serve` or `start` and stream its output as events.
+/// `events` asks for the JSON event stream; the window passes it when
+/// `version --json` lists the `events` capability.
 #[tauri::command]
 pub fn start_session(
     app: AppHandle,
     state: State<'_, crate::AppState>,
     action: String,
+    events: bool,
 ) -> Result<(), String> {
     if !["setup", "serve", "start"].contains(&action.as_str()) {
         return Err(format!("Unknown action {action}."));
@@ -353,10 +539,7 @@ pub fn start_session(
     {
         return Err("A session is already running.".into());
     }
-    // Session commands print human lines; `--json` only changes the final
-    // record, so it is left off here and status is polled separately.
-    let mut args = data_dir_args(&settings);
-    args.extend(session_args(&settings, &action)?);
+    let args = start_args(&settings, &action, events)?;
     let mut child = command(&server.path)
         .args(&args)
         .stdout(Stdio::piped())
@@ -365,20 +548,24 @@ pub fn start_session(
         .map_err(|e| format!("Could not start the server: {e}"))?;
     let stdout = child.stdout.take().ok_or("no stdout")?;
     let stderr = child.stderr.take().ok_or("no stderr")?;
-    for (reader, is_err) in [
-        (Box::new(stdout) as Box<dyn std::io::Read + Send>, false),
-        (Box::new(stderr), true),
-    ] {
+    {
         let app = app.clone();
         std::thread::spawn(move || {
-            for line in BufReader::new(reader).lines().map_while(Result::ok) {
-                let parsed = if is_err {
-                    OutputLine::Text { text: line }
-                } else {
-                    parse_line(&line)
+            pump_stdout(stdout, events, |forward| {
+                let _ = match forward {
+                    Forward::Output(line) => app.emit("session-output", &line),
+                    Forward::MapFeed(record) => app.emit("map-feed", &record),
+                    Forward::Skip => Ok(()),
                 };
-                let _ = app.emit("session-output", &parsed);
-            }
+            });
+        });
+    }
+    {
+        let app = app.clone();
+        std::thread::spawn(move || {
+            pump_stderr(stderr, |line| {
+                let _ = app.emit("session-output", &line);
+            });
         });
     }
     let stop_polling = Arc::new(AtomicBool::new(false));
@@ -496,6 +683,172 @@ mod tests {
         );
     }
 
+    fn text(text: &str) -> Forward {
+        Forward::Output(OutputLine::Text { text: text.into() })
+    }
+
+    #[test]
+    fn event_records_become_the_lines_the_human_stream_printed() {
+        let status = r#"{"version":1,"utc":"2026-10-20T15:52:14Z","event":"status","status":{"version":1,"id":"0123456789abcdef0123456789abcdef","action":"serve","game_running":false,"utc":"2026-10-20T15:52:13Z","state":"ready","message":"Server listening.","worker_pid":1,"game_pid":null,"server_pid":2}}"#;
+        assert_eq!(
+            parse_event(status),
+            Forward::Output(OutputLine::Status {
+                time: "15:52:13".into(),
+                state: "ready".into(),
+                message: "Server listening.".into(),
+            })
+        );
+        assert_eq!(
+            parse_event(
+                r#"{"version":1,"utc":"x","event":"diagnostic","source":"server","text":"2026-10-20T15:52:13.120Z  INFO listening"}"#
+            ),
+            text("2026-10-20T15:52:13.120Z  INFO listening")
+        );
+        assert_eq!(
+            parse_event(
+                r#"{"version":1,"utc":"x","event":"session","id":"0123456789abcdef0123456789abcdef","action":"serve","data_directory":"D:\\A","session_directory":"D:\\A\\artifacts\\launcher\\0123"}"#
+            ),
+            text("Session logs: D:\\A\\artifacts\\launcher\\0123")
+        );
+        assert_eq!(
+            parse_event(
+                r#"{"version":1,"utc":"2026-10-20T15:52:13Z","event":"final","exit_code":1,"message":"Installed file missing: NFS16.exe. Pass the directory containing NFS16.exe.","status":null}"#
+            ),
+            text("Installed file missing: NFS16.exe. Pass the directory containing NFS16.exe.")
+        );
+        assert_eq!(
+            parse_event(
+                r#"{"version":1,"utc":"x","event":"final","exit_code":0,"message":null,"status":null}"#
+            ),
+            Forward::Skip
+        );
+    }
+
+    #[test]
+    fn map_feed_records_are_forwarded_whole_and_unknown_events_skipped() {
+        let feed = r#"{"version":1,"utc":"2026-10-20T15:52:13Z","event":"map-feed","frame":42,"skipped":0,"worlds":[{"connection":1,"persona_id":"1000000007","world_ms":81250,"drivers":[{"participant":1,"x":-1234.57,"y":12.35,"z":6543.21,"heading":90.5,"speed":12.35}],"traffic":[],"rivals":[],"traffic_ring":null,"omitted":0}]}"#;
+        match parse_event(feed) {
+            Forward::MapFeed(value) => {
+                assert_eq!(value["frame"], 42);
+                assert_eq!(value["worlds"][0]["drivers"][0]["heading"], 90.5);
+            }
+            other => panic!("{other:?}"),
+        }
+        // A newer server's event kind, and records this launcher cannot read.
+        assert_eq!(
+            parse_event(r#"{"version":1,"utc":"x","event":"lap","time":3}"#),
+            Forward::Skip
+        );
+        assert_eq!(
+            parse_event(r#"{"version":1,"event":"status","status":{"state":"ready"}}"#),
+            Forward::Skip
+        );
+        assert_eq!(parse_event("   \r\n"), Forward::Skip);
+        // Anything that is not an event record is shown, not lost.
+        assert_eq!(parse_event("thread panicked\r\n"), text("thread panicked"));
+        assert_eq!(parse_event("[1,2]"), text("[1,2]"));
+    }
+
+    #[test]
+    fn a_status_without_a_readable_time_is_still_shown() {
+        assert_eq!(
+            clock_of(Some("2026-10-13T20:31:02.1234567+02:00")),
+            Some("20:31:02".into())
+        );
+        assert_eq!(clock_of(Some("2026-10-13T2a:31:02Z")), None);
+        assert_eq!(clock_of(Some("20:31:02")), None);
+        assert_eq!(clock_of(Some("2026-10-13T20:31")), None);
+        assert_eq!(clock_of(None), None);
+        let odd = r#"{"version":1,"utc":"later","event":"status","status":{"utc":"soon","state":"failed","message":"Server exited."}}"#;
+        assert_eq!(parse_event(odd), text("failed : Server exited."));
+        let fallback = r#"{"version":1,"utc":"2026-10-20T01:02:03Z","event":"status","status":{"utc":"soon","state":"ready","message":"m"}}"#;
+        assert!(
+            matches!(parse_event(fallback), Forward::Output(OutputLine::Status { time, .. }) if time == "01:02:03")
+        );
+    }
+
+    #[test]
+    fn lines_are_read_whole_and_overlong_ones_left_out() {
+        let read = |input: &[u8], max: usize| {
+            let mut lines = Vec::new();
+            read_lines(input, max, |line| lines.push(line));
+            lines
+        };
+        assert_eq!(
+            read(b"one\r\ntwo\n\nlast", 100),
+            [
+                Some("one".into()),
+                Some("two".into()),
+                Some(String::new()),
+                Some("last".into())
+            ]
+        );
+        assert_eq!(read(b"", 100), Vec::<Option<String>>::new());
+        // Lines longer than the reader's own buffer still arrive whole.
+        let long = "x".repeat(20_000);
+        let input = format!("{long}\nshort\n{long}\nend\n");
+        let kept = read(input.as_bytes(), 30_000);
+        assert_eq!(kept[0].as_deref().map(str::len), Some(20_000));
+        assert_eq!(kept.len(), 4);
+        assert_eq!(
+            read(input.as_bytes(), 10_000),
+            [None, Some("short".into()), None, Some("end".into())]
+        );
+        assert_eq!(read(b"abcdef", 3), [None]);
+        assert_eq!(read(b"abc\n", 3), [Some("abc".into())]);
+    }
+
+    #[test]
+    fn stdout_is_read_as_events_only_in_event_mode() {
+        let input = b"[20:31:02] ready : Server listening.\n{\"version\":1,\"utc\":\"2026-10-20T15:52:13Z\",\"event\":\"map-feed\",\"frame\":1,\"skipped\":0,\"worlds\":[]}\n";
+        let mut human = Vec::new();
+        pump_stdout(&input[..], false, |f| human.push(f));
+        assert!(
+            matches!(&human[0], Forward::Output(OutputLine::Status { state, .. }) if state == "ready")
+        );
+        assert!(matches!(
+            &human[1],
+            Forward::Output(OutputLine::Text { .. })
+        ));
+        let mut events = Vec::new();
+        pump_stdout(&input[..], true, |f| events.push(f));
+        assert_eq!(events[0], text("[20:31:02] ready : Server listening."));
+        assert!(
+            matches!(&events[1], Forward::MapFeed(value) if value["worlds"] == serde_json::json!([]))
+        );
+        let mut stderr = Vec::new();
+        pump_stderr(&b"{\"event\":\"status\"}\n"[..], |l| stderr.push(l));
+        assert_eq!(
+            stderr,
+            [OutputLine::Text {
+                text: "{\"event\":\"status\"}".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn sessions_ask_for_events_only_when_told_to() {
+        let settings = Settings {
+            game_dir: Some(PathBuf::from("/g")),
+            data_dir: Some(PathBuf::from("/d")),
+            ..Settings::default()
+        };
+        assert_eq!(
+            start_args(&settings, "serve", true).unwrap(),
+            ["--data-dir", "/d", "serve", "--game-dir", "/g", "--events"]
+        );
+        assert_eq!(
+            start_args(&settings, "start", false).unwrap(),
+            ["--data-dir", "/d", "start", "--game-dir", "/g"]
+        );
+        assert!(
+            !start_args(&settings, "setup", true)
+                .unwrap()
+                .contains(&"--json".to_owned())
+        );
+        assert!(start_args(&Settings::default(), "serve", true).is_err());
+    }
+
     #[test]
     fn arguments_follow_the_bundled_cli_contract() {
         let settings = Settings {
@@ -538,6 +891,63 @@ mod tests {
     fn long_output_is_cut_at_the_bound() {
         let long = vec![b'x'; MAX_SHORT_OUTPUT + 10];
         assert_eq!(read_bounded(&long[..]).len(), MAX_SHORT_OUTPUT);
+    }
+
+    /// A stand-in server's event stream read through a real pipe.
+    fn pump_fake(fake: &Path, args: &[&str]) -> Vec<Forward> {
+        let mut child = command(fake)
+            .args(args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let mut forwarded = Vec::new();
+        pump_stdout(child.stdout.take().unwrap(), true, |f| forwarded.push(f));
+        child.wait().unwrap();
+        forwarded
+    }
+
+    const FAKE_STATUS: &str = r#"{"version":1,"utc":"2026-10-20T15:52:13Z","event":"status","status":{"state":"ready","message":"Server listening.","utc":"2026-10-20T15:52:13Z"}}"#;
+    const FAKE_FEED: &str = r#"{"version":1,"utc":"2026-10-20T15:52:14Z","event":"map-feed","frame":7,"skipped":2,"worlds":[]}"#;
+    const FAKE_FINAL: &str = r#"{"version":1,"utc":"2026-10-20T15:52:15Z","event":"final","exit_code":0,"message":null,"status":null}"#;
+
+    fn assert_fake_stream(forwarded: &[Forward]) {
+        assert_eq!(forwarded.len(), 3, "{forwarded:?}");
+        assert!(
+            matches!(&forwarded[0], Forward::Output(OutputLine::Status { time, state, .. }) if time == "15:52:13" && state == "ready")
+        );
+        assert!(matches!(&forwarded[1], Forward::MapFeed(value) if value["skipped"] == 2));
+        assert_eq!(forwarded[2], Forward::Skip);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_session_event_stream_is_read_through_its_pipe() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir =
+            std::env::temp_dir().join(format!("afterhours-gui-events-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let fake = dir.join("Afterhours");
+        let script =
+            format!("#!/bin/sh\nprintf '%s\\n' '{FAKE_STATUS}' '{FAKE_FEED}' '{FAKE_FINAL}'\n");
+        std::fs::write(&fake, script).unwrap();
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert_fake_stream(&pump_fake(&fake, &["serve", "--events"]));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_session_event_stream_is_read_through_its_pipe() {
+        let dir =
+            std::env::temp_dir().join(format!("afterhours-gui-events-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let fake = dir.join("fake-events.cmd");
+        let script =
+            format!("@echo off\r\necho {FAKE_STATUS}\r\necho {FAKE_FEED}\r\necho {FAKE_FINAL}\r\n");
+        std::fs::write(&fake, script).unwrap();
+        assert_fake_stream(&pump_fake(&fake, &["serve", "--events"]));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[cfg(unix)]

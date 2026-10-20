@@ -27,10 +27,11 @@ describe("features", () => {
     expect(ready(null)).toEqual([]);
   });
 
-  it("open Profile, Cars, Save data, car pictures, Logs, World and Map on the sample server", () => {
+  it("open Profile, Cars, Save data, car pictures, Logs, World and the live Map on the sample server", () => {
     expect(ready({ capabilities: SAMPLE_VERSION.capabilities })).toEqual([
       "car-images",
       "cars",
+      "live-map",
       "logs",
       "map",
       "profile",

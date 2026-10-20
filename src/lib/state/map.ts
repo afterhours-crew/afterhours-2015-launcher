@@ -254,3 +254,47 @@ export function placeMarkers(
   }
   return placed;
 }
+
+/** Metres in the world as CSS pixels at `scale`. */
+export function metresToPixels(world: World, scale: number, metres: number): number {
+  return (metres / (world.max_x - world.min_x)) * scale;
+}
+
+/** A circle around a world position, such as a driver's spawn ring, in metres. */
+export interface MapRing {
+  id: string;
+  x: number;
+  z: number;
+  inner: number;
+  outer: number;
+}
+
+/** A ring in viewport pixels: its centre and both radii. */
+export interface PlacedRing {
+  id: string;
+  left: number;
+  top: number;
+  inner: number;
+  outer: number;
+}
+
+/** The rings that reach into the viewport, in viewport pixels. */
+export function placeRings(
+  rings: readonly MapRing[],
+  world: World | null,
+  view: MapView,
+  viewport: Viewport,
+): PlacedRing[] {
+  if (!world) return [];
+  const placed: PlacedRing[] = [];
+  for (const ring of rings) {
+    const at = worldToMap(world, ring.x, ring.z);
+    const { x, y } = mapToScreen(view, viewport, at.x, at.y);
+    const outer = metresToPixels(world, view.scale, ring.outer);
+    const inner = metresToPixels(world, view.scale, ring.inner);
+    const inside =
+      x >= -outer && y >= -outer && x <= viewport.width + outer && y <= viewport.height + outer;
+    if (inside) placed.push({ id: ring.id, left: x, top: y, inner, outer });
+  }
+  return placed;
+}

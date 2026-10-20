@@ -10,8 +10,8 @@ import type { ServerInfo } from "$lib/api/types";
  * (start the game in a running `serve` session) and `car-images` (decode
  * each car's in-game pictures) are contract v1's, `world-settings` (traffic
  * and rivals) came with v0.4.0, and `map-images` (decode the game's world map)
- * is newer. `map-feed` (track 7, live positions for the map) is an expected
- * name no server reports yet.
+ * and `map-feed` (live positions in the event stream, for the Map's
+ * markers) are newer (afterhours-2015 #158 and #160).
  */
 export type Capability =
   | "profile"

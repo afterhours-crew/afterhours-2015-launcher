@@ -4,9 +4,11 @@ import {
   clampView,
   fitView,
   mapToScreen,
+  metresToPixels,
   panBy,
   pickLevel,
   placeMarkers,
+  placeRings,
   scaleBar,
   scaleRange,
   screenToMap,
@@ -172,5 +174,33 @@ describe("markers", () => {
 
   it("places nothing without the world box", () => {
     expect(placeMarkers([car("near", 0, 0)], null, view, VIEWPORT)).toEqual([]);
+  });
+});
+
+describe("rings", () => {
+  // At 16384 px across a 16384 m world, one pixel is one metre.
+  const view = { u: 0.5, v: 0.5, scale: 16384 };
+  const ring = (id: string, x: number, z: number) => ({ id, x, z, inner: 300, outer: 450 });
+
+  it("turn metres into pixels at the current zoom", () => {
+    expect(metresToPixels(WORLD, 16384, 450)).toBe(450);
+    expect(metresToPixels(WORLD, 600, 450)).toBeCloseTo(16.48, 2);
+  });
+
+  it("are placed while any of the circle reaches into view", () => {
+    const placed = placeRings(
+      [ring("near", 100, -50), ring("reaching", 900, 0), ring("gone", 1000, 0)],
+      WORLD,
+      view,
+      VIEWPORT,
+    );
+    expect(placed).toEqual([
+      { id: "near", left: 600, top: 250, inner: 300, outer: 450 },
+      { id: "reaching", left: 1400, top: 300, inner: 300, outer: 450 },
+    ]);
+  });
+
+  it("place nothing without the world box", () => {
+    expect(placeRings([ring("near", 0, 0)], null, view, VIEWPORT)).toEqual([]);
   });
 });

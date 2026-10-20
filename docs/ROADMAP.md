@@ -18,7 +18,7 @@ design canvas.
 | 4     | Account edits: `account set` for name, bank and REP                                                                                                                                             | afterhours-2015, then Profile        | Planned                                                                                                                                                                |
 | 5     | Overlay: the in-game companion window (design C1)                                                                                                                                               | none                                 | Not planned (2026-10-19); nothing is built for it. The live control endpoint it needed is still wanted, for track 3                                                    |
 | 6     | v0.1 tester preview: the first published launcher release                                                                                                                                       | this repository                      | Planned; uses the release machinery from 1c                                                                                                                            |
-| 7     | Live map: the game's own world map decoded from the tester's installation (`map-images`), then a read-only observer feed from the server (players, traffic and rival motion, spawns and clears) | afterhours-2015, then the Map screen | Map screen with pan and zoom over the game's map on `feature/map-screen` (server `map-images`: afterhours-2015 #158); the live feed is planned                         |
+| 7     | Live map: the game's own world map decoded from the tester's installation (`map-images`), then a read-only observer feed from the server (players, traffic and rival motion, spawns and clears) | afterhours-2015, then the Map screen | Map with pan and zoom on `feature/map-screen` (server `map-images`: afterhours-2015 #158); live markers on `feature/map-markers` (server `map-feed`: #160)             |
 
 The launch bar never shows a car. Its left side reads "Playing on", then
 "Your server", then whether it runs: "Offline · this PC only" or
@@ -128,5 +128,6 @@ the first release (track 6):
 - The window refuses to close while its session runs, because the v0.3.0
   server writes progress to pipes the window owns and would stop on a broken
   pipe. Track 1b's `--events` mode silences the console and survives a
-  broken pipe; once the pin reaches a release with it, sessions should run
-  with `--events` and the window may close freely.
+  broken pipe. Sessions now run with `--events` when the server reports
+  it (track 7's map markers need it); letting the window close while one
+  runs is still to decide.

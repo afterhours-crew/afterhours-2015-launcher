@@ -13,10 +13,11 @@
 // Cases for `stop`, `version`, `sessions` and `profile --list` run when a
 // schema of that name exists, so a pin bump that brings the contract v1
 // schemas exercises them without edits here. The `play`, `car-images`,
-// `map-images` and `settings` cases run when the server reports that
-// capability; they use an empty data folder, so there is no serve session to
-// start a game in, no prepared content to read pictures or the map from, and
-// only a scratch settings file. `status` is checked against
+// `map-images`, `settings` and `serve --events` cases run when the server
+// reports that capability; they use an empty data folder, so there is no
+// serve session to start a game in, no prepared content to read pictures or
+// the map from, only a scratch settings file, and a `serve` that preflight
+// refuses before any session exists. `status` is checked against
 // the schema of the contract the server speaks: v1's
 // `{"version":1,"session":...}` (status.schema.json) when it answers
 // `version --json`, else v0.3.0's `{"state":"none"}` or bare status
@@ -298,6 +299,33 @@ const cases = [
         throw new Error(`read back ${JSON.stringify(read)}`);
       }
       return "traffic 200 %, rivals 0, read back";
+    },
+  },
+  {
+    name: "serve --events refuses a folder without the game in one final event",
+    capability: "events",
+    schema: "event",
+    run: () => {
+      const dir = dataDir("serve-events");
+      const out = run(["--data-dir", dir, "serve", "--game-dir", fakeGame, "--events"]);
+      if (out.code === 0) throw new Error("serve accepted a folder without the game");
+      const check = validators.get("event");
+      if (!check) throw new Error(`${schemaDir}/event.schema.json is missing.`);
+      const events = out.stdout
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .map((line) => {
+          const value = JSON.parse(line);
+          if (!check(value)) throw new Error(`event schema: ${JSON.stringify(check.errors)}`);
+          return value;
+        });
+      const last = events.at(-1);
+      if (last?.event !== "final") throw new Error(`the last line is not final: ${out.stdout}`);
+      if (last.exit_code !== out.code || !last.message || last.status !== null) {
+        throw new Error(`final does not report the refusal: ${JSON.stringify(last)}`);
+      }
+      if (readdirSync(dir).length !== 0) throw new Error("serve wrote into the data folder");
+      return `${events.length} event(s), final exit ${last.exit_code}: ${last.message}`;
     },
   },
   {

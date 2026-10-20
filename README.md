@@ -15,9 +15,9 @@ yet stays in view, marked "Coming in a future update" the same way on every
 screen (design/README.md).
 The pinned server, afterhours-2015 v0.4.1, reports every capability the
 screens use (`profile`, `sessions`, `events`, `play`, `car-images`,
-`world-settings`) except `map-images`, which the Map screen needs and the
-next server release brings. Live map positions, Cops and driver edits wait
-for server work.
+`world-settings`) except `map-images`, which the Map screen needs, and
+`map-feed`, the live positions for its markers; the next server release
+brings both. Cops and driver edits wait for server work.
 Releases are published on this repository's Releases page. See
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -41,7 +41,8 @@ Releases are published on this repository's Releases page. See
    that code out. `&hosting` adds a `serve` session without a game
    (`&hosting=game` with one playing in it), `&noplay` a server without
    `play`, `&portable` a launcher in the game folder and `&feed` a server
-   log that keeps arriving.
+   log that keeps arriving. On the Map, sample cars lap a block of a made-up
+   map four times a second; `&nomapfeed` is a server without `map-feed`.
 
    `pnpm sidecar` downloads the server release pinned in `server-pin.json`,
    checks its SHA-256 and places `Afterhours.exe` in `src-tauri/binaries/`.
@@ -121,6 +122,23 @@ and without following links. A session is the server's own `setup`, `serve` or
 events, and its exit into `session-exit`. The supervisor is a separate
 process, exactly as it is for a terminal user. Because the session writes to
 pipes the window owns, the window will not close while its session runs.
+
+When `version --json` lists `events`, sessions run with `--events`: the
+server prints one JSON `event` record per line (`schemas/event.schema.json`)
+instead of console text. `cli.rs` turns `status`, `diagnostic`, `session`
+and a failed `final` into the same `session-output` lines the console text
+gave, and forwards `map-feed` records as `map-feed` events. A server
+without `events` (v0.3.0) keeps the console-text path. Lines are bounded
+at 2 MiB; a longer one is left out and noted.
+
+The Map draws the game's own world map from `map-images`. With `map-feed`
+the newest frame of the session's event stream becomes its markers
+(`src/lib/state/mapfeed.ts`): every driver in a local session is you,
+then traffic and roaming rivals, keyed by world connection, kind and the
+server's id; the spawn ring is a circle at the traffic policy's radii
+around each driver, labelled approximate because the policy spawns ahead
+of the driver. A frame with no world session, the session leaving `ready`
+or its end clears them. The Layers panel switches each kind on or off.
 
 The updater (`tauri-plugin-updater`) checks this repository's
 `releases/latest/download/latest.json`. Its decisions are pure functions in

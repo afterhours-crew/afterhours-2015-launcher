@@ -2,10 +2,12 @@
 // current session status and the session console.
 
 import { api, inTauri, onSessionEvents, statusFromResult, type Unlisten } from "$lib/api/tauri";
-import type { AppInfo, OutputLine, SessionAction, Settings, Status } from "$lib/api/types";
+import type { AppInfo, MapFeed, OutputLine, SessionAction, Settings, Status } from "$lib/api/types";
 import { emptySettings } from "$lib/api/types";
+import { hasCapability } from "./capabilities";
 import { isLive } from "./launchbar";
-import { sampleAppInfo, sampleFeed, sampleMode, sampleStatus } from "./preview";
+import { feedSurvives, takeFeed } from "./mapfeed";
+import { sampleAppInfo, sampleFeed, sampleMapFeed, sampleMode, sampleStatus } from "./preview";
 
 export const MAX_CONSOLE_LINES = 400;
 
@@ -33,6 +35,12 @@ export class Session {
   restarting = $state(false);
   /** When this window started its session; `null` for one started elsewhere. */
   startedAt = $state<Date | null>(null);
+  /**
+   * The newest `map-feed` event of the window's session: where the cars
+   * are. `null` without one, after a frame with no world session, and once
+   * the session leaves `ready` or ends.
+   */
+  mapFeed = $state.raw<MapFeed | null>(null);
   /**
    * "Hide my user name": copied paths and summaries show %USERNAME%
    * instead. On by default, for this run of the launcher.
@@ -69,6 +77,8 @@ export class Session {
         if (this.running) this.startedAt = new Date(Date.now() - 4 * 60_000);
         // `?sample&feed`: server lines keep arriving, for the live log panels.
         void sampleFeed((line) => this.receive(line));
+        // `?sample`: cars drive around the sample map, for the Map's markers.
+        void sampleMapFeed((event) => this.receiveMapFeed(event));
       }
       this.loaded = true;
       return;
@@ -77,7 +87,7 @@ export class Session {
       this.settings = await api.getSettings();
       this.info = await api.appInfo();
       if (this.serverReady) {
-        this.status = statusFromResult(await api.sessionStatus());
+        this.setStatus(statusFromResult(await api.sessionStatus()));
       }
       this.error = null;
     } catch (e) {
@@ -87,12 +97,12 @@ export class Session {
     }
     this.unlisten ??= await onSessionEvents({
       output: (line) => this.receive(line),
-      status: (result) => {
-        this.status = statusFromResult(result);
-      },
+      status: (result) => this.setStatus(statusFromResult(result)),
+      mapFeed: (event) => this.receiveMapFeed(event),
       exit: () => {
         this.running = false;
         this.closeBlocked = false;
+        this.mapFeed = null;
       },
       closeBlocked: () => {
         this.closeBlocked = true;
@@ -121,8 +131,10 @@ export class Session {
     this.error = null;
     this.console = [];
     this.received = 0;
+    this.mapFeed = null;
     try {
-      await api.startSession(action);
+      // A server with the event stream reports through it, map positions too.
+      await api.startSession(action, hasCapability(this.info?.server, "events"));
       this.running = true;
       this.startedAt = new Date();
       // The notice about a changed server ends with the first start on it.
@@ -176,7 +188,7 @@ export class Session {
       if (!this.running) {
         // The window stopped polling with its session; ask once more.
         try {
-          this.status = statusFromResult(await api.sessionStatus());
+          this.setStatus(statusFromResult(await api.sessionStatus()));
         } catch (e) {
           this.error = message(e);
           return false;
@@ -195,6 +207,17 @@ export class Session {
     } catch (e) {
       this.error = message(e);
     }
+  }
+
+  /** A new session status; the map's markers go when the session leaves `ready`. */
+  setStatus(next: Status | null): void {
+    if (!feedSurvives(this.status, next)) this.mapFeed = null;
+    this.status = next;
+  }
+
+  /** A `map-feed` event: the newest frame replaces the markers. */
+  receiveMapFeed(event: unknown): void {
+    this.mapFeed = takeFeed(this.mapFeed, event, this.status?.state);
   }
 
   /** Add one console line, dropping the oldest past the bound. */

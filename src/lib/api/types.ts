@@ -7,6 +7,11 @@ export type { Preflight } from "./generated/check";
 export type { VersionReport } from "./generated/version";
 export type { SettingsReport } from "./generated/settings";
 export type { MapImagesReport } from "./generated/map-images";
+import type { Event as SessionEvent } from "./generated/event";
+export type { SessionEvent };
+export type { MapCar, MapDriver, MapWorld, TrafficRing } from "./generated/event";
+/** A `map-feed` event of `--events`: where the cars are (capability `map-feed`). */
+export type MapFeed = Extract<SessionEvent, { event: "map-feed" }>;
 export type {
   Car,
   CarImage,

@@ -22,8 +22,10 @@ export async function sampleAppInfo(): Promise<AppInfo> {
   const { SAMPLE_VERSION } = await loadSample();
   const query = new URLSearchParams(window.location.search);
   // `&noplay`: a server from before `play`, which can only restart with the game.
+  // `&nomapfeed`: one without live map positions.
   const capabilities = SAMPLE_VERSION.capabilities.filter(
-    (name) => name !== "play" || !query.has("noplay"),
+    (name) =>
+      !(name === "play" && query.has("noplay")) && !(name === "map-feed" && query.has("nomapfeed")),
   );
   return {
     launcher_version: "0.1.0",
@@ -142,4 +144,22 @@ export async function sampleFeed(receive: (line: OutputLine) => void): Promise<v
     receive({ kind: "text", text: lines[i % lines.length]! });
     i += 1;
   }, 300);
+}
+
+/**
+ * `?sample`: a made-up `map-feed` event every 250 ms, as a session's event
+ * stream delivers them, so the Map's markers can be watched moving. The
+ * sample driver laps a block with traffic and rivals around
+ * (`sampleMapFrame`). `&nomapfeed` leaves it out, as a server without
+ * `map-feed` would.
+ */
+export async function sampleMapFeed(receive: (event: unknown) => void): Promise<void> {
+  if (!loadSample || new URLSearchParams(window.location.search).has("nomapfeed")) return;
+  const { sampleMapFrame } = await loadSample();
+  let frame = 0;
+  receive(sampleMapFrame(frame));
+  setInterval(() => {
+    frame += 1;
+    receive(sampleMapFrame(frame));
+  }, 250);
 }
