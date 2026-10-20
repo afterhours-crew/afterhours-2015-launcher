@@ -88,6 +88,19 @@ export async function windowControl(
 
 export type Unlisten = () => void;
 
+/**
+ * Calls `change` with whether the window is maximized, now and after every
+ * resize (the Maximize button, a double click on the header, Windows Snap),
+ * so the middle window button can show Restore.
+ */
+export async function onMaximizedChange(change: (maximized: boolean) => void): Promise<Unlisten> {
+  if (!inTauri) return () => {};
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  const current = getCurrentWindow();
+  change(await current.isMaximized());
+  return current.onResized(async () => change(await current.isMaximized()));
+}
+
 export async function onSessionEvents(handlers: {
   output: (line: OutputLine) => void;
   status: (result: CliResult) => void;
