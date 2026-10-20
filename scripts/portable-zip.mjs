@@ -41,9 +41,12 @@ try {
   const zip = join(resolve(out), zipName(version));
   rmSync(zip, { force: true });
   // Name the top-level entries: no shell expands a wildcard here, and "."
-  // would prefix every path in the ZIP with "./".
+  // would prefix every path in the ZIP with "./". Windows' own tar.exe by
+  // its full path: under Git Bash, as in the release workflow, "tar.exe" is
+  // GNU tar, which makes no ZIP and reads "D:\..." as a remote host.
   const entries = readdirSync(stage);
-  execFileSync("tar.exe", ["-a", "-c", "-f", zip, "-C", stage, ...entries], { stdio: "inherit" });
+  const tar = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe");
+  execFileSync(tar, ["-a", "-c", "-f", zip, "-C", stage, ...entries], { stdio: "inherit" });
   console.log(`${zipName(version)} SHA-256 ${sha256(readFileSync(zip))}`);
   console.log(zip);
 } catch (error) {

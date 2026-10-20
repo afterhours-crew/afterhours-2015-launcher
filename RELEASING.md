@@ -150,7 +150,17 @@ older installer, then copy the contents of
 
 ## Not verified yet
 
-A signed release built by the workflow, the updater's install and relaunch on
-Windows, whether the relaunched app inherits a job object, and SmartScreen's
-behaviour without Authenticode have not been exercised. Record the first
-release's results here.
+The updater's install and relaunch on Windows, whether the relaunched app
+inherits a job object, and SmartScreen's behaviour without Authenticode have
+not been exercised. Record the first release's results here.
+
+The first run, v0.1.0 (2026-10-20), signed the installer and attached it, its
+`.sig` and `latest.json` to the draft. Two later steps failed and were fixed
+afterwards:
+
+- The no-install ZIP: under the workflow's Git Bash, `tar.exe` was GNU tar.
+  `scripts/portable-zip.mjs` now calls Windows' own `tar.exe` by its full path.
+- `latest.json`: on a draft, tauri-action links each update to the GitHub API
+  (`api.github.com/.../releases/assets/<id>`). `scripts/updater-manifest.mjs`
+  now replaces that with the public `releases/download/v<version>/` link for
+  the file the signature names, instead of refusing it.
