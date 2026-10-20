@@ -7,14 +7,15 @@
 //! its own server, as it would a server on another PC.
 //!
 //! The server answers plain HTTP/1.1 on `127.0.0.1`, one request per
-//! connection: `GET /v1/status`, `POST /v1/stop` and `POST /v1/play` return
-//! the same records as the matching commands, and `GET /v1/events` streams
-//! the session's `event` records as server-sent events. Every request
-//! carries the session's token, read from `api --json`. The event stream
-//! becomes the window's usual events: `session-output` console lines,
-//! `session-status` and `map-feed`. Nothing here depends on the server
-//! process's pipes, so the session outlives a closed or crashed window and a
-//! reopened one reconnects.
+//! connection: `GET /v1/status`, `POST /v1/stop`, `POST /v1/play`,
+//! `GET`/`PUT /v1/settings` and `GET /v1/profile` return the same records as
+//! the matching commands, and `GET /v1/events` streams the session's `event`
+//! records as server-sent events. Every request carries the session's
+//! token, read from `api --json`. The event stream becomes the window's
+//! usual events: `session-output` console lines, `session-status` and
+//! `map-feed`. Nothing here depends on the server process's pipes, so the
+//! session outlives a closed or crashed window and a reopened one
+//! reconnects.
 
 use crate::cli::{self, CliResult, Forward, OutputLine};
 use serde::Deserialize;
@@ -90,10 +91,18 @@ impl Endpoint {
         })
     }
 
-    fn head(&self, method: &str, path: &str) -> String {
+    /// A request head; a body, when there is one, is JSON.
+    fn head(&self, method: &str, path: &str, body: &[u8]) -> String {
+        let json = if body.is_empty() {
+            ""
+        } else {
+            "Content-Type: application/json\r\n"
+        };
         format!(
-            "{method} {path} HTTP/1.1\r\nHost: {}\r\nAuthorization: Bearer {}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
-            self.address, self.token
+            "{method} {path} HTTP/1.1\r\nHost: {}\r\nAuthorization: Bearer {}\r\n{json}Content-Length: {}\r\nConnection: close\r\n\r\n",
+            self.address,
+            self.token,
+            body.len()
         )
     }
 
@@ -104,13 +113,25 @@ impl Endpoint {
         Ok(stream)
     }
 
-    /// One request; the answer's status code and body.
+    /// One request without a body; the answer's status code and body.
     pub fn request(&self, method: &str, path: &str) -> Result<Response, String> {
+        self.send(method, path, &[], REQUEST_TIMEOUT)
+    }
+
+    /// One request with a JSON `body` (none when empty), waiting up to
+    /// `wait` for the answer; its status code and body.
+    pub fn send(
+        &self,
+        method: &str,
+        path: &str,
+        body: &[u8],
+        wait: Duration,
+    ) -> Result<Response, String> {
         let unreachable = |e: std::io::Error| format!("Could not reach your server: {e}");
-        let mut stream = self.connect(REQUEST_TIMEOUT).map_err(unreachable)?;
-        stream
-            .write_all(self.head(method, path).as_bytes())
-            .map_err(unreachable)?;
+        let mut stream = self.connect(wait).map_err(unreachable)?;
+        let mut request = self.head(method, path, body).into_bytes();
+        request.extend_from_slice(body);
+        stream.write_all(&request).map_err(unreachable)?;
         let mut bytes = Vec::new();
         stream
             .take(MAX_RESPONSE as u64 + 1)
@@ -127,12 +148,36 @@ impl Endpoint {
         Ok(self.request("POST", path)?.into_result())
     }
 
+    /// The saved traffic and rivals: `GET /v1/settings`, or `PUT` the
+    /// change when there is one (see [`cli::settings_change`]), as the
+    /// window's command result. `None` when this API cannot answer, so the
+    /// `settings` command runs instead.
+    pub fn settings(&self, change: Option<&serde_json::Value>) -> Option<CliResult> {
+        let answer = match change {
+            None => self.send("GET", "/v1/settings", &[], REQUEST_TIMEOUT),
+            Some(change) => self.send(
+                "PUT",
+                "/v1/settings",
+                change.to_string().as_bytes(),
+                REQUEST_TIMEOUT,
+            ),
+        };
+        usable(answer)
+    }
+
+    /// `GET /v1/profile`: the selected save's profile, waiting up to `wait`
+    /// (a save is read whole). `None` when this API cannot answer, so the
+    /// `profile` command runs instead.
+    pub fn profile(&self, wait: Duration) -> Option<CliResult> {
+        usable(self.send("GET", "/v1/profile", &[], wait))
+    }
+
     /// Open the event stream, positioned after its response head.
     pub fn open_events(&self) -> Result<BufReader<TcpStream>, String> {
         let unreachable = |e: std::io::Error| format!("Could not reach your server: {e}");
         let mut stream = self.connect(STREAM_IDLE).map_err(unreachable)?;
         stream
-            .write_all(self.head("GET", "/v1/events").as_bytes())
+            .write_all(self.head("GET", "/v1/events", &[]).as_bytes())
             .map_err(unreachable)?;
         let mut reader = BufReader::new(stream);
         let mut head = Vec::new();
@@ -158,6 +203,16 @@ impl Endpoint {
             .map_err(unreachable)?;
         Err(parse_response(&answer)?.message())
     }
+}
+
+/// An answer the window can use: `None` when the API could not be reached
+/// or does not serve the address (404, a server from before the route),
+/// so the matching command runs instead.
+fn usable(answer: Result<Response, String>) -> Option<CliResult> {
+    answer
+        .ok()
+        .filter(|response| response.status != 404)
+        .map(Response::into_result)
 }
 
 /// An answer from the session API.
@@ -683,7 +738,8 @@ mod tests {
     }
 
     /// A stand-in session API on a loopback port: answers each connection
-    /// with `answer(request head)`, as many times as asked.
+    /// with `answer(request)`, as many times as asked. A request is its
+    /// head and the body its `Content-Length` announces.
     fn fake_api(
         answers: usize,
         answer: impl Fn(&str) -> Vec<u8> + Send + 'static,
@@ -691,7 +747,7 @@ mod tests {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         let handle = std::thread::spawn(move || {
-            let mut heads = Vec::new();
+            let mut requests = Vec::new();
             for _ in 0..answers {
                 let (mut stream, _) = listener.accept().unwrap();
                 let mut head = Vec::new();
@@ -700,11 +756,18 @@ mod tests {
                     stream.read_exact(&mut byte).unwrap();
                     head.push(byte[0]);
                 }
-                let head = String::from_utf8(head).unwrap();
-                stream.write_all(&answer(&head)).unwrap();
-                heads.push(head);
+                let mut request = String::from_utf8(head).unwrap();
+                let length = request
+                    .lines()
+                    .find_map(|line| line.strip_prefix("Content-Length: "))
+                    .map_or(0, |n| n.parse().unwrap());
+                let mut body = vec![0u8; length];
+                stream.read_exact(&mut body).unwrap();
+                request.push_str(std::str::from_utf8(&body).unwrap());
+                stream.write_all(&answer(&request)).unwrap();
+                requests.push(request);
             }
-            heads
+            requests
         });
         let endpoint = Endpoint {
             id: "a".repeat(32),
@@ -737,7 +800,83 @@ mod tests {
                 "{head}"
             );
             assert!(head.contains(&format!("Authorization: Bearer {TOKEN}\r\n")));
+            assert!(head.ends_with("Content-Length: 0\r\nConnection: close\r\n\r\n"));
         }
+    }
+
+    #[test]
+    fn settings_and_the_profile_are_asked_of_the_api() {
+        let (endpoint, server) = fake_api(3, |request| {
+            let saved = if request.starts_with("PUT /v1/settings ") {
+                "true"
+            } else if request.starts_with("GET /v1/settings ") {
+                "false"
+            } else {
+                return answer("200 OK", r#"{"version":1,"account_id":"x"}"#);
+            };
+            answer(
+                "200 OK",
+                &format!(r#"{{"version":1,"traffic_percent":200,"saved":{saved}}}"#),
+            )
+        });
+        let read = endpoint.settings(None);
+        assert!(matches!(read, Some(CliResult::Ok { value }) if value["saved"] == false));
+        let change = cli::settings_change(Some(200), Some("original")).unwrap();
+        let saved = endpoint.settings(change.as_ref());
+        assert!(matches!(saved, Some(CliResult::Ok { value }) if value["saved"] == true));
+        let profile = endpoint.profile(Duration::from_secs(5));
+        assert!(matches!(profile, Some(CliResult::Ok { value }) if value["account_id"] == "x"));
+        let requests = server.join().unwrap();
+        assert!(requests[0].starts_with("GET /v1/settings HTTP/1.1\r\n"));
+        assert!(requests[0].ends_with("Content-Length: 0\r\nConnection: close\r\n\r\n"));
+        // The change goes as the settings record's fields, as JSON.
+        let (head, body) = requests[1].split_once("\r\n\r\n").unwrap();
+        assert!(head.starts_with("PUT /v1/settings HTTP/1.1\r\n"), "{head}");
+        assert!(head.contains("Content-Type: application/json\r\n"));
+        assert!(head.contains(&format!("Content-Length: {}\r\n", body.len())));
+        assert!(head.contains(&format!("Authorization: Bearer {TOKEN}\r\n")));
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(body).unwrap(),
+            serde_json::json!({"traffic_percent": 200, "rival_limit": null})
+        );
+        assert!(requests[2].starts_with("GET /v1/profile HTTP/1.1\r\n"));
+    }
+
+    #[test]
+    fn settings_and_the_profile_fall_back_when_the_api_cannot_answer() {
+        // A server from before these routes answers 404; the commands run.
+        // A refusal is the command's own answer and is passed on.
+        let (endpoint, server) = fake_api(3, |request| {
+            if request.starts_with("GET /v1/profile ") {
+                answer(
+                    "409 Conflict",
+                    r#"{"version":1,"message":"No saved driver is selected."}"#,
+                )
+            } else {
+                answer(
+                    "404 Not Found",
+                    r#"{"version":1,"message":"No such API address."}"#,
+                )
+            }
+        });
+        assert_eq!(endpoint.settings(None), None);
+        let change = serde_json::json!({"traffic_percent": 0});
+        assert_eq!(endpoint.settings(Some(&change)), None);
+        assert_eq!(
+            endpoint.profile(Duration::from_secs(5)),
+            Some(CliResult::Error {
+                exit: 1,
+                message: "No saved driver is selected.".into()
+            })
+        );
+        server.join().unwrap();
+        // An API that no longer answers.
+        let closed = Endpoint {
+            address: "127.0.0.1:9".parse().unwrap(),
+            ..endpoint
+        };
+        assert_eq!(closed.settings(None), None);
+        assert_eq!(closed.profile(Duration::from_secs(1)), None);
     }
 
     #[test]
@@ -809,6 +948,43 @@ mod tests {
         assert!(
             matches!(&info, CliResult::Ok { value } if value["capabilities"].as_array().unwrap().contains(&"api".into())),
             "{info:?}"
+        );
+        // Settings and the profile: the commands' records, through the API.
+        let exe = crate::server::current().unwrap().path;
+        let command = |args: Vec<String>| cli::run_json(&exe, &args, Duration::from_secs(30));
+        let read = cli::settings_args(&settings, None, None).unwrap();
+        let original = endpoint.settings(None).expect("the API serves settings");
+        assert_eq!(original, command(read.clone()).unwrap());
+        let CliResult::Ok { value } = &original else {
+            panic!("{original:?}")
+        };
+        let saved = endpoint.settings(Some(&serde_json::json!({"traffic_percent": 150})));
+        assert!(
+            matches!(&saved, Some(CliResult::Ok { value }) if value["saved"] == true && value["traffic_percent"] == 150),
+            "{saved:?}"
+        );
+        assert!(
+            matches!(command(read).unwrap(), CliResult::Ok { value } if value["traffic_percent"] == 150)
+        );
+        let back = serde_json::json!({"traffic_percent": value["traffic_percent"]});
+        assert!(matches!(
+            endpoint.settings(Some(&back)),
+            Some(CliResult::Ok { .. })
+        ));
+        let profile = endpoint.profile(Duration::from_secs(30));
+        let expected = command(crate::reads::profile_args(&settings, None).unwrap()).unwrap();
+        match &expected {
+            CliResult::Ok { .. } => assert_eq!(profile.as_ref(), Some(&expected)),
+            CliResult::Error { .. } => {
+                assert!(matches!(profile, Some(CliResult::Error { exit: 1, .. })))
+            }
+        }
+        eprintln!(
+            "profile through the API: {}",
+            match &expected {
+                CliResult::Ok { value } => format!("driver {}", value["identity"]["display_name"]),
+                CliResult::Error { message, .. } => format!("refused alike: {message}"),
+            }
         );
         let reader = endpoint.open_events().unwrap();
         let stopper = {

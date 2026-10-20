@@ -20,6 +20,10 @@
 //! records (where the cars are) are forwarded whole as `map-feed` events.
 //! Servers without `events` keep the human-line path.
 //!
+//! While the window follows a session through its API ([`crate::connection`]),
+//! `stop`, `play` and `settings` go to that API instead, with the same
+//! records; the command runs when the API cannot answer.
+//!
 //! Every child runs without a console window of its own (`CREATE_NO_WINDOW`
 //! on Windows): its output is piped here.
 
@@ -578,20 +582,45 @@ pub fn settings_args(
         args.push(percent.to_string());
     }
     if let Some(rivals) = rivals {
-        if rivals != "original" && rivals.parse::<u16>().is_err() {
-            return Err(format!(
-                "Rivals must be a count or \"original\", not {rivals:?}."
-            ));
-        }
+        rival_count(rivals)?;
         args.push("--rivals".into());
         args.push(rivals.to_owned());
     }
     Ok(args)
 }
 
+/// A `rivals` value: a count, or `None` for `original`.
+fn rival_count(rivals: &str) -> Result<Option<u16>, String> {
+    match rivals {
+        "original" => Ok(None),
+        count => count
+            .parse::<u16>()
+            .map(Some)
+            .map_err(|_| format!("Rivals must be a count or \"original\", not {rivals:?}.")),
+    }
+}
+
+/// The body of the session API's `PUT /v1/settings` for the same changes
+/// as [`settings_args`]: the `settings` record's `traffic_percent` and
+/// `rival_limit` (`null` for `original`). `None` when nothing changes, a
+/// read (`GET /v1/settings`).
+pub fn settings_change(
+    traffic: Option<u16>,
+    rivals: Option<&str>,
+) -> Result<Option<serde_json::Value>, String> {
+    let mut change = serde_json::Map::new();
+    if let Some(percent) = traffic {
+        change.insert("traffic_percent".into(), percent.into());
+    }
+    if let Some(rivals) = rivals {
+        change.insert("rival_limit".into(), rival_count(rivals)?.into());
+    }
+    Ok((!change.is_empty()).then_some(change.into()))
+}
+
 /// `settings --json`: the saved traffic and rival amounts, or save new
-/// ones. Saving is refused (exit 1) while a session holds the data
-/// directory, because a running session keeps the values it started with.
+/// ones; a running session applies a save within about a second. Through
+/// the session API when the window follows one.
 #[tauri::command]
 pub async fn world_settings(
     state: State<'_, crate::AppState>,
@@ -601,9 +630,16 @@ pub async fn world_settings(
     let settings = settings_of(&state);
     let server = server::current()?;
     let args = settings_args(&settings, traffic, rivals.as_deref())?;
-    tauri::async_runtime::spawn_blocking(move || run_json(&server.path, &args, STATUS_TIMEOUT))
-        .await
-        .map_err(|e| e.to_string())?
+    let change = settings_change(traffic, rivals.as_deref())?;
+    let endpoint = state.endpoint();
+    tauri::async_runtime::spawn_blocking(move || {
+        match endpoint.and_then(|e| e.settings(change.as_ref())) {
+            Some(result) => Ok(result),
+            None => run_json(&server.path, &args, STATUS_TIMEOUT),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Start `setup`, `serve` or `start` and stream its output as events.
@@ -757,6 +793,27 @@ mod tests {
         );
         assert!(settings_args(&settings, None, Some("lots")).is_err());
         assert!(settings_args(&settings, None, Some("-1")).is_err());
+    }
+
+    #[test]
+    fn settings_changes_become_the_apis_request_body() {
+        use serde_json::json;
+        assert_eq!(settings_change(None, None).unwrap(), None, "a read");
+        assert_eq!(
+            settings_change(Some(200), None).unwrap(),
+            Some(json!({"traffic_percent": 200}))
+        );
+        assert_eq!(
+            settings_change(None, Some("original")).unwrap(),
+            Some(json!({"rival_limit": null}))
+        );
+        assert_eq!(
+            settings_change(Some(0), Some("15")).unwrap(),
+            Some(json!({"traffic_percent": 0, "rival_limit": 15}))
+        );
+        for bad in ["lots", "-1", "", "Original"] {
+            assert!(settings_change(None, Some(bad)).is_err(), "{bad}");
+        }
     }
 
     #[test]

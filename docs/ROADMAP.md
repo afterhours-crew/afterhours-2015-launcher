@@ -19,7 +19,7 @@ design canvas.
 | 5     | Overlay: the in-game companion window (design C1)                                                                                                                                               | none                                 | Not planned (2026-10-19); nothing is built for it. The live control endpoint it needed is still wanted, for track 3                                                    |
 | 6     | v0.1 tester preview: the first published launcher release                                                                                                                                       | this repository                      | Planned; uses the release machinery from 1c                                                                                                                            |
 | 7     | Live map: the game's own world map decoded from the tester's installation (`map-images`), then a read-only observer feed from the server (players, traffic and rival motion, spawns and clears) | afterhours-2015, then the Map screen | Map with pan and zoom on `feature/map-screen` (server `map-images`: afterhours-2015 #158); live markers on `feature/map-markers` (server `map-feed`: #160)             |
-| 8     | Server connection: the launcher reaches every server, its own included, through the server's HTTP API, as it would a server on another PC; see [Server connection](#server-connection-track-8)  | afterhours-2015, then here           | Step 1, the session API (`--api`): afterhours-2015 #164; step 2, the launcher following it: `feature/server-connection`; step 3 is next                                |
+| 8     | Server connection: the launcher reaches every server, its own included, through the server's HTTP API, as it would a server on another PC; see [Server connection](#server-connection-track-8)  | afterhours-2015, then here           | Step 1, the session API: afterhours-2015 #164; step 2: `feature/server-connection`; step 3, settings and profile: #166, `feature/api-settings-profile`                 |
 
 The launch bar never shows a car. Its left side reads "Playing on", then
 "Your server", then whether it runs: "Offline · this PC only" or
@@ -68,8 +68,16 @@ Steps, in order:
    reopened launcher finds a running session and reconnects. Servers without
    `api` keep today's path. Talking to its own server on `127.0.0.1` is not
    a network call: nothing leaves the PC.
-3. **Server: settings and profile over the API** (`GET`/`PUT /v1/settings`,
-   `GET /v1/profile`), so World and Profile work the same way.
+3. **Settings and profile over the API** (afterhours-2015 #165, pull
+   request #166, `feature/api-settings-profile` in both repositories). The
+   server answers `GET /v1/settings` and `GET /v1/profile` with the
+   `settings` and `profile` records, and `PUT /v1/settings` saves a small
+   JSON body of the `settings` record's `traffic_percent` and `rival_limit`
+   (bounded at 1 KiB, checked as `--traffic` and `--rivals` are), which the
+   running server applies within about a second. While the launcher follows
+   a session, World reads and saves through it and Profile reads the
+   selected save through it; otherwise, or when the API cannot answer, they
+   run the commands as before.
 4. **Server and research: beyond this PC.** Listening on the network as an
    explicit opt-in, and starting the game against a server on another PC,
    which needs research into routing the game to an address that is not

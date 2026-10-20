@@ -9,6 +9,8 @@
 //! read-only commands (contract v1). The window asks for them only when the
 //! server reports the `profile` or `sessions` capability, and they run like
 //! `status`: with `--json`, within a deadline, their one object returned.
+//! While the window follows a session's API, the selected save's profile
+//! comes from its `GET /v1/profile` instead, the same record.
 //!
 //! The log viewer opens one file of one session folder by name: the server
 //! names the session folders and their files in `sessions --json`, and this
@@ -168,14 +170,24 @@ async fn run_read(args: Vec<String>) -> Result<cli::CliResult, String> {
         .map_err(|e| e.to_string())?
 }
 
-/// `profile --json`, for the active save or `account_id`.
+/// `profile --json`, for the active save or `account_id`. The active save
+/// comes through the session API when the window follows one.
 #[tauri::command]
 pub async fn profile(
     state: State<'_, crate::AppState>,
     account_id: Option<String>,
 ) -> Result<cli::CliResult, String> {
     let args = profile_args(&settings_of(&state), account_id.as_deref())?;
-    run_read(args).await
+    let Some(endpoint) = state.endpoint().filter(|_| account_id.is_none()) else {
+        return run_read(args).await;
+    };
+    let server = server::current()?;
+    tauri::async_runtime::spawn_blocking(move || match endpoint.profile(READ_TIMEOUT) {
+        Some(result) => Ok(result),
+        None => cli::run_json(&server.path, &args, READ_TIMEOUT),
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// `profile --list --json`.

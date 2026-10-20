@@ -125,11 +125,20 @@ is for a terminal user.
 **Your server, as any server** (roadmap track 8). When `version --json`
 lists `api`, sessions run with `--api`: the supervisor serves the session
 over HTTP on `127.0.0.1` (`GET /v1/status`, `/v1/events`, `POST /v1/stop`,
-`/v1/play`), and the window follows it there, as it would a server on
-another PC. `connection.rs` reads the address and token from `api --json`,
-turns the event stream (statuses, diagnostics, map frames) into the usual
-`session-output`, `session-status` and `map-feed` events, reopens a stream
-that breaks while the session lives, and sends Stop and Play to the API. The
+`/v1/play`, `GET`/`PUT /v1/settings`, `GET /v1/profile`), and the window
+follows it there, as it would a server on another PC. `connection.rs` reads
+the address and token from `api --json`, turns the event stream (statuses,
+diagnostics, map frames) into the usual `session-output`, `session-status`
+and `map-feed` events, reopens a stream that breaks while the session lives,
+and sends Stop and Play to the API. While it follows a session, World reads
+and saves traffic and rivals through `/v1/settings` (a save is the
+`settings` record's `traffic_percent` and `rival_limit` as JSON; the running
+server applies it within about a second), and Profile reads the selected
+save through `/v1/profile`; the records are the same as the `settings` and
+`profile` commands print. Without a followed session, or when its API cannot
+answer (unreachable, or a server from before these routes), they run the
+commands as before; another save than the selected one always comes from
+`profile`. The
 command's own output then holds only its `session` and `final` lines (why it
 was refused, if it was), so nothing in the session depends on the window:
 

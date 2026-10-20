@@ -52,7 +52,10 @@ export const api = {
   carImages: () => invoke<CliResult>("car_images"),
   /** `map-images --json`: decode the game's world map into the data folder. */
   mapImages: () => invoke<CliResult>("map_images"),
-  /** `settings --json`: read the traffic and rival amounts, or save one of them. */
+  /**
+   * `settings --json`, or the followed session API's `/v1/settings`: read the
+   * traffic and rival amounts, or save one of them.
+   */
   worldSettings: (traffic: number | null = null, rivals: string | null = null) =>
     invoke<CliResult>("world_settings", { traffic, rivals }),
   recorded: () => invoke<Recorded>("recorded"),
@@ -60,7 +63,10 @@ export const api = {
   sessionActivity: () => invoke<Activity>("session_activity"),
   backupSaves: (from: string, to: string) => invoke<BackupReport>("backup_saves", { from, to }),
   appInfo: () => invoke<AppInfo>("app_info"),
-  /** `profile --json` for the active save, or the account named. */
+  /**
+   * `profile --json` for the active save (the followed session API's
+   * `/v1/profile`), or the account named.
+   */
   profile: (accountId: string | null = null) => invoke<CliResult>("profile", { accountId }),
   profileList: () => invoke<CliResult>("profile_list"),
   sessions: () => invoke<CliResult>("sessions"),

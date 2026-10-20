@@ -19,10 +19,14 @@ is built against. `event.schema.json` adds the `map-feed` event, copied unchange
 (formatted by Prettier) from afterhours-2015 `feature/map-feed` (pull request #160,
 commit ce9a456, stacked on #158), which the Map's markers are built against.
 `api.schema.json` and `api-error.schema.json` are new and `version.schema.json`
-lists the `map-images`, `map-feed` and `api` capabilities; these three come
+lists the `map-images`, `map-feed` and `api` capabilities; the first two come
 unchanged (formatted by Prettier) from afterhours-2015 `feature/server-api` (pull
 request #164, commit 9bfa9d5, stacked on #160), which the session API connection
-is built against; its `event.schema.json` is identical to #160's. The pin bump to
+is built against; its `event.schema.json` is identical to #160's.
+`version.schema.json` comes unchanged (formatted by Prettier) from
+`feature/api-settings-profile` (pull request #166, commit 5827de8, stacked on
+#164), whose `api` capability also names the settings and profile routes; every
+other schema there is identical to #164's. The pin bump to
 the release that carries them replaces them with the released files, which must
 be identical. Until then the pinned v0.4.1 reports none of `map-images`,
 `map-feed` and `api`, so the Map screen shows its note, sessions use `--events`,
