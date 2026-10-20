@@ -26,9 +26,13 @@
   let server = $derived(session.info?.server ?? null);
   let running = $derived(isLive(session.status?.state));
 
+  // "Running for" counts in seconds for its first minute, so it ticks every
+  // second while the server runs, and not at all otherwise.
   let now = $state(Date.now());
   $effect(() => {
-    const timer = setInterval(() => (now = Date.now()), 30_000);
+    if (!running) return;
+    now = Date.now();
+    const timer = setInterval(() => (now = Date.now()), 1_000);
     return () => clearInterval(timer);
   });
   let runningFor = $derived(
@@ -116,6 +120,13 @@
     flex-direction: column;
     gap: var(--space-4);
     padding: var(--space-5) var(--space-6) var(--space-6);
+  }
+  /* The heading, the note and the log with its side panel share one
+     centred width. */
+  main > :global(*) {
+    width: 100%;
+    max-width: var(--page-wide);
+    margin-inline: auto;
   }
   .head {
     display: flex;
