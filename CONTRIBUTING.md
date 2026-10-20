@@ -55,7 +55,7 @@ unsigned Windows installer.
 | `src/lib/components/`       | design-system components                                              |
 | `src/lib/views/`            | the screens                                                           |
 | `design/`                   | tokens and the design rules                                           |
-| `scripts/`                  | pin, types, contract, version and release-manifest tooling            |
+| `scripts/`                  | pin, types, contract, version, release-manifest and release tooling   |
 
 ## Licenses
 

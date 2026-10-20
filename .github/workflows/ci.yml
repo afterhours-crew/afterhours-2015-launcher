@@ -11,8 +11,10 @@ on:
 permissions:
   contents: read
 
+# Every main commit keeps its own run: a merged release is tagged only after
+# CI passes on its merge commit (release-tag.yml), so none may be cancelled.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -136,3 +138,34 @@ jobs:
           path: ${{ runner.temp }}/portable/*.zip
           if-no-files-found: error
           retention-days: 14
+
+  # What the next release would start with, from the base branch: version
+  # and notes in the run summary. Nothing is committed or pushed.
+  release-preview:
+    name: Release preview
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Draft the next release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          status=0
+          node scripts/release/cli.mjs prepare --head HEAD^1 --preview --body "$RUNNER_TEMP/pr-body.md" || status=$?
+          if [ "$status" -eq 3 ]; then
+            echo "Nothing to release on the base branch yet." >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$status" -eq 0 ]; then
+            cat "$RUNNER_TEMP/pr-body.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            exit "$status"
+          fi
