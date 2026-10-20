@@ -43,9 +43,11 @@ Decided (2026-10-20):
 
 - **Closing the launcher stops its own server.** It asks the server to stop,
   waits until the session has finished, then closes.
-- **Another PC's launcher works as this one does today**, only over the
-  network. Which changes it may make (its own account, for example) is
-  decided later, with access by account.
+- **Local and remote work the same way.** The goal is one player using their
+  own server on another PC on their network, reached exactly as the
+  launcher reaches its own (see [Your server on another
+  PC](#your-server-on-another-pc-planned-2026-10-20)). Several players and
+  access by account are not planned.
 - **The game always runs on the player's PC**, started and routed by the
   bundled `Afterhours.exe`, whichever server it plays on. Starting the
   server process, the file check, decoding car pictures and the map from the
@@ -78,14 +80,61 @@ Steps, in order:
    a session, World reads and saves through it and Profile reads the
    selected save through it; otherwise, or when the API cannot answer, they
    run the commands as before.
-4. **Server and research: beyond this PC.** Listening on the network as an
-   explicit opt-in, and starting the game against a server on another PC,
-   which needs research into routing the game to an address that is not
-   local. Nothing is promised until that research says it works.
-5. **Launcher: add a server by address**, with the same screens over the
-   network.
-6. **Later: access by account.** A launcher on another PC changes only what
-   its account owns.
+4. **Server: one address for everything** (afterhours-2015 #171).
+   `serve --server-only --api --listen <address>`: the API and every
+   game-facing listener (redirector, Blaze, QoS, the per-connection world
+   sockets and launcher services) bind that one address and advertise it;
+   `127.0.0.1` stays the default. The token is kept in the data folder
+   across sessions and shown as a pairing code, so a launcher reconnects
+   after a restart. `GET /v1/info` reports the game-facing addresses.
+5. **Server: play against a server** (afterhours-2015 #172). `play --server
+<url>` runs on the player's PC whatever the server's address: the game
+   checks, launcher services on `127.0.0.1:3216` relayed to the server, the
+   game started and routed to the server's redirector by the lease, and the
+   game's progress reported. `start` becomes `serve` plus `play` against
+   `127.0.0.1`, the same path.
+6. **Launcher: servers by address.** A list with "This PC" (started and
+   stopped by the launcher) and others added by address and pairing code.
+   Every screen goes through the chosen server's API, and Play runs
+   `play --server`; the process-pipe and command fallbacks go once the
+   pinned release has these.
+7. **Live check.** The whole flow against this PC's network address, then
+   against a second PC.
+
+### Your server on another PC (planned, 2026-10-20)
+
+One player, your own saves, your server on another PC on your network. The
+launcher reaches every server the same way, its own included:
+
+- **A server is an address and a token.** It is a long-running
+  `Afterhours.exe serve --server-only --api` process that owns the saves,
+  World's settings and the world. On this PC it listens on `127.0.0.1`; on
+  another PC it listens on the address given with `--listen`, an explicit
+  opt-in. Nothing else differs.
+- **The launcher talks to a server only through its API**: status, events
+  (console and map), settings, profile and stop. For "This PC" it starts the
+  server and reads the address and token with `api --json`; for another PC
+  you enter the address and the pairing code once.
+- **Playing always happens on this PC**, the same way for every server:
+  `play --server` runs the game checks here, relays launcher services, starts
+  the game, routes it to the server's address and reports its progress.
+- **What stays local**: the file check, car pictures and the map (decoded
+  from this PC's installation, matched by car rather than by the server's
+  file paths), and this PC's logs.
+- **Closing the launcher** stops "This PC" only; another PC's server keeps
+  running.
+
+What is not established, and how it is treated:
+
+- **The game reaching a server that is not on its own PC** is assumed to
+  work (decision, 2026-10-20) and checked live in step 7. Today every
+  listener is loopback-only, the QoS reply refuses a non-loopback address,
+  and the supervisor requires a loopback redirector.
+- **Launcher services through a relay**: the game expects them on
+  `127.0.0.1:3216` (observed); relaying the connection to the server
+  unchanged is inferred to be enough, and step 5 tests it.
+- **Security on the network**: plain HTTP with a token on a home network;
+  the server only listens there when told to.
 
 ## Sync model
 
