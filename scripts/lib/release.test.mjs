@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { annotateManifest, launcherVersions, signedVersion, versionProblems } from "./release.mjs";
+import {
+  annotateManifest,
+  launcherVersions,
+  signedFile,
+  signedVersion,
+  versionProblems,
+} from "./release.mjs";
 
 const files = (version, lockVersion = version) => ({
   packageJson: JSON.stringify({ name: "x", version }),
@@ -78,5 +84,45 @@ describe("latest.json", () => {
     expect(
       check(manifest({ platforms: { "windows-x86_64": { signature: signature(null), url } } })),
     ).toThrow(/records no version/);
+  });
+
+  it("links a draft's GitHub API asset to the public download of the signed file", () => {
+    // What tauri-action writes for a draft release (seen on v0.1.0).
+    const api = `https://api.github.com/repos/${repository}/releases/assets/658603730`;
+    const draft = manifest({
+      platforms: {
+        "windows-x86_64": { signature: signature("0.2.0"), url: api },
+        "windows-x86_64-nsis": { signature: signature("0.2.0"), url: api },
+      },
+    });
+    const out = annotateManifest(draft, { version: "0.2.0", repository, pin });
+    expect(out.platforms["windows-x86_64"].url).toBe(url);
+    expect(out.platforms["windows-x86_64-nsis"].url).toBe(url);
+    expect(out.platforms["windows-x86_64"].signature).toBe(signature("0.2.0"));
+    expect(out.server).toEqual(pin);
+    expect(signedFile(signature("0.2.0"))).toBe("Afterhours_0.2.0_x64-setup.exe");
+  });
+
+  it("keeps refusing other hosts, other repositories and unsigned files", () => {
+    const check =
+      (url, sig = signature("0.2.0")) =>
+      () =>
+        annotateManifest(manifest({ platforms: { "windows-x86_64": { signature: sig, url } } }), {
+          version: "0.2.0",
+          repository,
+          pin,
+        });
+    expect(check("https://api.github.com/repos/someone/else/releases/assets/1")).toThrow(
+      /downloads from/,
+    );
+    expect(check(`https://api.github.com/repos/${repository}/releases/assets/x`)).toThrow(
+      /downloads from/,
+    );
+    const noFile = Buffer.from(
+      "untrusted comment: c\nRUQ\ntrusted comment: timestamp:1\tversion:0.2.0\nZGVm\n",
+    ).toString("base64");
+    expect(check(`https://api.github.com/repos/${repository}/releases/assets/1`, noFile)).toThrow(
+      /downloads from/,
+    );
   });
 });
