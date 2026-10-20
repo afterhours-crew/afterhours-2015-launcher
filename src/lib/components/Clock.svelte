@@ -21,13 +21,10 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
   }
   .date {
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
+    font-size: 16px;
     color: var(--ink-soft);
   }
 </style>

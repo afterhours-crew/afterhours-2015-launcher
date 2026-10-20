@@ -1,0 +1,94 @@
+name: Release
+
+# A `v*` tag builds the signed-for-updates NSIS installer and attaches it,
+# its .sig and latest.json to a draft release. The owner tests the draft and
+# publishes it; only then does the updater endpoint
+# (releases/latest/download/latest.json) offer it. See RELEASING.md.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Windows release
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: The tag matches every version field
+        run: node scripts/versions.mjs --tag "$TAG"
+
+      - name: The updater signing key is set up
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          node -e 'const c = require("./src-tauri/tauri.conf.json"); if (!c.plugins.updater.pubkey.trim()) { console.error("plugins.updater.pubkey is empty; see RELEASING.md."); process.exit(1); }'
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "The TAURI_SIGNING_PRIVATE_KEY secret is missing; see RELEASING.md."
+            exit 1
+          fi
+
+      - name: Pinned server
+        id: pin
+        run: |
+          pnpm sidecar
+          pnpm contract
+          echo "tag=$(node -p 'require("./server-pin.json").tag')" >> "$GITHUB_OUTPUT"
+
+      - run: pnpm test
+
+      - name: Install pinned toolchain
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Build and attach to a draft release
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Afterhours Launcher __VERSION__
+          releaseBody: |
+            Afterhours Launcher __VERSION__ for Windows, bundling the Afterhours server ${{ steps.pin.outputs.tag }}.
+
+            Install: download the `-setup.exe` below and run it as your normal user. It installs for you only and needs no administrator rights. The installer is not code-signed yet, so Windows SmartScreen may warn; choose More info, then Run anyway.
+
+            Installed launchers update from Settings › Updates. An update never installs while a session runs, and your saves are copied to the data folder's `backups` before an update that changes the server.
+          releaseDraft: true
+          prerelease: false
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+          args: --bundles nsis
+
+      - name: Name the bundled server in latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/manifest"
+          gh release download "$TAG" --pattern latest.json --dir "$RUNNER_TEMP/manifest" --clobber
+          node scripts/updater-manifest.mjs "$RUNNER_TEMP/manifest/latest.json"
+          gh release upload "$TAG" "$RUNNER_TEMP/manifest/latest.json" --clobber

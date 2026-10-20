@@ -22,26 +22,27 @@
     height: var(--control-height);
     padding: 0 18px;
     border-radius: var(--radius-pill);
-    font-weight: 700;
-    font-size: 13px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    transition: background 160ms ease-out;
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
   }
   .solid {
     background: var(--ink);
     color: var(--on-ink);
-    font-weight: 800;
   }
   .outline {
-    border: 1px solid rgba(255, 255, 255, 0.35);
+    border: 1px solid var(--graphite-outline);
     color: var(--ink);
   }
   .outline:hover:not(:disabled) {
     background: var(--hover);
   }
   .text {
-    color: var(--ink-soft);
+    padding: 0 12px;
+    color: var(--ink);
+  }
+  .text:hover:not(:disabled) {
+    background: var(--hover);
   }
   .pill-button:disabled {
     color: var(--ink-faint);

@@ -21,8 +21,8 @@
     align-items: center;
     gap: 8px;
     color: var(--ink-soft);
-    font-size: 13px;
-    line-height: 18px;
+    font-size: 14px;
+    line-height: 1.4;
   }
   .dot {
     width: 8px;

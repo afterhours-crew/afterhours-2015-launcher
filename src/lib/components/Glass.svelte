@@ -1,9 +1,9 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  // A glass surface. Light glass for small things on the Garage home, dense
-  // glass for lists and forms. Radii follow the role.
+  // A panel: opaque graphite (app.css `.ah-glass`). Radii follow the role.
+  // `dense` is accepted for old call sites and changes nothing.
   let {
-    dense = false,
+    dense: _dense = false,
     radius = "panel",
     class: extra = "",
     label,
@@ -17,10 +17,6 @@
   } = $props();
 </script>
 
-<section
-  class="ah-glass {dense ? 'ah-glass-dense' : ''} {extra}"
-  style="border-radius: var(--radius-{radius})"
-  aria-label={label}
->
+<section class="ah-glass {extra}" style="border-radius: var(--radius-{radius})" aria-label={label}>
   {@render children()}
 </section>

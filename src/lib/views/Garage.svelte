@@ -1,48 +1,94 @@
 <script lang="ts">
+  import { untrack } from "svelte";
+  import { staggerIn } from "$lib/motion";
+  import IconAlertTriangle from "@tabler/icons-svelte/icons/alert-triangle";
   import Clock from "$lib/components/Clock.svelte";
+  import EmptyLine from "$lib/components/EmptyLine.svelte";
   import Glass from "$lib/components/Glass.svelte";
+  import Mark from "$lib/components/Mark.svelte";
+  import StatChip from "$lib/components/StatChip.svelte";
+  import { formatCount, formatMoney } from "$lib/state/format";
+  import { lastSession } from "$lib/state/garage";
+  import { current, records } from "$lib/state/records.svelte";
+  import { router } from "$lib/state/router.svelte";
   import { session } from "$lib/state/session.svelte";
 
-  // Garage home: the floor holds the clock; the side panel holds messages.
-  let messages = $derived.by(() => {
-    const list: { from: string; text: string; time: string }[] = [];
-    if (session.status) {
-      list.push({
-        from: "Launcher",
-        text: `${session.status.state}: ${session.status.message}`,
-        time: session.status.utc.slice(11, 16),
-      });
-    }
-    list.push({
-      from: "Afterhours",
-      text: "Development build. The Rust launcher's live run on the real game is still pending.",
-      time: "",
-    });
-    return list;
+  // Garage home (H1). The floor holds the clock and tonight's facts from
+  // the save; the side panel says how the last session went. World
+  // settings live on World, where the server's support decides what shows.
+  let profile = $derived(current(records.profile));
+  let sessions = $derived(current(records.sessions)?.sessions ?? null);
+  let last = $derived(lastSession(session.status, sessions, new Date()));
+
+  $effect(() => {
+    if (records.canSessions) untrack(() => void records.loadSessions());
   });
+
+  const dots = {
+    ready: "var(--status-ready)",
+    warn: "var(--status-warn)",
+    info: "var(--status-info)",
+  };
 </script>
 
-<main>
-  <div class="floor">
+<main use:staggerIn>
+  <section class="floor ah-on-art" aria-label="Tonight" data-enter>
+    <span class="where">Your server · Ventura Bay</span>
     <Clock />
-  </div>
-  <Glass radius="phone" label="Messages" class="side">
-    <div class="head">
-      <h2 class="t-panel-title">Messages</h2>
-      {#if messages.length > 0}<span class="count">{messages.length}</span>{/if}
-    </div>
-    {#each messages as m, i (i)}
-      <div class="message row-hover">
-        <span class="avatar">{m.from.slice(0, 2).toUpperCase()}</span>
-        <span class="body">
-          <span class="from"
-            ><strong>{m.from}</strong> <span class="t-data-small time">{m.time}</span></span
-          >
-          <span class="text">{m.text}</span>
-        </span>
+    {#if profile}
+      <div class="chips">
+        {#if profile.bank}<StatChip text={formatMoney(profile.bank.balance)} />{/if}
+        {#if profile.reputation?.level != null}<StatChip
+            text="REP {profile.reputation.level}"
+          />{/if}
+        {#if profile.cars}<StatChip
+            text="{formatCount(profile.cars.length)} {profile.cars.length === 1 ? 'car' : 'cars'}"
+          />{/if}
       </div>
-    {/each}
-  </Glass>
+    {/if}
+  </section>
+
+  <aside data-enter>
+    <Glass radius="phone" label="Last session and messages" class="side">
+      {#if last}
+        <h2 class="t-panel-title">{last.title}</h2>
+        <div class="rows">
+          <div class="list-row">
+            {#if last.dot}<span class="dot" style="background: {dots[last.dot]}" aria-hidden="true"
+              ></span>{/if}
+            <span class="grow">{last.state}</span>
+            {#if last.when}<span class="t-data">{last.when}</span>{/if}
+          </div>
+          {#if last.warnings}
+            <div class="list-row">
+              <IconAlertTriangle size={18} stroke={1.6} aria-hidden="true" class="warn" />
+              <span class="grow"
+                >{formatCount(last.warnings)}
+                {last.warnings === 1 ? "warning" : "warnings"}</span
+              >
+              <button type="button" class="link" onclick={() => router.go("logs")}>View logs</button
+              >
+            </div>
+          {/if}
+        </div>
+        {#if last.message}
+          <h2 class="t-panel-title messages">Messages</h2>
+          <div class="message">
+            <span class="badge" aria-hidden="true"><Mark height={14} /></span>
+            <span class="body">
+              <span class="from"
+                >Afterhours{#if last.when}<span class="t-data"> {last.when}</span>{/if}</span
+              >
+              <span class="t-caption">{last.message}</span>
+            </span>
+          </div>
+        {/if}
+      {:else}
+        <h2 class="t-panel-title">Last session</h2>
+        <EmptyLine>No sessions yet. Press Play to start one.</EmptyLine>
+      {/if}
+    </Glass>
+  </aside>
 </main>
 
 <style>
@@ -50,62 +96,85 @@
     position: relative;
     flex: 1 1 auto;
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-5);
     padding: var(--space-5) var(--space-6);
     min-height: 0;
+    overflow: auto;
+    align-items: flex-start;
   }
   .floor {
-    flex: 1 1 auto;
+    flex: 999 1 480px;
+    min-width: 0;
+    align-self: stretch;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 12px;
+    text-align: center;
   }
-  main :global(.side) {
-    flex: 0 0 340px;
+  .where {
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  aside {
+    flex: 1 1 320px;
+    max-width: 360px;
+  }
+  aside :global(.side) {
+    padding: 24px;
     display: flex;
     flex-direction: column;
     gap: 6px;
-    padding: 16px 14px;
-    align-self: flex-start;
-    max-height: 100%;
-    overflow: auto;
-  }
-  .head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding: 0 4px 6px;
   }
   h2 {
     margin: 0;
+    padding-bottom: 6px;
   }
-  .count {
-    min-width: 22px;
-    padding: 0 7px;
-    border-radius: var(--radius-pill);
-    background: var(--play);
-    color: var(--on-ink);
-    font-weight: 800;
-    font-size: 12px;
-    text-align: center;
+  .messages {
+    padding-top: 16px;
+    margin-top: 6px;
+    border-top: 1px solid var(--graphite-edge);
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+  }
+  .rows :global(.warn) {
+    flex: 0 0 auto;
+    color: var(--build);
+  }
+  .link {
+    min-height: 38px;
+    padding: 0 6px;
+    font-size: 14px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
   .message {
     display: flex;
-    gap: 10px;
-    padding: 8px 6px;
-    border-radius: var(--radius-row);
+    gap: 12px;
+    padding: 4px 0;
   }
-  .avatar {
+  .badge {
     flex: 0 0 auto;
-    width: var(--avatar-md);
-    height: var(--avatar-md);
-    border-radius: var(--radius-thumb);
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-row);
+    background: var(--graphite-raised);
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--field);
-    font-weight: 800;
-    font-size: 12px;
   }
   .body {
     display: flex;
@@ -113,12 +182,11 @@
     gap: 2px;
     min-width: 0;
   }
-  .time {
-    color: var(--ink-muted);
-  }
-  .text {
-    color: var(--ink-soft);
-    font-size: 14px;
-    line-height: 1.35;
+  .from {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 15px;
   }
 </style>

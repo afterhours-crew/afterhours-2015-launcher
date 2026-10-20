@@ -1,10 +1,8 @@
 /* Fonts are vendored through @fontsource so the launcher renders offline. */
-@import "@fontsource/saira-semi-condensed/400.css";
-@import "@fontsource/saira-semi-condensed/500.css";
-@import "@fontsource/saira-semi-condensed/700.css";
-@import "@fontsource/saira-semi-condensed/800.css";
-@import "@fontsource/jetbrains-mono/400.css";
-@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/dm-sans/400.css";
+@import "@fontsource/dm-sans/500.css";
+@import "@fontsource/dm-sans/600.css";
+@import "@fontsource/dm-sans/700.css";
 @import "./lib/styles/tokens.css";
 
 *,
@@ -24,8 +22,8 @@ body {
   background: var(--floor);
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 15px;
-  line-height: 1.45;
+  font-size: 16px;
+  line-height: 1.5;
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
@@ -55,30 +53,70 @@ a {
   outline-offset: 2px;
 }
 
-/* Glass: fill, blur, edge and shadow in one class. */
+/* No scrollbar is drawn anywhere; wheel, trackpad and keyboard still scroll. */
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* A panel: opaque graphite with an edge and a drop shadow, no blur. The
+   class keeps its old name; nothing in the launcher is glass any more. */
 .ah-glass {
-  background: var(--glass);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
-  box-shadow: var(--shadow-glass);
+  background: var(--graphite);
+  border: 1px solid var(--graphite-edge);
+  box-shadow: var(--shadow-panel);
 }
 
-.ah-glass-dense {
-  background: var(--glass-dense);
+/* The header's pills are flat: graphite with no edge and no shadow. */
+.ah-glass.flat {
+  border: 0;
+  box-shadow: none;
 }
 
-@supports not (backdrop-filter: blur(1px)) {
-  .ah-glass {
-    background: var(--glass-solid);
-  }
+/* Two text levels per panel (design/README.md). Labels and secondary text
+   are one size down in the secondary grey; numbers line up on the right. */
+.t-label,
+.t-caption,
+.t-data {
+  color: var(--ink-soft);
 }
 
-@media (prefers-reduced-transparency: reduce) {
-  .ah-glass {
-    background: var(--glass-solid);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
+.t-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* A panel's rows: a label, maybe a value, a rule between rows. */
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 48px;
+  padding: 6px 0;
+  border-top: 1px solid var(--graphite-edge);
+}
+
+.list-row:first-child {
+  border-top: 0;
+}
+
+.list-row > .grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* A secondary aside after a name ("· 3 kinds", "× 4"): Svelte trims the
+   leading space of a block, so the gap is a margin. */
+.then {
+  margin-left: 0.3em;
+}
+
+/* Running text stays readable: about 65 characters a line. */
+.measure {
+  max-width: 65ch;
 }
 
 /* Text placed directly on the backdrop art. */
@@ -88,12 +126,11 @@ a {
 
 .pill {
   min-height: var(--control-height);
-  padding: 0 16px;
+  padding: 0 14px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   border-radius: var(--radius-pill);
-  transition: background 160ms ease-out;
 }
 
 .pill:hover {
@@ -114,4 +151,147 @@ a {
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* A selectable row: lists of saves, tables, files, sessions and presets. */
+.pick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: var(--radius-row);
+  text-align: left;
+  font: 400 15px/1.3 var(--font-ui);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.pick:hover:not(:disabled) {
+  background: var(--row-hover);
+}
+
+.pick[aria-checked="true"],
+.pick[aria-pressed="true"],
+.pick[aria-current="page"],
+.pick[aria-current="true"] {
+  background: var(--selected);
+  box-shadow: inset 0 0 0 1px var(--selected-edge);
+}
+
+.pick:disabled {
+  cursor: default;
+}
+
+/* Hidden but read aloud. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Motion: short, ease-out, no bounce (timing in src/lib/state/motion.ts).
+   The reduced-motion rule above turns every transition and animation off. */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-fast: 150ms;
+  --motion-base: 200ms;
+  --motion-slow: 250ms;
+}
+
+/* Buttons ease between states and give a little under the pointer. */
+button {
+  transition:
+    transform var(--motion-fast) var(--ease-out),
+    background-color var(--motion-base) var(--ease-out),
+    color var(--motion-base) var(--ease-out),
+    filter var(--motion-fast) var(--ease-out),
+    opacity var(--motion-base) var(--ease-out);
+}
+
+button:active:not(:disabled):not(.pick):not(.line):not(.card) {
+  transform: scale(0.97);
+}
+
+.pick,
+.row-hover {
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+
+/* Panels and rows entering a view, one after another (staggerIn). */
+.enter {
+  animation: enter var(--motion-slow) var(--ease-out) both;
+  animation-delay: var(--enter-delay, 0ms);
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Bars grow from nothing when they first appear. */
+.grow-x {
+  transform-origin: left center;
+  animation: grow-x var(--motion-slow) var(--ease-out) both;
+  animation-delay: var(--grow-delay, 80ms);
+}
+
+.grow-y {
+  transform-origin: center bottom;
+  animation: grow-y var(--motion-slow) var(--ease-out) both;
+  animation-delay: var(--grow-delay, 80ms);
+}
+
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes grow-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+/* The selected-item pill slides between items (slidingIndicator). */
+.slider {
+  position: relative;
+  isolation: isolate;
+}
+
+.slider > * {
+  position: relative;
+  z-index: 1;
+}
+
+.slider[data-indicator]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  width: var(--indicator-w);
+  height: var(--indicator-h);
+  transform: translate(var(--indicator-x), var(--indicator-y));
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+}
+
+.slider[data-indicator="ready"]::before {
+  transition:
+    transform var(--motion-base) var(--ease-out),
+    width var(--motion-base) var(--ease-out),
+    height var(--motion-base) var(--ease-out);
+}
+
+.slider[data-indicator] [aria-current="page"],
+.slider[data-indicator] [aria-checked="true"] {
+  background: transparent;
 }

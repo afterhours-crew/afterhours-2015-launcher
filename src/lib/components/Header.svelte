@@ -1,6 +1,7 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import { initials } from "$lib/state/launchbar";
-  import type { View } from "$lib/state/views";
+  import { NAV, type NavItem, type View } from "$lib/state/routes";
   import Mark from "./Mark.svelte";
   import NavPills from "./NavPills.svelte";
   import WindowControls from "./WindowControls.svelte";
@@ -9,21 +10,27 @@
     view,
     onNavigate,
     driverName,
+    subline = null,
+    avatar = null,
     online = false,
     showNav = true,
+    play,
   }: {
     view: View;
     onNavigate: (view: View) => void;
     driverName: string;
+    /** "REP 18 · $250,000" from the save; nothing without the profile. */
+    subline?: string | null;
+    avatar?: string | null;
     online?: boolean;
     showNav?: boolean;
+    /** The compact Play, left of the profile pill, on views without the launch bar. */
+    play?: Snippet;
   } = $props();
+  const COLORS = ["style", "speed", "build", "crew", "outlaw", "peach"];
+  let fill = $derived(COLORS.includes(avatar ?? "") ? `var(--${avatar})` : "var(--style)");
 
-  const items: { id: View; label: string; dot?: string }[] = [
-    { id: "garage", label: "Garage" },
-    { id: "host", label: "Host" },
-    { id: "settings", label: "Settings" },
-  ];
+  const items: (NavItem & { dot?: string })[] = NAV;
 </script>
 
 <header data-tauri-drag-region>
@@ -36,15 +43,20 @@
   {:else}
     <span></span>
   {/if}
-  <div class="profile ah-glass">
-    {#if showNav}
-      <span class="avatar" class:online>{initials(driverName)}</span>
-      <span class="who">
-        <span class="name">{driverName}</span>
-        <span class="t-data-small sub">REP [LEVEL]</span>
-      </span>
-    {/if}
-    <WindowControls />
+  <div class="right">
+    {#if play}{@render play()}{/if}
+    <div class="profile ah-glass flat">
+      {#if showNav}
+        <span class="avatar" class:online style="background: {fill}" aria-hidden="true"
+          >{initials(driverName)}</span
+        >
+        <span class="who">
+          <span class="name">{driverName}</span>
+          {#if subline}<span class="t-data-small sub">{subline}</span>{/if}
+        </span>
+      {/if}
+      <WindowControls />
+    </div>
   </div>
 </header>
 
@@ -52,10 +64,19 @@
   header {
     position: relative;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 12px 24px;
+    gap: 12px 16px;
     padding: var(--header-top) var(--space-6) 0;
+  }
+  /* At the narrowest window the header wraps; Play stays with the profile. */
+  .right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
   }
   .brand {
     display: flex;
@@ -63,10 +84,9 @@
     gap: 10px;
   }
   .wordmark {
-    font-weight: 800;
-    font-size: 21px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: 0.02em;
   }
   .profile {
     display: flex;
@@ -82,9 +102,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--style);
     color: var(--on-ink);
-    font-weight: 800;
+    font-weight: 700;
     font-size: 13px;
   }
   .avatar.online {
@@ -98,7 +117,8 @@
     line-height: 1.15;
   }
   .name {
-    font-weight: 700;
+    font-weight: 600;
+    font-size: 14px;
   }
   .sub {
     color: var(--ink-soft);

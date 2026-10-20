@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "StatusReport",
+  "description": "What `status --json` prints: {\"state\":\"none\"} before any session, otherwise the current session's status record. Vendored from afterhours-2015 v0.3.0 (crates/launcher/src/records.rs and commands/status.rs) until the server publishes its own schemas.",
+  "oneOf": [{ "$ref": "#/definitions/NoSession" }, { "$ref": "#/definitions/Status" }],
+  "definitions": {
+    "NoSession": {
+      "title": "NoSession",
+      "type": "object",
+      "properties": { "state": { "const": "none" } },
+      "required": ["state"],
+      "additionalProperties": false
+    },
+    "State": {
+      "title": "State",
+      "description": "Session states in the order a successful session passes through them. `interrupted` is derived on read: a live state whose supervisor no longer holds the data directory lock.",
+      "type": "string",
+      "enum": [
+        "preparing",
+        "starting",
+        "activation",
+        "ready",
+        "stopping",
+        "finished",
+        "failed",
+        "interrupted"
+      ]
+    },
+    "Status": {
+      "title": "Status",
+      "description": "artifacts/launcher/<id>/status.json: the supervisor's latest state.",
+      "type": "object",
+      "properties": {
+        "version": { "type": "integer", "const": 1 },
+        "id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "utc": { "type": "string" },
+        "state": { "$ref": "#/definitions/State" },
+        "message": { "type": "string" },
+        "worker_pid": { "type": "integer", "minimum": 0 },
+        "game_pid": { "type": ["integer", "null"], "minimum": 0 },
+        "server_pid": { "type": ["integer", "null"], "minimum": 0 }
+      },
+      "required": [
+        "version",
+        "id",
+        "utc",
+        "state",
+        "message",
+        "worker_pid",
+        "game_pid",
+        "server_pid"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

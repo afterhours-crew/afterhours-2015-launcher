@@ -1,17 +1,23 @@
 <script lang="ts">
-  import type { View } from "$lib/state/views";
+  import { slidingIndicator } from "$lib/motion";
+  import type { NavItem, View } from "$lib/state/routes";
+  import Upcoming from "./Upcoming.svelte";
   let {
     current,
     items,
     onNavigate,
   }: {
     current: View;
-    items: { id: View; label: string; dot?: string }[];
+    items: (NavItem & { dot?: string })[];
     onNavigate: (view: View) => void;
   } = $props();
 </script>
 
-<nav aria-label="Main" class="ah-glass">
+<nav
+  aria-label="Main"
+  class="ah-glass flat slider"
+  use:slidingIndicator={{ selector: '[aria-current="page"]' }}
+>
   {#each items as item (item.id)}
     <button
       type="button"
@@ -20,6 +26,7 @@
       onclick={() => onNavigate(item.id)}
     >
       {item.label}
+      {#if item.upcoming}<Upcoming compact />{/if}
       {#if item.dot}<span class="dot" style="background: {item.dot}" aria-hidden="true"></span>{/if}
     </button>
   {/each}
@@ -34,7 +41,11 @@
     border-radius: var(--radius-pill);
   }
   .pill[aria-current="page"] {
-    font-weight: 800;
+    font-weight: 700;
+  }
+  /* On the selected (light) tab the clock takes the tab's text colour. */
+  .pill[aria-current="page"] :global(.mark) {
+    color: currentColor;
   }
   .dot {
     width: 6px;

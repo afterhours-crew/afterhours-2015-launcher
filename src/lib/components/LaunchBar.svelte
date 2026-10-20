@@ -1,18 +1,17 @@
 <script lang="ts">
-  import type { LaunchBarModel } from "$lib/state/launchbar";
+  import type { LaunchBarModel, PlayAction } from "$lib/state/launchbar";
   import PlayButton from "./PlayButton.svelte";
   import StatusDot from "./StatusDot.svelte";
-  // Always present, never on glass: the car or server name and Play sit on the floor.
-  let {
-    model,
-    onPlay,
-  }: { model: LaunchBarModel; onPlay: (action: "start" | "serve" | "stop") => void } = $props();
+  // On the Garage home, never in a panel: the server and Play sit on the floor.
+  // It never shows a car.
+  let { model, onPlay }: { model: LaunchBarModel; onPlay: (action: PlayAction) => void } = $props();
 </script>
 
 <footer class="ah-on-art">
   <div class="left">
     <span class="eyebrow">{model.eyebrow}</span>
     <span class="t-car-name">{model.title}</span>
+    <span class="summary">{model.summary}</span>
   </div>
   <div class="right">
     <div class="state">
@@ -22,6 +21,7 @@
       label={model.play.label}
       disabled={model.play.disabled}
       busy={model.play.busy}
+      title={model.play.hint}
       onclick={() => model.play.action && onPlay(model.play.action)}
     />
   </div>
@@ -43,10 +43,12 @@
     min-width: 0;
   }
   .eyebrow {
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-soft);
+  }
+  .summary {
+    font-size: 14px;
     color: var(--ink-soft);
   }
   .right {

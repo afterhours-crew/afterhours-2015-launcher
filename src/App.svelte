@@ -1,48 +1,93 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { inTauri } from "$lib/api/tauri";
   import Backdrop from "$lib/components/Backdrop.svelte";
   import Header from "$lib/components/Header.svelte";
+  import HeaderPlay from "$lib/components/HeaderPlay.svelte";
   import LaunchBar from "$lib/components/LaunchBar.svelte";
-  import { detectPlatform, isLive, launchBarModel } from "$lib/state/launchbar";
+  import PillButton from "$lib/components/PillButton.svelte";
+  import Stage from "$lib/components/Stage.svelte";
+  import { toastIn } from "$lib/motion";
+  import UpdateBanner from "$lib/components/UpdateBanner.svelte";
+  import { hasCapability } from "$lib/state/capabilities";
+  import { detectPlatform, isLive, launchBarModel, type PlayAction } from "$lib/state/launchbar";
+  import { sampleMode } from "$lib/state/preview";
+  import { driverName, headerLine } from "$lib/state/profile";
+  import { current, records } from "$lib/state/records.svelte";
+  import { router } from "$lib/state/router.svelte";
   import { session } from "$lib/state/session.svelte";
-  import type { View } from "$lib/state/views";
+  import { updater } from "$lib/state/updater.svelte";
+  import { serverChangeNotice } from "$lib/state/updates";
   import FirstRun from "$lib/views/FirstRun.svelte";
   import Garage from "$lib/views/Garage.svelte";
   import Host from "$lib/views/Host.svelte";
+  import Logs from "$lib/views/Logs.svelte";
+  import MapView from "$lib/views/Map.svelte";
+  import Profile from "$lib/views/Profile.svelte";
   import Settings from "$lib/views/Settings.svelte";
+  import World from "$lib/views/World.svelte";
 
   const platform = detectPlatform(navigator.userAgent);
-  let view = $state<View>("garage");
-  let firstRun = $state(false);
+  let noticeDismissed = $state(false);
 
   $effect(() => {
-    session.load().then(() => {
-      firstRun = !session.settings.first_run_done;
-      if (!inTauri) {
-        // Browser preview for styling work: no backend, so no wizard, and
-        // `?view=host` opens a screen directly.
-        firstRun = new URLSearchParams(location.search).get("view") === "firstrun";
-        const wanted = new URLSearchParams(location.search).get("view");
-        if (wanted && ["garage", "host", "settings"].includes(wanted)) {
-          view = wanted as View;
-        }
-      }
+    void session.load().then(() => {
+      updater.start();
+      // The header and the Garage show the active save's REP and bank.
+      void records.loadProfile();
     });
   });
+
+  // A session that ends has changed the save and the session list.
+  let wasRunning = false;
+  $effect(() => {
+    const running = session.running;
+    if (wasRunning && !running) untrack(() => void records.refreshAfterSession());
+    wasRunning = running;
+  });
+
+  let profile = $derived(current(records.profile));
+
+  // The wizard runs until it has been completed once; `#/first-run` shows it
+  // in the browser preview.
+  let firstRun = $derived(
+    router.route.firstRun || (inTauri && session.loaded && !session.settings.first_run_done),
+  );
+  let view = $derived(router.route.view);
+
+  let notice = $derived(
+    session.serverTag && !noticeDismissed
+      ? serverChangeNotice(session.settings.last_server_tag, session.serverTag)
+      : null,
+  );
 
   let model = $derived(
     launchBarModel({
       platform,
-      cliReady: session.cliReady,
-      gameChosen: session.settings.game_dir !== null,
+      serverReady: session.serverReady || !inTauri,
+      updating: updater.holdsPlay,
+      gameChosen: session.settings.game_dir !== null || !inTauri,
       status: session.status,
-      running: session.running,
+      // Restart with game holds Play between stopping and starting again.
+      running: session.running || session.restarting,
+      canPlay: hasCapability(session.info?.server, "play"),
     }),
   );
 
-  function onPlay(action: "start" | "serve" | "stop") {
-    if (action === "stop") void session.stop();
-    else void session.start(action);
+  function onPlay(action: PlayAction) {
+    switch (action) {
+      case "stop":
+        void session.stop();
+        break;
+      case "play":
+        void session.play();
+        break;
+      case "restart":
+        void session.restartWithGame();
+        break;
+      default:
+        void session.start(action);
+    }
   }
 </script>
 
@@ -50,36 +95,82 @@
   <Backdrop dim={firstRun || view !== "garage"} radial={firstRun} />
   <Header
     {view}
-    onNavigate={(v) => (view = v)}
-    driverName={session.settings.player_name ?? "Driver"}
+    onNavigate={(v) => router.go(v)}
+    driverName={driverName(profile) ?? session.settings.player_name ?? "Driver"}
+    subline={headerLine(profile)}
+    avatar={session.settings.avatar}
     online={isLive(session.status?.state)}
     showNav={!firstRun}
-  />
+  >
+    {#snippet play()}
+      {#if !firstRun && view !== "garage"}<HeaderPlay
+          pill={model.pill}
+          {onPlay}
+          caption={view !== "host"}
+        />{/if}
+    {/snippet}
+  </Header>
 
   {#if !inTauri}
-    <p class="banner">
-      Browser preview: the desktop window is needed to run anything. Use <code>pnpm tauri dev</code
-      >.
+    <p class="banner" in:toastIn>
+      {#if sampleMode}
+        Sample data · browser preview only. Nothing here comes from a real save or session.
+      {:else}
+        Browser preview: the desktop window is needed to run anything. Use <code
+          >pnpm tauri dev</code
+        >. Add <code>?sample</code> to the address to look at the screens with made-up records.
+      {/if}
     </p>
   {/if}
   {#if session.error}
-    <p class="banner warn">{session.error}</p>
+    <p class="banner warn" in:toastIn>{session.error}</p>
+  {/if}
+  {#if session.closeBlocked}
+    <div class="banner warn row" in:toastIn>
+      <span
+        >A session is running. Stop it before closing the launcher: closing now would end your game.</span
+      >
+      <PillButton variant="text" onclick={() => (session.closeBlocked = false)}>OK</PillButton>
+    </div>
+  {/if}
+  {#if !firstRun && notice}
+    <div class="banner row" in:toastIn>
+      <span>{notice}</span>
+      <PillButton variant="text" onclick={() => (noticeDismissed = true)}>OK</PillButton>
+    </div>
+  {/if}
+  {#if !firstRun && updater.bannerVisible}
+    <div in:toastIn><UpdateBanner /></div>
   {/if}
 
   {#if firstRun}
-    <FirstRun {platform} onDone={() => (firstRun = false)} />
+    <FirstRun {platform} onDone={() => router.go("garage")} />
     <p class="legal">
       Community preservation project. Not affiliated with Electronic Arts or Ghost Games.
     </p>
   {:else}
-    {#if view === "garage"}
-      <Garage />
-    {:else if view === "host"}
-      <Host />
-    {:else}
-      <Settings />
-    {/if}
-    <LaunchBar {model} {onPlay} />
+    <!-- Changing view: the old one fades out, the new one rises 8px as its
+         panels fade in (Stage, staggerIn). -->
+    <Stage key={view} rise={8}>
+      {#if view === "garage"}
+        <Garage />
+      {:else if view === "profile"}
+        <Profile />
+      {:else if view === "world"}
+        <World />
+      {:else if view === "map"}
+        <MapView />
+      {:else if view === "host"}
+        <Host />
+      {:else if view === "logs"}
+        <Logs />
+      {:else}
+        <Settings />
+      {/if}
+    </Stage>
+    <!-- The full launch bar sits on the Garage home's floor only; every other
+         view runs to the window's edge and has the compact Play in the header. -->
+    {#if view === "garage"}<LaunchBar {model} {onPlay} />{/if}
   {/if}
 </div>
 
@@ -99,12 +190,19 @@
   }
   .banner {
     margin: 12px var(--space-6) 0;
-    padding: 10px 14px;
+    padding: 10px 16px;
     border-radius: var(--radius-row);
-    background: var(--field);
-    border: 1px solid var(--glass-edge);
+    background: var(--graphite);
+    border: 1px solid var(--graphite-edge);
     color: var(--ink-soft);
-    font-size: 13px;
+    font-size: 14px;
+  }
+  .banner.row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 6px 4px 14px;
   }
   .banner.warn {
     background: var(--warn-soft);
@@ -113,13 +211,14 @@
   }
   code {
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
   }
   .legal {
     margin: 0;
     padding: 0 var(--space-6) 18px;
     text-align: center;
-    font-size: 12px;
-    color: var(--ink-muted);
+    font-size: 14px;
+    color: var(--ink-soft);
   }
 </style>
