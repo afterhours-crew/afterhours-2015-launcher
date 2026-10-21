@@ -98,14 +98,18 @@ Steps, in order:
    the server's own redirector reply and QoS give it the addresses it
    listens on. `start` becomes `serve` plus `play` against `127.0.0.1`, the
    same path.
-6. **Launcher: servers by address** (`feature/server-address`). Settings →
-   General → Your server: "This PC" (started and stopped by the launcher),
-   or another PC's server by address and token, checked before it is
-   saved. With another PC, status, console, map markers, World, Profile and
-   Stop go through that server's API, closing the launcher leaves it
-   running, and starting a server or Play are refused until `play
---server` exists; the process-pipe and command fallbacks go once the
-   pinned release has these.
+6. **Launcher: servers by address, only through the API**
+   (`feature/server-address`, then `feature/api-only`). Settings → General →
+   Your server: "This PC" or another PC's server by address and token,
+   checked before it is saved; Share lets your other PCs use this PC's
+   server (`--server-only --listen`) and shows its address and token. For
+   this PC the launcher chooses its server's port and token itself
+   (`--api-port`, `AFTERHOURS_API_TOKEN`) and starts it when it opens. While
+   it has an address and token it asks that API for everything (status,
+   World, Profile and saves, sessions and logs, pictures through
+   `afterhours://` and `GET /v1/content`) and runs no other command. Against
+   another PC, Play starts the game here with `start --remote`. The command
+   path stays only for servers without the API until the pin moves.
 7. **Live check.** The whole flow against this PC's network address, then
    against a second PC.
 
