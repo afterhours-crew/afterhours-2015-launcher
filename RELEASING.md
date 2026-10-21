@@ -4,19 +4,21 @@ How a new server reaches the launcher, and how a launcher release reaches
 testers. The plan and the rules behind it are in
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
-Workflows prepare everything up to an unpublished draft. A person does two
-things: reviews and merges the release pull request, then tests the draft and
-publishes it.
+Workflows prepare everything up to an unpublished draft. A person does three
+things: approves the release pull request's CI run, reviews and merges the
+pull request, then tests the draft and publishes it.
 
 1. A release pull request appears. **Server pin bump** opens one within the
    hour after the server publishes a release; **Prepare release** opens one,
    when run by hand, for launcher changes. It sets the next version by the
    rule below and drafts the notes in its description.
-2. Merging it is the go-ahead. Once CI passes on the merge commit, **Tag
+2. Its CI waits until someone chooses **Approve workflows to run** on the
+   pull request ([why](#ci-on-the-release-pull-request)).
+3. Merging it is the go-ahead. Once CI passes on the merge commit, **Tag
    release** tags it `v<version>` and starts **Release**.
-3. **Release** builds and signs the installer and the no-install ZIP and
+4. **Release** builds and signs the installer and the no-install ZIP and
    attaches them to a **draft** with the notes from the pull request.
-4. The owner tests the draft and publishes it. Nothing publishes on its own.
+5. The owner tests the draft and publishes it. Nothing publishes on its own.
 
 ## Versions
 
@@ -93,9 +95,42 @@ release open their pull requests with the workflow's own token and need it.
 The default permission can stay read-only: each workflow asks for what it
 needs. No other token is used: the server repository is public.
 
-A pull request opened with the workflow token starts no CI, and a tag pushed
-with it starts no Release, so the workflows dispatch those runs themselves
-(`gh workflow run`). That needs no further setting.
+A tag pushed with the workflow token starts no Release, so Tag release
+dispatches it (`gh workflow run`). A pull request opened with that token does
+get CI, but GitHub holds the run until a person approves it: see the next
+section. No setting lifts that hold.
+
+## CI on the release pull request
+
+Since June 2026 GitHub creates the CI run of a pull request opened with the
+workflow token in an approval-required state
+([changelog](https://github.blog/changelog/2026-06-11-bot-created-pull-requests-can-run-workflows-if-approved/)).
+Until someone with write access chooses **Approve workflows to run** in the
+pull request's merge box, the pull request has no checks and stays blocked,
+whatever its reviews say. Approve the run when the pull request appears, so
+CI runs while you read the notes. If a later push leaves the pull request
+waiting again, approve that run the same way.
+
+From the command line:
+
+```sh
+gh run list --branch <branch> --event pull_request --status action_required
+gh api -X POST repos/afterhours-crew/afterhours-2015-launcher/actions/runs/<id>/approve
+```
+
+Running CI on the branch by hand (`gh workflow run ci.yml --ref <branch>`)
+does not help: GitHub does not count a dispatched run's checks for a pull
+request. The pull requests for 0.3.0
+([#11](https://github.com/afterhours-crew/afterhours-2015-launcher/pull/11))
+and 0.4.0
+([#14](https://github.com/afterhours-crew/afterhours-2015-launcher/pull/14)),
+on 2026-10-20, each had a dispatched run pass and still stayed blocked until
+the held run was approved and passed.
+
+Only a pull request opened by another identity, a GitHub App installation
+token or a personal access token, gets CI without the approval. Either needs
+a stored secret; the workflows use the workflow token alone, so a person
+approves.
 
 ## A new server (pin bump)
 
@@ -112,10 +147,11 @@ published, non-prerelease release newer than `server-pin.json`, it:
    changes merged since the previous release) in `package.json`,
    `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and
    `src-tauri/Cargo.lock`;
-4. pushes `pin/afterhours-<tag>`, opens **Release \<version\>: bundle server
-   \<tag\>** with the draft notes in its description, and dispatches CI on it.
+4. pushes `pin/afterhours-<tag>` and opens **Release \<version\>: bundle
+   server \<tag\>** with the draft notes in its description. Its CI waits for
+   [approval](#ci-on-the-release-pull-request).
 
-If checks are missing, run `gh workflow run ci.yml --ref pin/afterhours-<tag>`.
+If checks are missing, the CI run is waiting for that approval.
 If a newer server comes out while a pin bump is open, the next run opens
 another one for it; its description names the older one, which can be closed.
 
@@ -136,7 +172,8 @@ picks the version, and the workflow stops with "Nothing to release" when no
 launcher change merged and the server is unchanged. **minor** or **major**
 overrides the rule. Tick **dry run** to see the notes and the version change in
 the run's summary without opening anything. It pushes
-`feature/release-<version>`, opens **Release \<version\>** and dispatches CI.
+`feature/release-<version>` and opens **Release \<version\>**, whose CI waits
+for [approval](#ci-on-the-release-pull-request).
 A newer server is not pulled in here; the pin bump brings it.
 
 CI's **Release preview** job shows, on every pull request, what Prepare release
@@ -167,9 +204,10 @@ v0.1.2 notes:
 Edit the notes in the description: the draft takes them from there when it is
 built. Before merging:
 
-- CI is green, including **Server contract** for a pin bump, which runs the
-  new executable's JSON commands against temporary data folders and validates
-  them against the schemas.
+- CI ran (after **Approve workflows to run**) and is green, including
+  **Server contract** for a pin bump, which runs the new executable's JSON
+  commands against temporary data folders and validates them against the
+  schemas.
 - The server's release notes do not change saves in a way the backup rule
   does not cover.
 - If the generated types changed, the app compiles against them; fix it on
@@ -257,9 +295,13 @@ older installer, then copy the contents of
 
 The updater's install and relaunch on Windows, whether the relaunched app
 inherits a job object, and SmartScreen's behaviour without Authenticode have
-not been exercised. Record the first release's results here. The release
-automation (pin bump or Prepare release through the draft) has not run end to
-end yet either.
+not been exercised. Record the first release's results here.
+
+The release automation ran end to end on 2026-10-20: a pin bump made 0.3.0
+and Prepare release made 0.4.0, each through Tag release and Release to a
+draft, which was then published. Both pull requests needed the
+[CI approval](#ci-on-the-release-pull-request), which the workflows had not
+expected.
 
 The first run, v0.1.0 (2026-10-20), signed the installer and attached it, its
 `.sig` and `latest.json` to the draft. Two later steps failed and were fixed

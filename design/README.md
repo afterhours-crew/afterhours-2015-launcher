@@ -50,6 +50,11 @@ first run (H10). The rules, which apply to every screen:
   (`src/lib/state/privacy.ts`).
 - One accent button per screen: Play, Connect or Next, in the game logo's
   blue (`play`). The Afterhours mark keeps its own orange (`brand`).
+- **Window buttons stay apart from the profile.** Minimize, Maximize (Restore
+  while maximized) and Close sit at the far right of the header after a
+  divider, never inside the profile pill, with the Windows glyphs, square
+  hovers and a red Close (`window-close`). They share the profile's row and
+  centre line, so they wrap with it at the narrowest window.
 - Color means event type or status, and a status is always a word plus a dot.
 - All text is DM Sans. Every target is at least 38px tall with a visible
   focus ring, so the launcher works with a gamepad.

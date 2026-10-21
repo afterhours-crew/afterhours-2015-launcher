@@ -49,8 +49,8 @@
   {/if}
   <div class="right">
     {#if play}{@render play()}{/if}
-    <div class="profile ah-glass flat">
-      {#if showNav}
+    {#if showNav}
+      <div class="profile ah-glass flat">
         <span class="avatar" class:online style="background: {fill}" aria-hidden="true"
           >{initials(driverName)}</span
         >
@@ -58,9 +58,10 @@
           <span class="name">{driverName}</span>
           {#if subline}<span class="t-data-small sub">{subline}</span>{/if}
         </span>
-      {/if}
-      <WindowControls />
-    </div>
+      </div>
+      <span class="divider" aria-hidden="true"></span>
+    {/if}
+    <WindowControls />
   </div>
 </header>
 
@@ -74,7 +75,8 @@
     gap: 12px 16px;
     padding: var(--header-top) var(--space-6) 0;
   }
-  /* At the narrowest window the header wraps; Play stays with the profile. */
+  /* At the narrowest window the header wraps; Play and the window buttons
+     stay on one row with the profile, centred on it. */
   .right {
     margin-left: auto;
     display: flex;
@@ -96,8 +98,14 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 4px 6px 4px 4px;
+    padding: 4px var(--space-4) 4px 4px;
     border-radius: var(--radius-pill);
+  }
+  /* Sets the window buttons apart from the driver. */
+  .divider {
+    width: 1px;
+    height: 24px;
+    background: var(--graphite-outline);
   }
   .avatar {
     width: var(--avatar-md);
