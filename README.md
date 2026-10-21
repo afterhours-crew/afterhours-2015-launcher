@@ -153,6 +153,20 @@ was refused, if it was), so nothing in the session depends on the window:
 Talking to its own server on `127.0.0.1` is not a network call: nothing
 leaves the PC.
 
+**Only the API.** The window reaches every server, its own included, by
+address and token. For this PC it chooses a port and a token once (kept in
+its settings as `local_api`), starts its server with `--api --api-port
+<port>` and the token in `AFTERHOURS_API_TOKEN`, and from then on asks
+that API for everything: status, events, World, Profile and every save,
+sessions and their logs, decoding car pictures and the map, and the
+pictures themselves, which the app's `afterhours://` protocol fetches from
+`GET /v1/content/<file>` with the token (a page cannot send it). It runs
+no other command and reads no server file while it has an address and
+token; an unreachable server says so. When the launcher opens, it starts
+its own server (`serve`) if none runs, so World, Profile and Play work at
+once, and Play starts the game in that session. Servers without the API
+(the pinned release until the pin moves) keep the earlier command path.
+
 **Your server on another PC** (Settings → General → Your server). Start it
 there with `Afterhours.exe serve --server-only --api --listen <its address>
 --api-port <port>` and enter that address and the token its `api --json`

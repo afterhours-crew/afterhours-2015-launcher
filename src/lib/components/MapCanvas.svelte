@@ -3,6 +3,8 @@
   import IconMinus from "@tabler/icons-svelte/icons/minus";
   import IconPlus from "@tabler/icons-svelte/icons/plus";
   import { imageSrc } from "$lib/api/images";
+  import { viaApi } from "$lib/state/server";
+  import { session } from "$lib/state/session.svelte";
   import type { MapImagesReport } from "$lib/api/types";
   import {
     ZOOM_STEP,
@@ -65,6 +67,10 @@
   let fitted = $derived(shown.scale <= range[0] + 0.5);
 
   function src(tile: PlacedTile): string | null {
+    if (viaApi(session.settings)) {
+      const name = `${tile.level}-${tile.column}-${tile.row}.png`;
+      return imageSrc(null, `map-images/${report.fingerprint}/${name}`);
+    }
     return imageSrc(tilePath(report.directory, tile.level, tile.column, tile.row));
   }
 

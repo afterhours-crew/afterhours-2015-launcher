@@ -26,7 +26,7 @@
     radius?: string;
   } = $props();
 
-  let src = $derived(imageSrc(picture?.path ?? null));
+  let src = $derived(imageSrc(picture?.path ?? null, picture?.file ?? null));
   let rect = $derived(coverRect(picture?.aspect ?? 1, parseRatio(ratio)));
   let loaded = $state(false);
   let failed = $state(false);

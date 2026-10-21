@@ -88,6 +88,19 @@ impl AppState {
             .map(|live| live.endpoint.clone())
     }
 
+    /// The server the window reaches by address and token: another PC's,
+    /// or this PC's own once the launcher has started it with the API.
+    /// While there is one, the window asks it everything and runs no
+    /// command and reads no server file.
+    pub fn server_endpoint(&self) -> Option<connection::Endpoint> {
+        let settings = self.settings();
+        match (&settings.server, &settings.local_api) {
+            (Some(remote), _) => connection::Endpoint::remote(remote).ok(),
+            (None, Some(api)) => Some(connection::Endpoint::local(api)),
+            (None, None) => None,
+        }
+    }
+
     /// Whether the session this window started still runs, and if so
     /// whether it reports through the API.
     pub fn window_session(&self) -> Option<bool> {
@@ -111,6 +124,12 @@ impl AppState {
 /// Build and run the application.
 pub fn run() {
     tauri::Builder::default()
+        // Pictures and map tiles from the server's API (`GET /v1/content`).
+        .register_asynchronous_uri_scheme_protocol("afterhours", |ctx, request, responder| {
+            let app = ctx.app_handle().clone();
+            let path = request.uri().path().to_owned();
+            std::thread::spawn(move || responder.respond(images::content_response(&app, &path)));
+        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())

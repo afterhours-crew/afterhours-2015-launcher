@@ -30,6 +30,15 @@ export function isToken(input: string): boolean {
   return /^[0-9a-f]{64}$/.test(input.trim());
 }
 
+/**
+ * Whether the window reaches its server through the server's API: another
+ * PC's, or this PC's own once the launcher has started it with the API.
+ * Then pictures come from the server too, never from files here.
+ */
+export function viaApi(settings: Settings): boolean {
+  return settings.server !== null || settings.local_api !== null;
+}
+
 /** "This PC", or the address of the server on another PC. */
 export function serverLabel(settings: Settings): string {
   return settings.server ? settings.server.url.replace(/^http:\/\//, "") : "This PC";

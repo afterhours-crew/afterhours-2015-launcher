@@ -113,6 +113,27 @@ impl Endpoint {
         })
     }
 
+    /// This PC's own server, at the port and token the launcher gave it.
+    pub fn local(api: &crate::settings::LocalApi) -> Self {
+        Self {
+            id: String::new(),
+            address: SocketAddr::from(([127, 0, 0, 1], api.port)),
+            token: api.token.clone(),
+        }
+    }
+
+    /// `GET path` as the window's command result, waiting up to `wait` and
+    /// keeping up to `max` bytes; `None` when the API cannot answer.
+    pub fn read(&self, path: &str, wait: Duration, max: usize) -> Option<CliResult> {
+        usable(self.send_bounded("GET", path, &[], wait, max))
+    }
+
+    /// `POST path` that takes long (decoding pictures), as the window's
+    /// command result; `None` when the API cannot answer.
+    pub fn run(&self, path: &str, wait: Duration) -> Option<CliResult> {
+        usable(self.send_bounded("POST", path, &[], wait, MAX_RESPONSE))
+    }
+
     /// Whether this is this PC's own server.
     pub fn is_local(&self) -> bool {
         self.address.ip().is_loopback()
@@ -154,6 +175,18 @@ impl Endpoint {
         body: &[u8],
         wait: Duration,
     ) -> Result<Response, String> {
+        self.send_bounded(method, path, body, wait, MAX_RESPONSE)
+    }
+
+    /// [`Endpoint::send`] keeping up to `max` bytes of the answer.
+    pub fn send_bounded(
+        &self,
+        method: &str,
+        path: &str,
+        body: &[u8],
+        wait: Duration,
+        max: usize,
+    ) -> Result<Response, String> {
         let unreachable = |e: std::io::Error| format!("Could not reach your server: {e}");
         let mut stream = self.connect(wait).map_err(unreachable)?;
         let mut request = self.head(method, path, body).into_bytes();
@@ -161,10 +194,10 @@ impl Endpoint {
         stream.write_all(&request).map_err(unreachable)?;
         let mut bytes = Vec::new();
         stream
-            .take(MAX_RESPONSE as u64 + 1)
+            .take(max as u64 + 1)
             .read_to_end(&mut bytes)
             .map_err(unreachable)?;
-        if bytes.len() > MAX_RESPONSE {
+        if bytes.len() > max {
             return Err("Your server's answer was too long.".into());
         }
         parse_response(&bytes)
@@ -514,10 +547,10 @@ pub fn follow(app: &AppHandle, endpoint: Endpoint) {
 /// After starting a session with `--api`: wait for its API, then follow
 /// it. Gives up when the session's command exits (`stop`) or after
 /// [`API_WAIT`].
-pub fn await_api(app: &AppHandle, settings: &crate::settings::Settings, stop: &AtomicBool) {
+pub fn await_api(app: &AppHandle, endpoint: Endpoint, stop: &AtomicBool) {
     let deadline = Instant::now() + API_WAIT;
     while !stop.load(Ordering::SeqCst) && Instant::now() < deadline {
-        if let Ok(Some(endpoint)) = cli::api_endpoint(settings) {
+        if answers(&endpoint) {
             follow(app, endpoint);
             return;
         }

@@ -29,6 +29,69 @@ pub const CAR_IMAGES_TIMEOUT: Duration = Duration::from_secs(180);
 /// The map's 1,344 tiles take about ten seconds in a release build.
 pub const MAP_IMAGES_TIMEOUT: Duration = Duration::from_secs(180);
 
+/// The file a `afterhours://` picture URL names: `content/<file>` after
+/// percent-decoding, as `convertFileSrc` encodes it; `None` otherwise.
+pub fn content_file(path: &str) -> Option<String> {
+    let bytes = path.trim_start_matches('/').as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            let hex = std::str::from_utf8(bytes.get(i + 1..i + 3)?).ok()?;
+            decoded.push(u8::from_str_radix(hex, 16).ok()?);
+            i += 3;
+        } else {
+            decoded.push(bytes[i]);
+            i += 1;
+        }
+    }
+    let text = String::from_utf8(decoded).ok()?;
+    let file = text.strip_prefix("content/")?;
+    let safe = !file.is_empty()
+        && file
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'/' | b'-' | b'.' | b'_'))
+        && !file.split('/').any(|part| part.is_empty() || part == "..");
+    safe.then(|| file.to_owned())
+}
+
+/// The answer to an `afterhours://` request: the picture from the server's
+/// API, or 404.
+pub fn content_response(app: &AppHandle, path: &str) -> tauri::http::Response<Vec<u8>> {
+    let missing = || {
+        tauri::http::Response::builder()
+            .status(404)
+            .body(Vec::new())
+            .unwrap_or_default()
+    };
+    let Some(file) = content_file(path) else {
+        return missing();
+    };
+    let Some(endpoint) = app
+        .try_state::<crate::AppState>()
+        .and_then(|state| state.server_endpoint())
+    else {
+        return missing();
+    };
+    match endpoint.send_bounded(
+        "GET",
+        &format!("/v1/content/{file}"),
+        &[],
+        Duration::from_secs(30),
+        MAX_PICTURE,
+    ) {
+        Ok(answer) if answer.status == 200 => tauri::http::Response::builder()
+            .status(200)
+            .header("Content-Type", "image/png")
+            .body(answer.body)
+            .unwrap_or_else(|_| missing()),
+        _ => missing(),
+    }
+}
+
+/// Longest picture or tile fetched from the server.
+const MAX_PICTURE: usize = 16 * 1024 * 1024;
+
 /// `<data>/artifacts/content/car-images`, where the server writes the
 /// decoded pictures; `None` without a data directory.
 pub fn car_images_dir(settings: &Settings) -> Option<PathBuf> {
@@ -81,6 +144,9 @@ pub async fn car_images(
     app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<CliResult, String> {
+    if let Some(endpoint) = state.server_endpoint() {
+        return through_api(endpoint, "/v1/car-images", CAR_IMAGES_TIMEOUT).await;
+    }
     let settings = state.settings();
     let args = car_images_args(&settings);
     decode(app, settings, args, CAR_IMAGES_TIMEOUT).await
@@ -94,9 +160,27 @@ pub async fn map_images(
     app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<CliResult, String> {
+    if let Some(endpoint) = state.server_endpoint() {
+        return through_api(endpoint, "/v1/map-images", MAP_IMAGES_TIMEOUT).await;
+    }
     let settings = state.settings();
     let args = map_images_args(&settings);
     decode(app, settings, args, MAP_IMAGES_TIMEOUT).await
+}
+
+/// Decode through the server's API: its record, or why not.
+async fn through_api(
+    endpoint: crate::connection::Endpoint,
+    path: &'static str,
+    timeout: Duration,
+) -> Result<CliResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        endpoint
+            .run(path, timeout)
+            .ok_or_else(|| "Your server is not running.".to_owned())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 async fn decode(
@@ -180,5 +264,29 @@ mod tests {
         let args = car_images_args(&bare);
         assert!(args.ends_with(&["car-images".to_owned()]));
         assert!(!args.iter().any(|a| a == "--player-name"));
+    }
+}
+
+#[cfg(test)]
+mod content_tests {
+    use super::content_file;
+
+    #[test]
+    fn picture_urls_name_only_decoded_content() {
+        let car = format!("car-images/{}/{}.png", "a".repeat(64), "b".repeat(40));
+        let encoded = format!("/{}", format!("content/{car}").replace('/', "%2F"));
+        assert_eq!(content_file(&encoded), Some(car.clone()));
+        assert_eq!(content_file(&format!("/content/{car}")), Some(car));
+        for bad in [
+            "/content/",
+            "/content%2F..%2Faccount.json",
+            "/content/car-images//x.png",
+            "/other/car-images/x.png",
+            "/content/car%20images/x.png",
+            "/content/%ZZ",
+            "/content/a%2",
+        ] {
+            assert_eq!(content_file(bad), None, "{bad}");
+        }
     }
 }

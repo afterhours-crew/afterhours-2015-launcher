@@ -242,6 +242,7 @@ function images(id: string, sizes: ("medium" | "large")[]): Car["image"] {
     sizes.includes(size)
       ? {
           path: `${SAMPLE_CAR_IMAGES}\\${id}-${size}.png`,
+          file: `car-images/f00d/${id}-${size}.png`,
           width: size === "medium" ? 256 : 512,
           height: size === "medium" ? 256 : 512,
           source_format: "BC1_UNORM",

@@ -104,6 +104,10 @@ export class Session {
         // follow it through its API, as any server.
         if (hasCapability(this.info.server, "api") && isLive(this.status?.state)) {
           this.adopted = await api.connectSession();
+        } else if (this.hostsOnOpen()) {
+          // Your server runs while the launcher is open, reached through its
+          // API like any other: World, Profile and Play need it.
+          await this.start("serve");
         }
       }
       this.error = null;
@@ -153,6 +157,17 @@ export class Session {
     if (this.info && hasCapability(this.info.server, "api") && isLive(this.status?.state)) {
       this.adopted = await api.connectSession();
     }
+  }
+
+  /** Whether opening the launcher starts this PC's own server. */
+  private hostsOnOpen(): boolean {
+    const game = this.info?.game_in_launcher_folder ?? this.settings.game_dir;
+    return (
+      this.settings.first_run_done &&
+      Boolean(game) &&
+      this.settings.server === null &&
+      hasCapability(this.info?.server, "api")
+    );
   }
 
   async save(patch: Partial<Settings>): Promise<void> {

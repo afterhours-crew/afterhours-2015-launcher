@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { viaApi } from "$lib/state/server";
   import { staggerIn } from "$lib/motion";
   import type { Profile } from "$lib/api/types";
   import CarImage from "$lib/components/CarImage.svelte";
@@ -112,7 +113,13 @@
             {#if pictures}
               <!-- Identical cars share a row, so they share its picture. -->
               <CarImage
-                picture={carPicture(row.car.image, "medium", pictures, profile.car_images)}
+                picture={carPicture(
+                  row.car.image,
+                  "medium",
+                  pictures,
+                  profile.car_images,
+                  viaApi(session.settings),
+                )}
                 alt={carName(row.car)}
                 ratio="72 / 40"
                 width="72px"
@@ -152,7 +159,13 @@
       <Glass radius="phone" label="Selected car" class="panel">
         {#if pictures}
           <CarImage
-            picture={carPicture(car.image, "large", pictures, profile.car_images)}
+            picture={carPicture(
+              car.image,
+              "large",
+              pictures,
+              profile.car_images,
+              viaApi(session.settings),
+            )}
             alt={carName(car)}
             ratio="16 / 9"
             icon={32}

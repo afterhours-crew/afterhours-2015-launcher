@@ -477,9 +477,25 @@ pub async fn run_check(state: State<'_, crate::AppState>) -> Result<CliResult, S
 #[tauri::command]
 pub async fn session_status(state: State<'_, crate::AppState>) -> Result<CliResult, String> {
     let settings = settings_of(&state);
-    if let Some(remote) = settings.server.clone() {
+    if let Some(endpoint) = state.server_endpoint() {
+        // A server that does not answer runs no session the window knows of.
         return tauri::async_runtime::spawn_blocking(move || {
-            remote_command(&remote, "GET", "/v1/status")
+            Ok(
+                match endpoint.read(
+                    "/v1/status",
+                    crate::connection::REQUEST_TIMEOUT,
+                    1024 * 1024,
+                ) {
+                    Some(result) => result,
+                    None if settings.server.is_some() => CliResult::Error {
+                        exit: 5,
+                        message: "Your server on another PC does not answer.".into(),
+                    },
+                    None => CliResult::Ok {
+                        value: serde_json::json!({"version": 1, "session": null}),
+                    },
+                },
+            )
         })
         .await
         .map_err(|e| e.to_string())?;
@@ -502,7 +518,7 @@ pub fn stop(settings: &Settings) -> Result<CliResult, String> {
 #[tauri::command]
 pub async fn stop_session(state: State<'_, crate::AppState>) -> Result<CliResult, String> {
     let settings = settings_of(&state);
-    let endpoint = state.endpoint();
+    let endpoint = state.server_endpoint();
     tauri::async_runtime::spawn_blocking(move || {
         match endpoint.and_then(|e| e.command("/v1/stop").ok()) {
             Some(result) => Ok(result),
@@ -525,7 +541,7 @@ pub async fn play_game(state: State<'_, crate::AppState>) -> Result<CliResult, S
     // (afterhours-2015 #172); its own `play` would start the game there.
     local_only(&settings, "Playing")?;
     let server = server::current()?;
-    let endpoint = state.endpoint();
+    let endpoint = state.server_endpoint();
     let mut args = global_args(&settings);
     args.push("play".into());
     tauri::async_runtime::spawn_blocking(move || {
@@ -587,12 +603,10 @@ pub async fn connect_session(
         return Ok(true);
     }
     let settings = settings_of(&state);
-    let found = tauri::async_runtime::spawn_blocking(move || match &settings.server {
-        // Another PC's server is followed whenever it answers.
-        Some(remote) => {
-            let endpoint = crate::connection::Endpoint::remote(remote)?;
-            Ok(crate::connection::answers(&endpoint).then_some(endpoint))
-        }
+    let known = state.server_endpoint();
+    let found = tauri::async_runtime::spawn_blocking(move || match known {
+        // A server known by address and token is followed whenever it answers.
+        Some(endpoint) => Ok(crate::connection::answers(&endpoint).then_some(endpoint)),
         None => api_endpoint(&settings),
     })
     .await
@@ -670,7 +684,7 @@ pub async fn world_settings(
     let server = server::current()?;
     let args = settings_args(&settings, traffic, rivals.as_deref())?;
     let change = settings_change(traffic, rivals.as_deref())?;
-    let endpoint = state.endpoint();
+    let endpoint = state.server_endpoint();
     let remote = settings.server.clone();
     tauri::async_runtime::spawn_blocking(move || {
         if let Some(remote) = remote {
@@ -712,11 +726,24 @@ pub fn start_session(
         return Err("A session is already running.".into());
     }
     let stream = Stream::offered(events, api);
-    let args = start_args(&settings, &action, stream)?;
+    let mut args = start_args(&settings, &action, stream)?;
+    // The launcher's own server answers at the address and token it chose.
+    let local = if stream == Stream::Api {
+        let local = crate::settings::ensure_local_api(&app, &state)?;
+        args.push("--api-port".into());
+        args.push(local.port.to_string());
+        Some(local)
+    } else {
+        None
+    };
     // With the API the session reports through it: its standard output
     // holds only `session` and `final`, and nothing it does depends on a
     // pipe this window owns.
-    let mut child = command(&server.path)
+    let mut child = command(&server.path);
+    if let Some(local) = &local {
+        child.env("AFTERHOURS_API_TOKEN", &local.token);
+    }
+    let mut child = child
         .args(&args)
         .stdout(Stdio::piped())
         .stderr(if stream == Stream::Api {
@@ -752,9 +779,10 @@ pub fn start_session(
         let app = app.clone();
         let stop = Arc::clone(&stop_polling);
         let settings = settings.clone();
-        if stream == Stream::Api {
+        if let Some(local) = &local {
             // The API's event stream brings every status once it is up.
-            std::thread::spawn(move || crate::connection::await_api(&app, &settings, &stop));
+            let endpoint = crate::connection::Endpoint::local(local);
+            std::thread::spawn(move || crate::connection::await_api(&app, endpoint, &stop));
         } else {
             std::thread::spawn(move || {
                 while !stop.load(Ordering::SeqCst) {

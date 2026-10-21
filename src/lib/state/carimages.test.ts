@@ -15,6 +15,7 @@ const DIR =
   "C:\\Users\\Driver\\AppData\\Local\\Afterhours2015\\artifacts\\content\\car-images\\f00d";
 const png = (name: string, size: number): CarImage => ({
   path: `${DIR}\\${name}.png`,
+  file: `car-images/f00d/${name}.png`,
   width: size,
   height: size,
   source_format: "BC1_UNORM",
@@ -130,5 +131,18 @@ describe("running car-images", () => {
     expect(needsCarImages({ ...missing, cars: null }, true)).toBe(false);
     expect(needsCarImages({ ...SAMPLE_PROFILE, car_images: DIR }, true)).toBe(false);
     expect(needsCarImages(null, true)).toBe(false);
+  });
+});
+
+describe("pictures through the server's API", () => {
+  it("name the server's file and need no folder here", () => {
+    expect(carPicture(both, "large", true, null, true)).toEqual({
+      path: png("l", 512).path,
+      file: "car-images/f00d/l.png",
+      aspect: carPicture(both, "large", true, DIR)!.aspect,
+    });
+    expect(carPicture(both, "large", false, null, true)).toBeNull();
+    const unnamed: CarImages = { medium: { ...png("m", 256), file: "" }, large: null };
+    expect(carPicture(unnamed, "large", true, null, true)).toBeNull();
   });
 });

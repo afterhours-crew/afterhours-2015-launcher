@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptySettings } from "$lib/api/types";
-import { isToken, serverLabel, serverUrl } from "./server";
+import { isToken, serverLabel, serverUrl, viaApi } from "./server";
 
 describe("a server on another PC", () => {
   it("is one IPv4 address with a port, with or without http://", () => {
@@ -45,5 +45,20 @@ describe("a server on another PC", () => {
         server: { url: "http://192.168.1.20:61000", token: "a".repeat(64) },
       }),
     ).toBe("192.168.1.20:61000");
+  });
+});
+
+describe("reaching the server through its API", () => {
+  it("is so for another PC's server and for this PC's once it has an API", () => {
+    expect(viaApi(emptySettings())).toBe(false);
+    expect(viaApi({ ...emptySettings(), local_api: { port: 61234, token: "a".repeat(64) } })).toBe(
+      true,
+    );
+    expect(
+      viaApi({
+        ...emptySettings(),
+        server: { url: "http://192.168.1.20:61000", token: "a".repeat(64) },
+      }),
+    ).toBe(true);
   });
 });

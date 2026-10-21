@@ -63,6 +63,8 @@ export interface Settings {
   last_server_tag: string | null;
   /** Your server on another PC on your network; `null` is this PC's own. */
   server: RemoteServer | null;
+  /** The port and token the launcher gives its own server's API. */
+  local_api: { port: number; token: string } | null;
 }
 
 /** A server on another PC: what its `api --json` prints there. */
@@ -155,5 +157,6 @@ export function emptySettings(): Settings {
     updates: { mode: "ask", skipped_version: null },
     last_server_tag: null,
     server: null,
+    local_api: null,
   };
 }

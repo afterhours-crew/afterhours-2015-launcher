@@ -27,6 +27,8 @@ export const DISPLAY_ASPECT: Record<ImageSize, number> = { medium: 1, large: 16 
 /** A picture to show: its file and the aspect to show it at. */
 export interface CarPicture {
   path: string;
+  /** Its name on the server (`GET /v1/content/<file>`), when it comes through the API. */
+  file: string | null;
   aspect: number;
 }
 
@@ -51,13 +53,21 @@ export function carPicture(
   size: ImageSize,
   enabled: boolean,
   dir: string | null,
+  viaApi = false,
 ): CarPicture | null {
-  if (!enabled || !image || !dir) return null;
+  if (!enabled || !image) return null;
   const other: ImageSize = size === "medium" ? "large" : "medium";
   const used: ImageSize = image[size] ? size : other;
   const chosen = image[used];
-  return chosen && insideDir(chosen.path, dir)
-    ? { path: chosen.path, aspect: DISPLAY_ASPECT[used] }
+  if (!chosen) return null;
+  // Through the API the server names the picture; no path here is used.
+  if (viaApi) {
+    return chosen.file
+      ? { path: chosen.path, file: chosen.file, aspect: DISPLAY_ASPECT[used] }
+      : null;
+  }
+  return dir && insideDir(chosen.path, dir)
+    ? { path: chosen.path, file: null, aspect: DISPLAY_ASPECT[used] }
     : null;
 }
 

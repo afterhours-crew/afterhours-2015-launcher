@@ -34,6 +34,55 @@ pub struct Settings {
     /// Your server on another PC on your network, reached through its API;
     /// `None` is this PC's own server, which the launcher starts and stops.
     pub server: Option<RemoteServer>,
+    /// This PC's own server's API, as the launcher starts it: the port and
+    /// token it chooses, so it reaches its own server by address and token
+    /// exactly as it reaches one on another PC. Created the first time it
+    /// starts a server with the API.
+    pub local_api: Option<LocalApi>,
+}
+
+/// The API address and token the launcher gives its own server.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LocalApi {
+    pub port: u16,
+    /// 64 lowercase hexadecimal characters from the system's random source.
+    pub token: String,
+}
+
+impl LocalApi {
+    /// A free loopback port and a new token.
+    pub fn new() -> Result<Self, String> {
+        let port = std::net::TcpListener::bind(("127.0.0.1", 0))
+            .and_then(|listener| listener.local_addr())
+            .map_err(|e| format!("No free port for your server's API: {e}"))?
+            .port();
+        let mut bytes = [0u8; 32];
+        getrandom::getrandom(&mut bytes)
+            .map_err(|e| format!("No random source for your server's token: {e}"))?;
+        Ok(Self {
+            port,
+            token: bytes.iter().map(|b| format!("{b:02x}")).collect(),
+        })
+    }
+}
+
+/// This PC's own server's API, created and saved on first use.
+pub fn ensure_local_api(app: &AppHandle, state: &crate::AppState) -> Result<LocalApi, String> {
+    let mut current = state
+        .settings
+        .lock()
+        .map_err(|_| "settings state poisoned")?;
+    if let Some(api) = &current.local_api {
+        return Ok(api.clone());
+    }
+    let api = LocalApi::new()?;
+    let next = Settings {
+        local_api: Some(api.clone()),
+        ..current.clone()
+    };
+    write(&file(app)?, &next)?;
+    *current = next;
+    Ok(api)
 }
 
 /// A server on another PC: what its `api --json` prints there.
@@ -136,6 +185,11 @@ pub fn save_settings(
         .settings
         .lock()
         .map_err(|_| "settings state poisoned")?;
+    // The window never chooses this PC's API; keep the launcher's own.
+    let settings = Settings {
+        local_api: current.local_api.clone(),
+        ..settings
+    };
     let stored = to_store(settings, &current, &state.game_folder(&current));
     write(&file(&app)?, &stored)?;
     *current = stored;
@@ -212,12 +266,22 @@ mod tests {
                 url: "http://192.168.1.20:61000".into(),
                 token: "a".repeat(64),
             }),
+            local_api: Some(LocalApi::new().unwrap()),
         };
         write(&path, &settings).unwrap();
         assert_eq!(read(&path), settings);
         // Files from before this setting use this PC's own server.
         std::fs::write(&path, br#"{"first_run_done": true}"#).unwrap();
         assert_eq!(read(&path).server, None);
+        assert_eq!(read(&path).local_api, None);
+        let a = LocalApi::new().unwrap();
+        let b = LocalApi::new().unwrap();
+        assert!(a.port != 0 && a.token.len() == 64 && a.token != b.token);
+        assert!(
+            a.token
+                .bytes()
+                .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
+        );
         std::fs::write(&path, b"{ not json").unwrap();
         assert_eq!(read(&path), Settings::default());
         std::fs::remove_dir_all(dir).unwrap();
