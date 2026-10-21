@@ -584,9 +584,17 @@ pub enum ClosePlan {
     Wait,
 }
 
+/// Whether the followed session is this PC's own server, which closing
+/// stops: one is followed and the settings choose no server on another PC.
+/// A chosen server is never this PC's own, whatever its address (a test may
+/// run the "other PC" on loopback), so closing leaves it running.
+pub fn follows_own(server: Option<&crate::settings::RemoteServer>, followed: bool) -> bool {
+    server.is_none() && followed
+}
+
 /// Decide what closing does: `window_session` is the session this window
 /// started, if it still runs, and whether it uses the API; `following` is
-/// a session followed through its API.
+/// this PC's own server followed through its API ([`follows_own`]).
 pub fn close_plan(window_session: Option<bool>, following: bool, closing: bool) -> ClosePlan {
     match (closing, window_session, following) {
         (true, _, _) => ClosePlan::Wait,
@@ -1133,6 +1141,36 @@ mod tests {
         // A second close while stopping waits.
         assert_eq!(close_plan(Some(true), true, true), Wait);
         assert_eq!(close_plan(None, false, true), Wait);
+    }
+
+    #[test]
+    fn closing_leaves_a_chosen_server_running_even_on_loopback() {
+        use ClosePlan::*;
+        // Live check 2026-10-21: the "other PC" ran on 127.0.0.1 and closing
+        // a window that followed it stopped it.
+        let chosen = crate::settings::RemoteServer {
+            url: "http://127.0.0.1:61234".into(),
+            token: TOKEN.into(),
+        };
+        assert!(Endpoint::remote(&chosen).unwrap().is_local());
+        assert!(!follows_own(Some(&chosen), true));
+        assert_eq!(
+            close_plan(None, follows_own(Some(&chosen), true), false),
+            Close
+        );
+        // This PC's own server, followed, is still stopped first.
+        assert!(follows_own(None, true));
+        assert_eq!(
+            close_plan(None, follows_own(None, true), false),
+            StopThenClose
+        );
+        assert!(!follows_own(None, false));
+        // A game this window started (the relay for a chosen server) is the
+        // window's own session and is still stopped first.
+        assert_eq!(
+            close_plan(Some(true), follows_own(Some(&chosen), true), false),
+            StopThenClose
+        );
     }
 
     #[test]

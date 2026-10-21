@@ -167,10 +167,14 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event
                 && let Some(state) = window.try_state::<AppState>()
             {
-                // Only this PC's own server is stopped on close.
+                // Only this PC's own server is stopped on close; the settings
+                // say which server that is, not its address.
                 let plan = connection::close_plan(
                     state.window_session(),
-                    state.endpoint().is_some_and(|e| e.is_local()),
+                    connection::follows_own(
+                        state.settings().server.as_ref(),
+                        state.endpoint().is_some(),
+                    ),
                     state.closing.load(Ordering::SeqCst),
                 );
                 match plan {
