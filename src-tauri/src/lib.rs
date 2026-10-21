@@ -193,6 +193,7 @@ pub fn run() {
             settings::get_settings,
             settings::save_settings,
             settings::set_server,
+            settings::set_sharing,
             detect::detect_game_dirs,
             cli::run_check,
             cli::session_status,

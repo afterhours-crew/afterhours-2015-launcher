@@ -167,6 +167,12 @@ its own server (`serve`) if none runs, so World, Profile and Play work at
 once, and Play starts the game in that session. Servers without the API
 (the pinned release until the pin moves) keep the earlier command path.
 
+**Sharing this PC's server** (Settings → General → Your server → Share).
+The launcher then starts its server with `--server-only --listen <this PC's
+address>` and shows the address and token another PC's launcher enters;
+the game no longer runs on this PC. It takes effect from the server's next
+start, and Windows may ask to allow it through the firewall.
+
 **Your server on another PC** (Settings → General → Your server). Start it
 there with `Afterhours.exe serve --server-only --api --listen <its address>
 --api-port <port>` and enter that address and the token its `api --json`

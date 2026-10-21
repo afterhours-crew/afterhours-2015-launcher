@@ -39,6 +39,50 @@ pub struct Settings {
     /// exactly as it reaches one on another PC. Created the first time it
     /// starts a server with the API.
     pub local_api: Option<LocalApi>,
+    /// This PC's network address when your other PCs may use this server:
+    /// the launcher then starts it with `--server-only --listen <address>`.
+    /// `None` keeps it on this PC only.
+    pub share_address: Option<std::net::Ipv4Addr>,
+}
+
+/// This PC's IPv4 address on its network: the source a UDP socket would
+/// use toward a documentation address (connecting one sends nothing).
+pub fn this_pc_address() -> Option<std::net::Ipv4Addr> {
+    let socket = std::net::UdpSocket::bind(("0.0.0.0", 0)).ok()?;
+    socket.connect(("192.0.2.1", 9)).ok()?;
+    match socket.local_addr().ok()?.ip() {
+        std::net::IpAddr::V4(ip) if !ip.is_loopback() && !ip.is_unspecified() => Some(ip),
+        _ => None,
+    }
+}
+
+/// Let your other PCs use this PC's server, or keep it on this PC only.
+/// Takes effect when the server next starts; refused while it runs.
+#[tauri::command]
+pub fn set_sharing(
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+    enabled: bool,
+) -> Result<Settings, String> {
+    if state.window_session_runs() {
+        return Err("Stop your server first; sharing changes when it starts.".into());
+    }
+    let share_address = if enabled {
+        Some(this_pc_address().ok_or("This PC has no network address to share on.")?)
+    } else {
+        None
+    };
+    let mut current = state
+        .settings
+        .lock()
+        .map_err(|_| "settings state poisoned")?;
+    let next = Settings {
+        share_address,
+        ..current.clone()
+    };
+    write(&file(&app)?, &next)?;
+    *current = next;
+    Ok(effective(&current, &state.game_folder(&current)))
 }
 
 /// The API address and token the launcher gives its own server.
@@ -267,6 +311,7 @@ mod tests {
                 token: "a".repeat(64),
             }),
             local_api: Some(LocalApi::new().unwrap()),
+            share_address: Some([192, 168, 1, 20].into()),
         };
         write(&path, &settings).unwrap();
         assert_eq!(read(&path), settings);
@@ -274,6 +319,7 @@ mod tests {
         std::fs::write(&path, br#"{"first_run_done": true}"#).unwrap();
         assert_eq!(read(&path).server, None);
         assert_eq!(read(&path).local_api, None);
+        assert_eq!(read(&path).share_address, None);
         let a = LocalApi::new().unwrap();
         let b = LocalApi::new().unwrap();
         assert!(a.port != 0 && a.token.len() == 64 && a.token != b.token);

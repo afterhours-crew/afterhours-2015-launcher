@@ -5,7 +5,7 @@
   import Note from "$lib/components/Note.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
   import { sampleMode } from "$lib/state/preview";
-  import { isToken, serverLabel, serverUrl } from "$lib/state/server";
+  import { isToken, pairing, serverLabel, serverUrl } from "$lib/state/server";
   import { session } from "$lib/state/session.svelte";
   import Field from "$lib/components/Field.svelte";
 
@@ -79,6 +79,25 @@
       serverNote = { kind: "warn", text: failure(e) };
     } finally {
       connecting = false;
+    }
+  }
+
+  let sharing = $derived(session.settings.share_address !== null);
+  let paired = $derived(pairing(session.settings));
+
+  async function share(enabled: boolean) {
+    serverNote = null;
+    try {
+      if (sampleMode) throw new Error("The browser preview cannot share a server.");
+      session.settings = await api.setSharing(enabled);
+      serverNote = {
+        kind: "ready",
+        text: enabled
+          ? "Your server will be shared from its next start, without the game on this PC."
+          : "Your server stays on this PC from its next start.",
+      };
+    } catch (e) {
+      serverNote = { kind: "warn", text: failure(e) };
     }
   }
 
@@ -193,6 +212,27 @@
           >
         {/if}
       </div>
+    </div>
+  {/if}
+  {#if !session.settings.server}
+    <div class="list-row tall">
+      <span class="grow text">
+        <span class="name" id="share-label">
+          Let your other PCs use this server
+          <InfoButton
+            label="About sharing"
+            text="Your server then listens on this PC's network address, so a launcher on another PC on your network can use it, and the game no longer runs on this PC. Windows may ask you to allow it through the firewall."
+          />
+        </span>
+        {#if paired}
+          <span class="t-data path">Address {paired.address} · Token {paired.token}</span>
+        {:else if sharing}
+          <span class="t-data path">Start your server once to get its address and token.</span>
+        {/if}
+      </span>
+      <PillButton variant="text" onclick={() => share(!sharing)} disabled={connecting}
+        >{sharing ? "Stop sharing" : "Share"}</PillButton
+      >
     </div>
   {/if}
   {#if serverNote}<div class="note"><Note kind={serverNote.kind}>{serverNote.text}</Note></div>{/if}

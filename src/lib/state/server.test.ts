@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptySettings } from "$lib/api/types";
-import { isToken, serverLabel, serverUrl, viaApi } from "./server";
+import { isToken, pairing, serverLabel, serverUrl, viaApi } from "./server";
 
 describe("a server on another PC", () => {
   it("is one IPv4 address with a port, with or without http://", () => {
@@ -60,5 +60,18 @@ describe("reaching the server through its API", () => {
         server: { url: "http://192.168.1.20:61000", token: "a".repeat(64) },
       }),
     ).toBe(true);
+  });
+});
+
+describe("sharing this PC's server", () => {
+  it("gives the address and token another PC enters, once both exist", () => {
+    const local_api = { port: 61234, token: "a".repeat(64) };
+    expect(pairing(emptySettings())).toBeNull();
+    expect(pairing({ ...emptySettings(), share_address: "192.168.1.20" })).toBeNull();
+    expect(pairing({ ...emptySettings(), local_api })).toBeNull();
+    expect(pairing({ ...emptySettings(), local_api, share_address: "192.168.1.20" })).toEqual({
+      address: "192.168.1.20:61234",
+      token: "a".repeat(64),
+    });
   });
 });

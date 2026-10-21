@@ -39,6 +39,8 @@ export const api = {
    * or this PC's own again with `null`.
    */
   setServer: (server: RemoteServer | null) => invoke<Settings>("set_server", { server }),
+  /** Let your other PCs use this PC's server, from its next start. */
+  setSharing: (enabled: boolean) => invoke<Settings>("set_sharing", { enabled }),
   detectGameDirs: () => invoke<string[]>("detect_game_dirs"),
   runCheck: () => invoke<CliResult>("run_check"),
   sessionStatus: () => invoke<CliResult>("session_status"),

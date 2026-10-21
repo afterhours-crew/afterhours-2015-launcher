@@ -571,6 +571,20 @@ pub async fn play_game(
     .map_err(|e| e.to_string())?
 }
 
+/// Arguments for a `serve` shared with your other PCs: on this PC's network
+/// address, without game support here (a game on a PC reaches it through a
+/// relay there). None otherwise.
+pub fn sharing_args(settings: &Settings, action: &str) -> Vec<String> {
+    match settings.share_address {
+        Some(address) if action == "serve" => vec![
+            "--server-only".to_owned(),
+            "--listen".to_owned(),
+            address.to_string(),
+        ],
+        _ => Vec::new(),
+    }
+}
+
 /// One request to your server on another PC, as the window's command
 /// result: there are no local commands to fall back to.
 pub fn remote_command(
@@ -764,6 +778,7 @@ fn launch(
     }
     let mut args = start_args(&settings, &action, stream)?;
     args.extend(extra);
+    args.extend(sharing_args(&settings, &action));
     // The launcher's own server answers at the address and token it chose.
     let local = if stream == Stream::Api {
         let local = crate::settings::ensure_local_api(&app, state)?;
@@ -905,6 +920,21 @@ mod tests {
         );
         assert!(settings_args(&settings, None, Some("lots")).is_err());
         assert!(settings_args(&settings, None, Some("-1")).is_err());
+    }
+
+    #[test]
+    fn a_shared_server_listens_on_this_pcs_address_without_the_game() {
+        let mut settings = Settings::default();
+        assert!(sharing_args(&settings, "serve").is_empty());
+        settings.share_address = Some([192, 168, 1, 20].into());
+        assert_eq!(
+            sharing_args(&settings, "serve"),
+            ["--server-only", "--listen", "192.168.1.20"]
+        );
+        assert!(
+            sharing_args(&settings, "start").is_empty(),
+            "the game stays local"
+        );
     }
 
     #[test]

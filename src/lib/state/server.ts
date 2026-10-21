@@ -39,6 +39,18 @@ export function viaApi(settings: Settings): boolean {
   return settings.server !== null || settings.local_api !== null;
 }
 
+/**
+ * What another PC enters to use this PC's server: its address and token,
+ * once sharing is on and the server has an API port; `null` otherwise.
+ */
+export function pairing(settings: Settings): { address: string; token: string } | null {
+  if (!settings.share_address || !settings.local_api) return null;
+  return {
+    address: `${settings.share_address}:${settings.local_api.port}`,
+    token: settings.local_api.token,
+  };
+}
+
 /** "This PC", or the address of the server on another PC. */
 export function serverLabel(settings: Settings): string {
   return settings.server ? settings.server.url.replace(/^http:\/\//, "") : "This PC";

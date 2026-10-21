@@ -65,6 +65,8 @@ export interface Settings {
   server: RemoteServer | null;
   /** The port and token the launcher gives its own server's API. */
   local_api: { port: number; token: string } | null;
+  /** This PC's network address while your other PCs may use its server. */
+  share_address: string | null;
 }
 
 /** A server on another PC: what its `api --json` prints there. */
@@ -158,5 +160,6 @@ export function emptySettings(): Settings {
     last_server_tag: null,
     server: null,
     local_api: null,
+    share_address: null,
   };
 }
