@@ -174,9 +174,11 @@ prints; the launcher asks the server's API before saving them. From then on
 the window follows that server exactly as it follows its own: status,
 console, map markers, World and Profile come from its API and Stop stops it,
 but closing the launcher leaves it running. There is no command to fall back
-to for another PC, so an unreachable server says so. Starting a server and
-Play need this PC's server until `play --server` (afterhours-2015 #172)
-starts the game here against another PC; "Use this PC" switches back.
+to for another PC, so an unreachable server says so. Starting a server here is refused; Play starts the game on this PC with
+`start --remote <address> --token <token>` (afterhours-2015 #172), which
+relays it to that server, and the window follows that local session until
+the game closes, then Stop stops the game, not the server. "Use this PC"
+switches back.
 
 Without `api`, older servers keep the earlier paths. With `events`, sessions
 run with `--events`: the server prints one JSON `event` record per line

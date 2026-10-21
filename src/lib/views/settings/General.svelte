@@ -154,7 +154,7 @@
         Your server
         <InfoButton
           label="About your server"
-          text="The launcher reaches its server through the server's API, on this PC or on another PC on your network. On the other PC, start it with serve --server-only --api --listen <its address> --api-port <port>, then enter that address and the token its api --json prints. Playing from here against another PC comes later."
+          text="The launcher reaches its server through the server's API, on this PC or on another PC on your network. On the other PC, start it with serve --server-only --api --listen <its address> --api-port <port>, then enter that address and the token its api --json prints. Play then starts the game on this PC and connects it to that server."
         />
       </span>
       <span class="t-data path">{serverLabel(session.settings)}</span>

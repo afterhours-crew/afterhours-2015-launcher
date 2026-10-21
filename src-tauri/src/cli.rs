@@ -518,7 +518,9 @@ pub fn stop(settings: &Settings) -> Result<CliResult, String> {
 #[tauri::command]
 pub async fn stop_session(state: State<'_, crate::AppState>) -> Result<CliResult, String> {
     let settings = settings_of(&state);
-    let endpoint = state.server_endpoint();
+    // The session the window follows first: a game played here against
+    // another PC's server is stopped, not that server.
+    let endpoint = state.endpoint().or_else(|| state.server_endpoint());
     tauri::async_runtime::spawn_blocking(move || {
         match endpoint.and_then(|e| e.command("/v1/stop").ok()) {
             Some(result) => Ok(result),
@@ -535,11 +537,26 @@ pub async fn stop_session(state: State<'_, crate::AppState>) -> Result<CliResult
 /// request's record, or the refusal (no serve session, a game already
 /// running). Through the session API when the window follows one.
 #[tauri::command]
-pub async fn play_game(state: State<'_, crate::AppState>) -> Result<CliResult, String> {
+pub async fn play_game(
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+) -> Result<CliResult, String> {
     let settings = settings_of(&state);
-    // Playing against another PC's server comes with `play --server`
-    // (afterhours-2015 #172); its own `play` would start the game there.
-    local_only(&settings, "Playing")?;
+    // Against another PC's server the game still runs here: `start
+    // --remote` relays it to that server (afterhours-2015 #172), and the
+    // window follows that local session until the game closes.
+    if let Some(remote) = &settings.server {
+        let extra = vec![
+            "--remote".to_owned(),
+            remote.url.clone(),
+            "--token".to_owned(),
+            remote.token.clone(),
+        ];
+        launch(&app, &state, "start", Stream::Api, extra)?;
+        return Ok(CliResult::Ok {
+            value: serde_json::json!({"version": 1, "remote": remote.url}),
+        });
+    }
     let server = server::current()?;
     let endpoint = state.server_endpoint();
     let mut args = global_args(&settings);
@@ -716,8 +733,28 @@ pub fn start_session(
     if !["setup", "serve", "start"].contains(&action.as_str()) {
         return Err(format!("Unknown action {action}."));
     }
-    let settings = settings_of(&state);
-    local_only(&settings, "Starting a server")?;
+    local_only(&settings_of(&state), "Starting a server")?;
+    launch(
+        &app,
+        &state,
+        &action,
+        Stream::offered(events, api),
+        Vec::new(),
+    )
+}
+
+/// Start a session reporting through `stream`, with `extra` arguments after
+/// the action's (`--remote` and `--token` for a game against another PC).
+fn launch(
+    app: &AppHandle,
+    state: &State<'_, crate::AppState>,
+    action: &str,
+    stream: Stream,
+    extra: Vec<String>,
+) -> Result<(), String> {
+    let app = app.clone();
+    let action = action.to_owned();
+    let settings = settings_of(state);
     let server = server::current()?;
     let mut guard = state.session.lock().map_err(|_| "session state poisoned")?;
     if let Some(running) = guard.as_mut()
@@ -725,11 +762,11 @@ pub fn start_session(
     {
         return Err("A session is already running.".into());
     }
-    let stream = Stream::offered(events, api);
     let mut args = start_args(&settings, &action, stream)?;
+    args.extend(extra);
     // The launcher's own server answers at the address and token it chose.
     let local = if stream == Stream::Api {
-        let local = crate::settings::ensure_local_api(&app, &state)?;
+        let local = crate::settings::ensure_local_api(&app, state)?;
         args.push("--api-port".into());
         args.push(local.port.to_string());
         Some(local)
