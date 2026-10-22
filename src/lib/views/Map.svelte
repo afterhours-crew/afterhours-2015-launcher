@@ -92,10 +92,10 @@
             <div class="state">
               {#if noContent}
                 <p>The map is read from your game when your server first gets ready.</p>
-                <p class="t-caption">Start your server once on Host, then come back.</p>
+                <p class="t-caption">Start your server once on Server, then come back.</p>
                 <div class="actions">
-                  <PillButton variant="solid" onclick={() => router.go("host")}
-                    >Open Host</PillButton
+                  <PillButton variant="solid" onclick={() => router.go("server")}
+                    >Open Server</PillButton
                   >
                   <PillButton onclick={() => void records.loadMap()}>Try again</PillButton>
                 </div>

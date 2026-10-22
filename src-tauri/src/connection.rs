@@ -166,6 +166,27 @@ impl Endpoint {
         self.send(method, path, &[], REQUEST_TIMEOUT)
     }
 
+    /// `GET path` giving the server `wait` to accept the connection and to
+    /// answer: the Server screen's checks, which must not hang on a PC
+    /// that is off.
+    pub fn probe(&self, path: &str, wait: Duration) -> Result<Response, String> {
+        let unreachable = |e: std::io::Error| format!("Could not reach the server: {e}");
+        let mut stream = TcpStream::connect_timeout(&self.address, wait).map_err(unreachable)?;
+        stream.set_read_timeout(Some(wait)).map_err(unreachable)?;
+        stream.set_write_timeout(Some(wait)).map_err(unreachable)?;
+        let request = self.head("GET", path, &[]).into_bytes();
+        stream.write_all(&request).map_err(unreachable)?;
+        let mut bytes = Vec::new();
+        stream
+            .take(MAX_RESPONSE as u64 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(unreachable)?;
+        if bytes.len() > MAX_RESPONSE {
+            return Err("The server's answer was too long.".into());
+        }
+        parse_response(&bytes)
+    }
+
     /// One request with a JSON `body` (none when empty), waiting up to
     /// `wait` for the answer; its status code and body.
     pub fn send(
@@ -515,8 +536,24 @@ pub fn follow(app: &AppHandle, endpoint: Endpoint) {
     let app = app.clone();
     std::thread::spawn(move || {
         let mut last_status = None;
+        let (key, name) = app
+            .try_state::<crate::AppState>()
+            .map(|state| crate::servers::label_for(&state, &endpoint))
+            .unwrap_or_else(|| (crate::servers::THIS_PC.to_owned(), "server".to_owned()));
+        let mut opened = 0u32;
         loop {
             if let Ok(reader) = endpoint.open_events() {
+                opened += 1;
+                crate::connlog::record(
+                    &app,
+                    &key,
+                    &if opened == 1 {
+                        format!("Connected to {name}")
+                    } else {
+                        format!("Reconnected to {name}")
+                    },
+                    endpoint.address.to_string(),
+                );
                 read_stream(reader, &mut last_status, |event| send(&app, event));
             }
             // The stream ends with the session; one that broke is reopened.
@@ -524,6 +561,18 @@ pub fn follow(app: &AppHandle, endpoint: Endpoint) {
                 break;
             }
             std::thread::sleep(Duration::from_millis(500));
+        }
+        if !stop.load(Ordering::SeqCst) {
+            crate::connlog::record(
+                &app,
+                &key,
+                &if has_ended(&last_status) {
+                    format!("{name}: the session ended")
+                } else {
+                    format!("{name} stopped answering")
+                },
+                String::new(),
+            );
         }
         let Some(state) = app.try_state::<crate::AppState>() else {
             return;
@@ -590,6 +639,29 @@ pub enum ClosePlan {
 /// run the "other PC" on loopback), so closing leaves it running.
 pub fn follows_own(server: Option<&crate::settings::RemoteServer>, followed: bool) -> bool {
     server.is_none() && followed
+}
+
+/// What closing does with this PC's own running server.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CloseChoice {
+    /// Ask the person: keep it running for the other PCs, or stop it.
+    Ask,
+    /// Close and leave it running.
+    Keep,
+    /// Stop it, wait, then close.
+    Stop,
+}
+
+/// A server that is not shared is stopped, as decided on 2026-10-20: nothing
+/// else uses it. A shared one may be in use by your other PCs, so the
+/// remembered choice decides, or the person is asked.
+pub fn close_choice(shared: bool, action: crate::servers::CloseAction) -> CloseChoice {
+    use crate::servers::CloseAction;
+    match (shared, action) {
+        (false, _) | (true, CloseAction::Stop) => CloseChoice::Stop,
+        (true, CloseAction::Keep) => CloseChoice::Keep,
+        (true, CloseAction::Ask) => CloseChoice::Ask,
+    }
 }
 
 /// Decide what closing does: `window_session` is the session this window

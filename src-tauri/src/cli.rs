@@ -73,6 +73,13 @@ pub enum OutputLine {
     },
     /// Anything else: server or game diagnostics, launch context.
     Text { text: String },
+    /// The launcher's own line about the server in use: picked, connected,
+    /// refused, stop sent (see [`crate::connlog`]).
+    Launcher {
+        time: String,
+        message: String,
+        detail: String,
+    },
 }
 
 /// Parse one console line from the supervisor.
@@ -516,19 +523,27 @@ pub fn stop(settings: &Settings) -> Result<CliResult, String> {
 /// Ask the session to stop: through its API when the window follows one,
 /// else with the `stop` command.
 #[tauri::command]
-pub async fn stop_session(state: State<'_, crate::AppState>) -> Result<CliResult, String> {
+pub async fn stop_session(
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+) -> Result<CliResult, String> {
     let settings = settings_of(&state);
     // The session the window follows first: a game played here against
     // another PC's server is stopped, not that server.
     let endpoint = state.endpoint().or_else(|| state.server_endpoint());
-    tauri::async_runtime::spawn_blocking(move || {
+    let (key, name) = crate::servers::in_use_label(&state);
+    let result = tauri::async_runtime::spawn_blocking(move || {
         match endpoint.and_then(|e| e.command("/v1/stop").ok()) {
             Some(result) => Ok(result),
             None => stop(&settings),
         }
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+    if matches!(result, CliResult::Ok { .. }) {
+        crate::connlog::record(&app, &key, &format!("Stop sent to {name}"), String::new());
+    }
+    Ok(result)
 }
 
 /// `play --json`: ask the running `serve` session to start the game. The
@@ -542,6 +557,7 @@ pub async fn play_game(
     state: State<'_, crate::AppState>,
 ) -> Result<CliResult, String> {
     let settings = settings_of(&state);
+    let (key, name) = crate::servers::in_use_label(&state);
     // Against another PC's server the game still runs here: `start
     // --remote` relays it to that server (afterhours-2015 #172), and the
     // window follows that local session until the game closes.
@@ -553,6 +569,13 @@ pub async fn play_game(
             remote.token.clone(),
         ];
         launch(&app, &state, "start", Stream::Api, extra)?;
+        crate::servers::note_played(&app, &state);
+        crate::connlog::record(
+            &app,
+            &key,
+            &format!("Play: the game starts on this PC, relayed to {name}"),
+            String::new(),
+        );
         return Ok(CliResult::Ok {
             value: serde_json::json!({"version": 1, "remote": remote.url}),
         });
@@ -561,14 +584,24 @@ pub async fn play_game(
     let endpoint = state.server_endpoint();
     let mut args = global_args(&settings);
     args.push("play".into());
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         match endpoint.and_then(|e| e.command("/v1/play").ok()) {
             Some(result) => Ok(result),
             None => run_json(&server.path, &args, STATUS_TIMEOUT),
         }
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+    if matches!(result, CliResult::Ok { .. }) {
+        crate::servers::note_played(&app, &state);
+        crate::connlog::record(
+            &app,
+            &key,
+            "Play: the game starts on this PC's server",
+            String::new(),
+        );
+    }
+    Ok(result)
 }
 
 /// Arguments for a `serve` shared with your other PCs: on this PC's network

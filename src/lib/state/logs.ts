@@ -426,7 +426,7 @@ export interface ConsoleRow {
   /** "17:41:02"; empty for a line without a time. */
   time: string;
   level: string;
-  tone: "warn" | "error" | null;
+  tone: "warn" | "error" | "info" | null;
   message: string;
   /** "service=lsx route=GetBlockList", in the secondary grey. */
   detail: string;
@@ -446,6 +446,17 @@ export function consoleRow(line: OutputLine): ConsoleRow {
       tone: state === "failed" ? "warn" : null,
       message: line.message,
       detail: "",
+    };
+  }
+  // The launcher's own line about the server in use, told apart from the
+  // server's by its level.
+  if (line.kind === "launcher") {
+    return {
+      time: line.time,
+      level: "Launcher",
+      tone: "info",
+      message: line.message,
+      detail: line.detail,
     };
   }
   const parsed = parseLogLine(line.text, 0);

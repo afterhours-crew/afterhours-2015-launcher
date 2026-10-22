@@ -28,12 +28,14 @@
 
 pub mod cli;
 pub mod connection;
+pub mod connlog;
 pub mod data;
 pub mod detect;
 pub mod images;
 pub mod pin;
 pub mod reads;
 pub mod server;
+pub mod servers;
 pub mod settings;
 pub mod updates;
 
@@ -65,6 +67,11 @@ pub struct AppState {
     pub closing: AtomicBool,
     /// The folder holding this launcher's executable.
     pub launcher_dir: Option<std::path::PathBuf>,
+    /// Your servers: the ones on other PCs and which one is in use.
+    pub servers: Mutex<servers::Servers>,
+    /// What each saved server last answered a check with, by id, so only
+    /// a change is written to its log.
+    pub health: Mutex<std::collections::HashMap<String, String>>,
 }
 
 impl AppState {
@@ -147,12 +154,15 @@ pub fn run() {
                 window.set_focus()?;
             }
             let settings = settings::load(app.handle())?;
+            let servers = servers::load(app.handle(), &settings)?;
             app.manage(AppState {
                 settings: Mutex::new(settings),
                 session: Mutex::new(None),
                 connection: Mutex::new(None),
                 closing: AtomicBool::new(false),
                 launcher_dir: detect::launcher_dir(),
+                servers: Mutex::new(servers),
+                health: Mutex::new(std::collections::HashMap::new()),
             });
             let state = app.state::<AppState>();
             images::allow(app.handle(), &state.settings());
@@ -185,10 +195,35 @@ pub fn run() {
                     }
                     connection::ClosePlan::Wait => api.prevent_close(),
                     connection::ClosePlan::StopThenClose => {
-                        api.prevent_close();
-                        state.closing.store(true, Ordering::SeqCst);
-                        let _ = window.emit("closing", ());
-                        connection::stop_then_close(window.app_handle().clone());
+                        // A shared server may be in use by your other PCs:
+                        // ask whether to keep it running, unless the answer
+                        // was remembered.
+                        let shared = state.settings().share_address.is_some();
+                        let action = state
+                            .servers
+                            .lock()
+                            .map(|s| s.close_action)
+                            .unwrap_or_default();
+                        match connection::close_choice(shared, action) {
+                            connection::CloseChoice::Ask => {
+                                api.prevent_close();
+                                let _ = window.emit("close-ask", ());
+                            }
+                            connection::CloseChoice::Keep => {
+                                connlog::record(
+                                    window.app_handle(),
+                                    servers::THIS_PC,
+                                    "Launcher closed; the shared server keeps running",
+                                    String::new(),
+                                );
+                            }
+                            connection::CloseChoice::Stop => {
+                                api.prevent_close();
+                                state.closing.store(true, Ordering::SeqCst);
+                                let _ = window.emit("closing", ());
+                                connection::stop_then_close(window.app_handle().clone());
+                            }
+                        }
                     }
                 }
             }
@@ -206,6 +241,17 @@ pub fn run() {
             cli::play_game,
             cli::connect_session,
             cli::world_settings,
+            servers::servers_list,
+            servers::server_check,
+            servers::server_add,
+            servers::server_use,
+            servers::server_rename,
+            servers::server_forget,
+            servers::server_set_token,
+            servers::servers_health,
+            servers::set_close_action,
+            servers::close_decision,
+            servers::connection_log,
             images::car_images,
             images::map_images,
             data::recorded,

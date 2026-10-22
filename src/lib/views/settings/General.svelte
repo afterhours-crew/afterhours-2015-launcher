@@ -4,10 +4,11 @@
   import InfoButton from "$lib/components/InfoButton.svelte";
   import Note from "$lib/components/Note.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
+  import Segmented from "$lib/components/Segmented.svelte";
   import { sampleMode } from "$lib/state/preview";
-  import { isToken, pairing, serverLabel, serverUrl } from "$lib/state/server";
+  import { router } from "$lib/state/router.svelte";
+  import { servers } from "$lib/state/servers.svelte";
   import { session } from "$lib/state/session.svelte";
-  import Field from "$lib/components/Field.svelte";
 
   // Game and data (H9): where the game is and where the server keeps saves
   // and logs. Changing the game folder checks it at once. A launcher in the
@@ -53,72 +54,15 @@
     await session.refreshInfo();
   }
 
-  // Your server (track 8): this PC's own, or one on another PC on your
-  // network, reached the same way through its API.
-  let editing = $state(false);
-  let address = $state("");
-  let token = $state("");
-  let connecting = $state(false);
-  let serverNote = $state<{ kind: "ready" | "warn"; text: string } | null>(null);
-
-  async function useServer(server: { url: string; token: string } | null) {
-    connecting = true;
-    serverNote = null;
-    try {
-      if (sampleMode) throw new Error("The browser preview cannot reach a server.");
-      await session.useServer(server);
-      editing = false;
-      token = "";
-      serverNote = {
-        kind: "ready",
-        text: server
-          ? `Using your server at ${serverLabel(session.settings)}.`
-          : "Using this PC's server.",
-      };
-    } catch (e) {
-      serverNote = { kind: "warn", text: failure(e) };
-    } finally {
-      connecting = false;
-    }
-  }
-
-  let sharing = $derived(session.settings.share_address !== null);
-  let paired = $derived(pairing(session.settings));
-
-  async function share(enabled: boolean) {
-    serverNote = null;
-    try {
-      if (sampleMode) throw new Error("The browser preview cannot share a server.");
-      session.settings = await api.setSharing(enabled);
-      serverNote = {
-        kind: "ready",
-        text: enabled
-          ? "Your server will be shared from its next start, without the game on this PC."
-          : "Your server stays on this PC from its next start.",
-      };
-    } catch (e) {
-      serverNote = { kind: "warn", text: failure(e) };
-    }
-  }
-
-  function connect() {
-    const url = serverUrl(address);
-    if (!url) {
-      serverNote = {
-        kind: "warn",
-        text: "Enter the server's address and port, such as 192.168.1.20:61000.",
-      };
-      return;
-    }
-    if (!isToken(token)) {
-      serverNote = {
-        kind: "warn",
-        text: "Paste the 64-character token from that server's api --json.",
-      };
-      return;
-    }
-    void useServer({ url, token: token.trim() });
-  }
+  // Your servers, this PC's own and the ones on other PCs, are picked on
+  // Server; what closing does with a shared server is remembered there
+  // and changed here.
+  let closeAction = $derived(servers.list.close_action);
+  const closeOptions = [
+    { value: "ask" as const, label: "Ask me" },
+    { value: "keep" as const, label: "Keep it running" },
+    { value: "stop" as const, label: "Stop it" },
+  ];
 
   async function openData() {
     note = null;
@@ -166,89 +110,40 @@
   {#if note}<div class="note"><Note kind={note.kind}>{note.text}</Note></div>{/if}
 </Glass>
 
-<Glass radius="panel" label="Your server" class="panel rows-panel">
+<Glass radius="panel" label="Your servers" class="panel rows-panel">
   <div class="list-row tall">
     <span class="grow text">
       <span class="name">
-        Your server
+        Your servers
         <InfoButton
-          label="About your server"
-          text="The launcher reaches its server through the server's API, on this PC or on another PC on your network. On the other PC, start it with serve --server-only --api --listen <its address> --api-port <port>, then enter that address and the token its api --json prints. Play then starts the game on this PC and connects it to that server."
+          label="About your servers"
+          text="This PC's own server and the ones on your other PCs are picked on Server, where you also share this PC's server and add others by their pairing code."
         />
       </span>
-      <span class="t-data path">{serverLabel(session.settings)}</span>
+      <span class="t-caption">Picked on Server.</span>
     </span>
-    <PillButton
-      onclick={() => {
-        editing = !editing;
-        serverNote = null;
-      }}
-      disabled={connecting}>{editing ? "Cancel" : "Change"}</PillButton
-    >
+    <PillButton variant="text" onclick={() => router.go("server")}>Open Server</PillButton>
   </div>
-  {#if editing}
-    <div class="server-form">
-      <Field
-        id="server-address"
-        label="Address"
-        placeholder="192.168.1.20:61000"
-        mono
-        bind:value={address}
-      />
-      <Field
-        id="server-token"
-        label="Token"
-        placeholder="64 characters from api --json"
-        mono
-        bind:value={token}
-      />
-      <div class="server-actions">
-        <PillButton onclick={connect} disabled={connecting}
-          >{connecting ? "Connecting…" : "Connect"}</PillButton
-        >
-        {#if session.settings.server}
-          <PillButton variant="text" onclick={() => useServer(null)} disabled={connecting}
-            >Use this PC</PillButton
-          >
-        {/if}
-      </div>
-    </div>
-  {/if}
-  {#if !session.settings.server}
-    <div class="list-row tall">
-      <span class="grow text">
-        <span class="name" id="share-label">
-          Let your other PCs use this server
-          <InfoButton
-            label="About sharing"
-            text="Your server then listens on this PC's network address, so a launcher on another PC on your network can use it, and the game no longer runs on this PC. Windows may ask you to allow it through the firewall."
-          />
-        </span>
-        {#if paired}
-          <span class="t-data path">Address {paired.address} · Token {paired.token}</span>
-        {:else if sharing}
-          <span class="t-data path">Start your server once to get its address and token.</span>
-        {/if}
+  <div class="list-row tall">
+    <span class="grow text">
+      <span class="name">
+        When I close while my shared server runs
+        <InfoButton
+          label="About closing"
+          text="Your other PCs may be on your shared server. Keep it running and the launcher closes without it; Server shows it next time. A server that is not shared stops when the launcher closes."
+        />
       </span>
-      <PillButton variant="text" onclick={() => share(!sharing)} disabled={connecting}
-        >{sharing ? "Stop sharing" : "Share"}</PillButton
-      >
-    </div>
-  {/if}
-  {#if serverNote}<div class="note"><Note kind={serverNote.kind}>{serverNote.text}</Note></div>{/if}
+    </span>
+    <Segmented
+      options={closeOptions}
+      value={closeAction}
+      label="When I close while my shared server runs"
+      onchange={(value) => void servers.setCloseAction(value)}
+    />
+  </div>
 </Glass>
 
 <style>
-  .server-form {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 0 16px 16px;
-  }
-  .server-actions {
-    display: flex;
-    gap: 8px;
-  }
   .tall {
     min-height: 72px;
   }

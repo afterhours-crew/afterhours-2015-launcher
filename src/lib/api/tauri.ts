@@ -7,11 +7,15 @@ import type {
   AppInfo,
   BackupReport,
   CliResult,
+  CloseAction,
   Folder,
   OutputLine,
   Preflight,
   Recorded,
   RemoteServer,
+  ServerCheck,
+  ServerHealth,
+  Servers,
   SessionAction,
   SessionFileText,
   Settings,
@@ -41,6 +45,28 @@ export const api = {
   setServer: (server: RemoteServer | null) => invoke<Settings>("set_server", { server }),
   /** Let your other PCs use this PC's server, from its next start. */
   setSharing: (enabled: boolean) => invoke<Settings>("set_sharing", { enabled }),
+  /** Your servers (src-tauri/src/servers.rs): the list and which is in use. */
+  serversList: () => invoke<Servers>("servers_list"),
+  /** Look at a pairing code before saving it: what answers there. */
+  serverCheck: (pairing: string) => invoke<ServerCheck>("server_check", { pairing }),
+  /** Save a server from its pairing code (checked first); use it when `useNow`. */
+  serverAdd: (name: string, pairing: string, useNow: boolean) =>
+    invoke<Servers>("server_add", { name, pairing, useNow }),
+  /** Use a saved server by id, or this PC's own with `null`. */
+  serverUse: (id: string | null) => invoke<Servers>("server_use", { id }),
+  serverRename: (id: string, name: string) => invoke<Servers>("server_rename", { id, name }),
+  serverForget: (id: string) => invoke<Servers>("server_forget", { id }),
+  /** A new pairing code for a saved server whose token changed. */
+  serverSetToken: (id: string, pairing: string) =>
+    invoke<Servers>("server_set_token", { id, pairing }),
+  /** Check every saved server at once, two seconds each. */
+  serversHealth: () => invoke<ServerHealth[]>("servers_health"),
+  setCloseAction: (action: CloseAction) => invoke<Servers>("set_close_action", { action }),
+  /** The answer to "Keep your server running?" on close. */
+  closeDecision: (keep: boolean, remember: boolean) =>
+    invoke<void>("close_decision", { keep, remember }),
+  /** The launcher's log of one server (`null`: this PC's own), newest last. */
+  connectionLog: (id: string | null) => invoke<string>("connection_log", { id }),
   detectGameDirs: () => invoke<string[]>("detect_game_dirs"),
   runCheck: () => invoke<CliResult>("run_check"),
   sessionStatus: () => invoke<CliResult>("session_status"),
@@ -136,6 +162,10 @@ export async function onSessionEvents(handlers: {
   closing: () => void;
   /** The server did not stop in time; the window stays open. */
   closeFailed: (message: string) => void;
+  /** Closing while the shared server runs: keep it running, or stop it? */
+  closeAsk: () => void;
+  /** Picking another server: this PC's own is being stopped first. */
+  serverSwitching: (message: string) => void;
 }): Promise<Unlisten> {
   if (!inTauri) return () => {};
   const { listen } = await import("@tauri-apps/api/event");
@@ -149,6 +179,8 @@ export async function onSessionEvents(handlers: {
     listen("close-blocked", () => handlers.closeBlocked()),
     listen("closing", () => handlers.closing()),
     listen<string>("close-failed", (e) => handlers.closeFailed(e.payload)),
+    listen("close-ask", () => handlers.closeAsk()),
+    listen<string>("server-switching", (e) => handlers.serverSwitching(e.payload)),
   ]);
   return () => stops.forEach((stop) => stop());
 }

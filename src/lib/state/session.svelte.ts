@@ -45,6 +45,10 @@ export class Session {
   adopted = $state(false);
   /** Restart with game is stopping the serve session before it starts again. */
   restarting = $state(false);
+  /** Closing while the shared server runs: the window asks what to do. */
+  closeAsk = $state(false);
+  /** Picking another server: this PC's own is being stopped first. */
+  switching = $state<string | null>(null);
   /** When this window started its session; `null` for one started elsewhere. */
   startedAt = $state<Date | null>(null);
   /**
@@ -135,6 +139,12 @@ export class Session {
         this.closing = false;
         this.error = message;
       },
+      closeAsk: () => {
+        this.closeAsk = true;
+      },
+      serverSwitching: (message) => {
+        this.switching = message;
+      },
     });
   }
 
@@ -152,10 +162,27 @@ export class Session {
    */
   async useServer(server: RemoteServer | null): Promise<void> {
     this.settings = await api.setServer(server);
+    await this.refreshServer();
+  }
+
+  /**
+   * The server in use changed (the Server screen picked one): read the
+   * settings again, follow the new server's session when one runs, and
+   * start this PC's own server when it is the one in use and is off.
+   */
+  async refreshServer(): Promise<void> {
+    this.switching = null;
+    if (!inTauri) return;
+    this.settings = await api.getSettings();
     this.adopted = false;
+    this.console = [];
+    this.received = 0;
+    this.mapFeed = null;
     this.setStatus(statusFromResult(await api.sessionStatus()));
     if (this.info && hasCapability(this.info.server, "api") && isLive(this.status?.state)) {
       this.adopted = await api.connectSession();
+    } else if (!this.running && this.hostsOnOpen()) {
+      await this.start("serve");
     }
   }
 

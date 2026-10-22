@@ -9,15 +9,17 @@
   import { current, records } from "$lib/state/records.svelte";
   import { router } from "$lib/state/router.svelte";
   import { session } from "$lib/state/session.svelte";
+  import Connections from "./logs/Connections.svelte";
   import Sessions from "./logs/Sessions.svelte";
   import Viewer from "./logs/Viewer.svelte";
 
-  // Logs (H7) and the log viewer (H8), from `sessions --json`. Without the
-  // `sessions` capability the view gives one note; the live log of a
-  // session this window started is on Host either way.
+  // Logs (H7) and the log viewer (H8), from `sessions --json`, and the
+  // launcher's own connection log per server. Without the `sessions`
+  // capability the view gives one note; the live log of the server in use
+  // is on Server either way.
   let ready = $derived(featureReady(session.info?.server, "logs"));
   let list = $derived(current(records.sessions));
-  let viewer = $derived(router.route.section === "viewer");
+  let section = $derived(router.route.section ?? "sessions");
 
   $effect(() => {
     if (ready) untrack(() => void records.loadSessions());
@@ -25,15 +27,22 @@
 </script>
 
 <main>
-  {#if !ready}
+  {#if section === "connections"}
+    <Stage key="connections" flow>
+      <Connections />
+    </Stage>
+  {:else if !ready}
     <div class="column" use:staggerIn>
       <h1 class="t-view-title" data-enter>Logs</h1>
       <div data-enter>
         <ViewNote>Earlier sessions, their files and what they say.</ViewNote>
       </div>
       <div class="now" data-enter>
-        <span class="t-caption">The session you start now shows its log live on Host.</span>
-        <PillButton onclick={() => router.go("host")}>Open Host</PillButton>
+        <span class="t-caption">The server in use shows its log live on Server.</span>
+        <PillButton onclick={() => router.go("server")}>Open Server</PillButton>
+        <PillButton variant="text" onclick={() => router.go("logs", "connections")}
+          >Connections</PillButton
+        >
       </div>
     </div>
   {:else if !list}
@@ -46,8 +55,8 @@
       {/if}
     </div>
   {:else}
-    <Stage key={viewer ? "viewer" : "sessions"} flow>
-      {#if viewer}<Viewer />{:else}<Sessions {list} />{/if}
+    <Stage key={section === "viewer" ? "viewer" : "sessions"} flow>
+      {#if section === "viewer"}<Viewer />{:else}<Sessions {list} />{/if}
     </Stage>
   {/if}
 </main>

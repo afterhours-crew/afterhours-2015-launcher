@@ -73,6 +73,18 @@ describe("launch bar", () => {
     }
   });
 
+  it("names the server picked on another PC and where it is", () => {
+    const remote = { name: "Garage PC", address: "192.168.1.32:61234" };
+    expect(launchBarModel({ ...base, server: remote })).toMatchObject({
+      title: "Garage PC",
+      summary: "Offline · 192.168.1.32:61234",
+    });
+    expect(
+      launchBarModel({ ...base, server: remote, running: true, status: status("ready") }).summary,
+    ).toBe("Running · 192.168.1.32:61234");
+    expect(launchBarModel({ ...base, server: null }).title).toBe("Your server");
+  });
+
   it("says why Play is disabled instead of just disabling it", () => {
     expect(launchBarModel({ ...base, serverReady: false }).play).toMatchObject({
       disabled: true,

@@ -6,7 +6,15 @@
     label,
     labelledby,
     disabled = false,
-  }: { checked?: boolean; label?: string; labelledby?: string; disabled?: boolean } = $props();
+    onchange,
+  }: {
+    checked?: boolean;
+    label?: string;
+    labelledby?: string;
+    disabled?: boolean;
+    /** Told after a press, for a switch whose value is saved elsewhere. */
+    onchange?: (checked: boolean) => void;
+  } = $props();
 </script>
 
 <button
@@ -18,7 +26,10 @@
   {disabled}
   class="track"
   class:on={checked}
-  onclick={() => (checked = !checked)}
+  onclick={() => {
+    checked = !checked;
+    onchange?.(checked);
+  }}
 >
   <span class="knob"></span>
 </button>

@@ -2,6 +2,7 @@
   import { untrack } from "svelte";
   import { inTauri } from "$lib/api/tauri";
   import Backdrop from "$lib/components/Backdrop.svelte";
+  import ClosePrompt from "$lib/components/ClosePrompt.svelte";
   import Header from "$lib/components/Header.svelte";
   import HeaderPlay from "$lib/components/HeaderPlay.svelte";
   import LaunchBar from "$lib/components/LaunchBar.svelte";
@@ -15,15 +16,17 @@
   import { driverName, headerLine } from "$lib/state/profile";
   import { current, records } from "$lib/state/records.svelte";
   import { router } from "$lib/state/router.svelte";
+  import { entryAddress, inUseEntry } from "$lib/state/serverpicker";
+  import { servers } from "$lib/state/servers.svelte";
   import { session } from "$lib/state/session.svelte";
   import { updater } from "$lib/state/updater.svelte";
   import { serverChangeNotice } from "$lib/state/updates";
   import FirstRun from "$lib/views/FirstRun.svelte";
   import Garage from "$lib/views/Garage.svelte";
-  import Host from "$lib/views/Host.svelte";
   import Logs from "$lib/views/Logs.svelte";
   import MapView from "$lib/views/Map.svelte";
   import Profile from "$lib/views/Profile.svelte";
+  import Server from "$lib/views/Server.svelte";
   import Settings from "$lib/views/Settings.svelte";
   import World from "$lib/views/World.svelte";
 
@@ -31,12 +34,16 @@
   let noticeDismissed = $state(false);
 
   $effect(() => {
+    untrack(() => void servers.load());
     void session.load().then(() => {
       updater.start();
       // The header and the Garage show the active save's REP and bank.
       void records.loadProfile();
     });
   });
+
+  // The launch bar names the server picked on Server.
+  let inUse = $derived(inUseEntry(servers.list));
 
   // A session that ends has changed the save and the session list.
   let wasRunning = false;
@@ -71,6 +78,7 @@
       // Restart with game holds Play between stopping and starting again.
       running: session.running || session.restarting,
       canPlay: hasCapability(session.info?.server, "play"),
+      server: inUse ? { name: inUse.name, address: entryAddress(inUse) } : null,
     }),
   );
 
@@ -106,7 +114,7 @@
       {#if !firstRun && view !== "garage"}<HeaderPlay
           pill={model.pill}
           {onPlay}
-          caption={view !== "host"}
+          caption={view !== "server"}
         />{/if}
     {/snippet}
   </Header>
@@ -138,6 +146,10 @@
       Stopping your server before the launcher closes. This takes a few seconds.
     </p>
   {/if}
+  {#if session.switching && view !== "server"}
+    <p class="banner" role="status" in:toastIn>{session.switching}</p>
+  {/if}
+  {#if session.closeAsk}<ClosePrompt />{/if}
   {#if !firstRun && notice}
     <div class="banner row" in:toastIn>
       <span>{notice}</span>
@@ -165,8 +177,8 @@
         <World />
       {:else if view === "map"}
         <MapView />
-      {:else if view === "host"}
-        <Host />
+      {:else if view === "server"}
+        <Server />
       {:else if view === "logs"}
         <Logs />
       {:else}

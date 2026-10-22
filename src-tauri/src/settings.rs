@@ -265,6 +265,16 @@ pub async fn set_server(
             return Err(info.message());
         }
     }
+    write_server(&app, &state, server)
+}
+
+/// Save which server the window reaches (`None`: this PC's own) and follow
+/// it from now on, without checking it; the Server screen checks first.
+pub fn write_server(
+    app: &AppHandle,
+    state: &crate::AppState,
+    server: Option<RemoteServer>,
+) -> Result<Settings, String> {
     let saved = {
         let mut current = state
             .settings
@@ -274,7 +284,7 @@ pub async fn set_server(
             server,
             ..current.clone()
         };
-        write(&file(&app)?, &next)?;
+        write(&file(app)?, &next)?;
         *current = next;
         effective(&current, &state.game_folder(&current))
     };

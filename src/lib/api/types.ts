@@ -78,7 +78,76 @@ export interface RemoteServer {
 }
 
 export type OutputLine =
-  { kind: "status"; time: string; state: string; message: string } | { kind: "text"; text: string };
+  | { kind: "status"; time: string; state: string; message: string }
+  | { kind: "text"; text: string }
+  /** The launcher's own line about the server in use (src-tauri/src/connlog.rs). */
+  | { kind: "launcher"; time: string; message: string; detail: string };
+
+/** What closing the launcher does while this PC's shared server runs. */
+export type CloseAction = "ask" | "keep" | "stop";
+
+/** A server on another PC, as paired (src-tauri/src/servers.rs). */
+export interface ServerEntry {
+  id: string;
+  name: string;
+  /** `http://<IPv4 address>:<port>`. */
+  url: string;
+  token: string;
+  added_utc: string;
+  last_seen_utc: string | null;
+  last_version: string | null;
+  last_capabilities: string[];
+  last_played_utc: string | null;
+}
+
+/** `servers.json`: your servers and which one is in use. */
+export interface Servers {
+  version: number;
+  servers: ServerEntry[];
+  /** The entry in use; `null` is this PC's own server. */
+  in_use: string | null;
+  close_action: CloseAction;
+  this_pc: { last_played_utc: string | null };
+}
+
+/** What a check of a server found. */
+export type Reach =
+  | {
+      state: "online";
+      version: string;
+      release: string;
+      capabilities: string[];
+      ping_ms: number;
+      session: string | null;
+      game_running: boolean;
+      saves: number | null;
+    }
+  | { state: "unreachable"; message: string }
+  | { state: "refused"; message: string }
+  | { state: "older"; message: string };
+
+/** `server_check`: a pairing code looked at before saving. */
+export type ServerCheck = Reach & {
+  url: string;
+  address: string;
+  /** That is this PC's own server. */
+  own: boolean;
+  /** Already saved, under this name. */
+  known_as: string | null;
+};
+
+/** One saved server as the Server screen last saw it. */
+export type ServerHealth = Reach & { id: string; checked_utc: string };
+
+export function emptyServers(): Servers {
+  return {
+    version: 1,
+    servers: [],
+    in_use: null,
+    close_action: "ask",
+    this_pc: { last_played_utc: null },
+  };
+}
 
 export type SessionAction = "setup" | "serve" | "start";
 

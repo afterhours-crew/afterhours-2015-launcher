@@ -4,13 +4,13 @@
 
 import type { Feature } from "./capabilities";
 
-export const VIEWS = ["garage", "profile", "world", "map", "host", "logs", "settings"] as const;
+export const VIEWS = ["garage", "profile", "world", "map", "server", "logs", "settings"] as const;
 export type View = (typeof VIEWS)[number];
 
 /** Views with sub-views; the first one is where the view opens. */
 export const SECTIONS = {
   profile: ["overview", "cars", "save-data", "edit-driver"],
-  logs: ["sessions", "viewer"],
+  logs: ["sessions", "viewer", "connections"],
   settings: ["general", "updates", "about"],
 } as const;
 export type ProfileSection = (typeof SECTIONS.profile)[number];
@@ -41,7 +41,7 @@ export const NAV: NavItem[] = [
   { id: "profile", label: "Profile" },
   { id: "world", label: "World" },
   { id: "map", label: "Map", feature: "map" },
-  { id: "host", label: "Host" },
+  { id: "server", label: "Server" },
   { id: "logs", label: "Logs" },
   { id: "settings", label: "Settings" },
 ];
@@ -60,6 +60,7 @@ export const SECTION_LABELS: Record<Section, string> = {
   "edit-driver": "Edit driver",
   sessions: "Sessions",
   viewer: "Log viewer",
+  connections: "Connections",
   general: "General",
   updates: "Updates",
   about: "About",
@@ -86,6 +87,8 @@ export function sectionFor(view: View, wanted: string | null | undefined): Secti
 export function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   if (parts[0] === "first-run") return { ...HOME, firstRun: true };
+  // The Server screen was called Host before it picked servers.
+  if (parts[0] === "host") parts[0] = "server";
   if (!isView(parts[0])) return HOME;
   return { view: parts[0], section: sectionFor(parts[0], parts[1]), firstRun: false };
 }
