@@ -62,8 +62,8 @@ Releases are published on this repository's Releases page. See
    and asks for a driver name. Then the garage opens. Play runs `start` on
    Windows and `serve` elsewhere.
 
-   Host runs `serve`: the server without a game, shown as "Hosting · server
-   running". Like every session it needs the game folder (`--game-dir`);
+   Server runs `serve` for this PC's own server: the server without a game,
+   shown as "Hosting · server running". Like every session it needs the game folder (`--game-dir`);
    on Windows the server also runs `start`'s game checks for `serve`, so
    a game can join later, and the launcher never passes `--server-only`. Play then starts the game in that session with `play` when
    `version --json` lists capability `play`; the session goes Starting →
@@ -167,24 +167,64 @@ its own server (`serve`) if none runs, so World, Profile and Play work at
 once, and Play starts the game in that session. Servers without the API
 (the pinned release until the pin moves) keep the earlier command path.
 
-**Sharing this PC's server** (Settings → General → Your server → Share).
-The launcher then starts its server with `--server-only --listen <this PC's
-address>` and shows the address and token another PC's launcher enters;
-the game no longer runs on this PC. It takes effect from the server's next
-start, and Windows may ask to allow it through the firewall.
+**Your servers** (the Server screen; `servers.rs`). The Servers panel lists
+this PC's own server and every saved server on another PC; pressing a row
+uses that server, and Play, World, Profile, Map and Logs follow it. The
+list is `servers.json` beside `settings.json`: each entry's name, address,
+token, when it was added, when it last answered, the version and
+capabilities it last reported and when a game last played on it, plus which
+entry is in use and what closing does. The entry in use is mirrored into
+`settings.json` as `server`, which every command reads, so one server is
+reached at a time. While the screen is open every saved server is checked
+(`GET /v1/info`, two seconds each, all at once, every thirty seconds), and
+each row shows a dot and a word: *In use*, *Online*, *Not reachable*, *New
+token* (the server refused it), *Older* (no session API). A server that
+is off still shows what it was.
 
-**Your server on another PC** (Settings → General → Your server). Start it
-there with `Afterhours.exe serve --server-only --api --listen <its address>
---api-port <port>` and enter that address and the token its `api --json`
-prints; the launcher asks the server's API before saving them. From then on
-the window follows that server exactly as it follows its own: status,
-console, map markers, World and Profile come from its API and Stop stops it,
-but closing the launcher leaves it running. There is no command to fall back
-to for another PC, so an unreachable server says so. Starting a server here is refused; Play starts the game on this PC with
-`start --remote <address> --token <token>` (afterhours-2015 #172), which
-relays it to that server, and the window follows that local session until
-the game closes, then Stop stops the game, not the server. "Use this PC"
-switches back.
+**Sharing this PC's server** (Server → This PC → Let your other PCs use
+this server). The launcher then starts its server with `--server-only
+--listen <this PC's address>` and shows the pairing code
+`<address>:<port>/<token>` with a Copy button; the game no longer runs on
+this PC. It takes effect from the server's next start, and Windows may ask
+to allow it through the firewall.
+
+**Adding a server on another PC** (Server → Add a server). Paste the
+pairing code the other PC's Server screen copied (or the address, then the
+token) and press Check: the launcher asks that server's API with the token
+and says what answered, which features work here, how many drivers are
+saved there and whether a game is playing, or why it cannot be used (not
+reachable, token refused, an older server without the API, this PC's own
+server). Save and use picks it at once; Save for later keeps it in the
+list. From then on the window follows that server exactly as it follows
+its own: status, console, map markers, World and Profile come from its API
+and Stop stops it (asked twice), but closing the launcher leaves it
+running. There is no command to fall back to for another PC, so an
+unreachable server says so. Starting a server here is refused; Play starts
+the game on this PC with `start --remote <address> --token <token>`
+(afterhours-2015 #172), which relays it to that server, and the window
+follows that local session until the game closes, then Stop stops the
+game, not the server. A saved server can be renamed, forgotten (not while
+in use) or given a new pairing code when its token changed.
+
+**Picking** (`server_use`). Picking a server on another PC while this PC's
+own server runs stops that server first, because a game here can talk to
+one server only, unless it is shared, in which case it keeps running for
+the other PCs. A game that is playing right now blocks the switch. Picking
+This PC again starts this PC's own server when it is off.
+
+**Connection logs** (`connlog.rs`). The launcher keeps its own log per
+server under `servers/` in its config directory, at most 1 MiB each (the
+oldest lines go): picked, connected and reconnected, stopped answering,
+token refused, not reachable, a stop sent, a game started, renamed, a new
+pairing code. Each line also goes to the window as a *Launcher* row of the
+Server screen's live log, and Logs → Connections shows each server's log.
+
+**Closing while a shared server runs.** A server that is not shared is
+stopped when the launcher closes, as before. A shared one may be in use by
+your other PCs, so the window asks: *Keep running* closes the launcher and
+leaves the server (Server shows it next time), *Stop and close* stops it
+first. "Always do this" remembers the answer; Settings → General changes
+it.
 
 Without `api`, older servers keep the earlier paths. With `events`, sessions
 run with `--events`: the server prints one JSON `event` record per line

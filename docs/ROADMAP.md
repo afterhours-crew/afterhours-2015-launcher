@@ -19,7 +19,7 @@ design canvas.
 | 5     | Overlay: the in-game companion window (design C1)                                                                                                                                               | none                                 | Not planned (2026-10-19); nothing is built for it. The live control endpoint it needed is still wanted, for track 3                                                    |
 | 6     | v0.1 tester preview: the first published launcher release                                                                                                                                       | this repository                      | Planned; uses the release machinery from 1c                                                                                                                            |
 | 7     | Live map: the game's own world map decoded from the tester's installation (`map-images`), then a read-only observer feed from the server (players, traffic and rival motion, spawns and clears) | afterhours-2015, then the Map screen | Map with pan and zoom on `feature/map-screen` (server `map-images`: afterhours-2015 #158); live markers on `feature/map-markers` (server `map-feed`: #160)             |
-| 8     | Server connection: the launcher reaches every server, its own included, through the server's HTTP API, as it would a server on another PC; see [Server connection](#server-connection-track-8)  | afterhours-2015, then here           | Step 1, the session API: afterhours-2015 #164; step 2: `feature/server-connection`; step 3, settings and profile: #166, `feature/api-settings-profile`                 |
+| 8     | Server connection: the launcher reaches every server, its own included, through the server's HTTP API, as it would a server on another PC; see [Server connection](#server-connection-track-8)  | afterhours-2015, then here           | Steps 1 to 7 built and checked live on one PC (loopback and its network address, 2026-10-21); step 8, the Server screen with a server picker, built on `feature/server-picker`; a second PC is still to be tried |
 
 The launch bar never shows a car. Its left side reads "Playing on", then
 "Your server", then whether it runs: "Offline · this PC only" or
@@ -110,6 +110,22 @@ Steps, in order:
    `afterhours://` and `GET /v1/content`) and runs no other command. Against
    another PC, Play starts the game here with `start --remote`. The command
    path stays only for servers without the API until the pin moves.
+8. **Launcher: the Server screen picks a server** (`feature/server-picker`,
+   design canvas row I). Host becomes Server, since a server on another PC
+   is not hosted here. Its Servers panel lists this PC's own server and
+   every saved server with a dot and a word (In use, Online, Not reachable,
+   New token, Older), checked every thirty seconds while the screen is
+   open; pressing a row uses that server, and Play, World, Profile, Map and
+   Logs follow it. A server is added with its pairing code
+   (`<address>:<port>/<token>`, copied from the other PC's Server screen)
+   after a check that says what answered, what works here and why a server
+   cannot be used. Saved servers live in `servers.json` with what the
+   launcher last saw of each. Sharing this PC's server moves from Settings
+   to This PC's card, with the pairing code and Copy. The launcher keeps a
+   bounded connection log per server, shown as Launcher rows in the live
+   log and under Logs → Connections. Closing while a shared server runs
+   asks whether to keep it running; the answer can be remembered. The
+   launch bar and the Garage name the server in use.
 7. **Live check.** The whole flow against this PC's network address, then
    against a second PC.
 
