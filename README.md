@@ -177,8 +177,8 @@ entry is in use and what closing does. The entry in use is mirrored into
 `settings.json` as `server`, which every command reads, so one server is
 reached at a time. While the screen is open every saved server is checked
 (`GET /v1/info`, two seconds each, all at once, every thirty seconds), and
-each row shows a dot and a word: *In use*, *Online*, *Not reachable*, *New
-token* (the server refused it), *Older* (no session API). A server that
+each row shows a dot and a word: _In use_, _Online_, _Not reachable_, _New
+token_ (the server refused it), _Older_ (no session API). A server that
 is off still shows what it was.
 
 **Sharing this PC's server** (Server → This PC → Let your other PCs use
@@ -216,13 +216,13 @@ This PC again starts this PC's own server when it is off.
 server under `servers/` in its config directory, at most 1 MiB each (the
 oldest lines go): picked, connected and reconnected, stopped answering,
 token refused, not reachable, a stop sent, a game started, renamed, a new
-pairing code. Each line also goes to the window as a *Launcher* row of the
+pairing code. Each line also goes to the window as a _Launcher_ row of the
 Server screen's live log, and Logs → Connections shows each server's log.
 
 **Closing while a shared server runs.** A server that is not shared is
 stopped when the launcher closes, as before. A shared one may be in use by
-your other PCs, so the window asks: *Keep running* closes the launcher and
-leaves the server (Server shows it next time), *Stop and close* stops it
+your other PCs, so the window asks: _Keep running_ closes the launcher and
+leaves the server (Server shows it next time), _Stop and close_ stops it
 first. "Always do this" remembers the answer; Settings → General changes
 it.
 
