@@ -73,21 +73,45 @@ pub fn content_response(app: &AppHandle, path: &str) -> tauri::http::Response<Ve
     else {
         return missing();
     };
-    match endpoint.send_bounded(
+    let answer = endpoint.send_bounded(
         "GET",
         &format!("/v1/content/{file}"),
         &[],
         Duration::from_secs(30),
         MAX_PICTURE,
-    ) {
+    );
+    match answer {
         Ok(answer) if answer.status == 200 => tauri::http::Response::builder()
             .status(200)
             .header("Content-Type", "image/png")
             .body(answer.body)
             .unwrap_or_else(|_| missing()),
-        _ => missing(),
+        other => {
+            // Say once per run why pictures are missing, in the server's
+            // connection log, instead of a silent tile.
+            if !PICTURE_FAILURE_LOGGED.swap(true, std::sync::atomic::Ordering::SeqCst)
+                && let Some(state) = app.try_state::<crate::AppState>()
+            {
+                let (key, name) = crate::servers::in_use_label(&state);
+                let why = match other {
+                    Ok(answer) => format!("{} answered {}", name, answer.status),
+                    Err(message) => message,
+                };
+                crate::connlog::record(
+                    app,
+                    &key,
+                    &format!("A picture could not be fetched from {name}"),
+                    format!("{file}: {why}"),
+                );
+            }
+            missing()
+        }
     }
 }
+
+/// The first failed picture fetch of this run was logged.
+static PICTURE_FAILURE_LOGGED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 /// Longest picture or tile fetched from the server.
 const MAX_PICTURE: usize = 16 * 1024 * 1024;
