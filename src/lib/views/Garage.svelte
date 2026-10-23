@@ -2,6 +2,9 @@
   import { untrack } from "svelte";
   import { staggerIn } from "$lib/motion";
   import IconAlertTriangle from "@tabler/icons-svelte/icons/alert-triangle";
+  import IconCoffee from "@tabler/icons-svelte/icons/coffee";
+  import IconX from "@tabler/icons-svelte/icons/x";
+  import { openUrl } from "$lib/api/tauri";
   import Clock from "$lib/components/Clock.svelte";
   import EmptyLine from "$lib/components/EmptyLine.svelte";
   import Glass from "$lib/components/Glass.svelte";
@@ -12,11 +15,15 @@
   import { current, records } from "$lib/state/records.svelte";
   import { router } from "$lib/state/router.svelte";
   import { session } from "$lib/state/session.svelte";
+  import { supportLinks } from "$lib/state/support";
 
   // Garage home (H1). The floor holds the clock and tonight's facts from
   // the save; the side panel says how the last session went. World
   // settings live on World, where the server's support decides what shows.
+  // Now and then (not every open: src/lib/state/support.ts) the panel ends
+  // with one quiet line and the Ko-fi and Patreon links (canvas J2).
   let profile = $derived(current(records.profile));
+  let support = $derived(session.supportNudge ? supportLinks() : []);
   let sessions = $derived(current(records.sessions)?.sessions ?? null);
   let last = $derived(lastSession(session.status, sessions, new Date()));
 
@@ -87,6 +94,29 @@
         <h2 class="t-panel-title">Last session</h2>
         <EmptyLine>No sessions yet. Press Play to start one.</EmptyLine>
       {/if}
+      {#if support.length > 0}
+        <div class="support" role="note" aria-label="Support the project">
+          <IconCoffee size={20} stroke={1.6} aria-hidden="true" class="cup" />
+          <span class="support-body">
+            <span class="t-caption"
+              >Afterhours is free. If it keeps your garage open, you can chip in.</span
+            >
+            <span class="support-links">
+              {#each support as link (link.key)}
+                <button type="button" class="link" onclick={() => void openUrl(link.url)}
+                  >{link.short}</button
+                >
+              {/each}
+            </span>
+          </span>
+          <button
+            type="button"
+            class="dismiss"
+            aria-label="Hide for now"
+            onclick={() => session.dismissNudge()}><IconX size={16} stroke={1.8} /></button
+          >
+        </div>
+      {/if}
     </Glass>
   </aside>
 </main>
@@ -137,6 +167,46 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+  }
+  .support {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-top: 12px;
+    padding-top: 14px;
+    border-top: 1px solid var(--graphite-edge);
+  }
+  .support :global(.cup) {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    color: var(--ink-soft);
+  }
+  .support-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .support-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+  }
+  .dismiss {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    margin: -6px -6px 0 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: var(--ink-soft);
+  }
+  .dismiss:hover {
+    background: var(--hover);
+    color: var(--ink);
   }
   h2 {
     margin: 0;

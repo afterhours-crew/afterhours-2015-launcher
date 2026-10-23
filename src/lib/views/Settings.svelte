@@ -2,6 +2,7 @@
   import { staggerIn } from "$lib/motion";
   import { router } from "$lib/state/router.svelte";
   import General from "./settings/General.svelte";
+  import Support from "./settings/Support.svelte";
   import Updates from "./settings/Updates.svelte";
 
   // Settings (H9), one column: game and data, then updates, with the build
@@ -20,6 +21,7 @@
     <h1 class="t-view-title" data-enter>Settings</h1>
     <div data-enter><General /></div>
     <div data-enter bind:this={updates}><Updates aboutOpen={section === "about"} /></div>
+    <div data-enter><Support /></div>
     <p class="t-caption legal" data-enter>
       Community preservation project. Not affiliated with Electronic Arts or Ghost Games. The
       launcher is MPL-2.0; the server's license and notices are installed beside it.

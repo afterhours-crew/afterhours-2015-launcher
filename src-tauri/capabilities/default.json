@@ -14,7 +14,10 @@
       "identifier": "opener:allow-open-url",
       "allow": [
         { "url": "https://github.com/afterhours-crew/afterhours-2015-launcher/*" },
-        { "url": "https://github.com/afterhours-crew/afterhours-2015/*" }
+        { "url": "https://github.com/afterhours-crew/afterhours-2015/*" },
+        { "url": "https://ko-fi.com/*" },
+        { "url": "https://www.patreon.com/*" },
+        { "url": "https://patreon.com/*" }
       ]
     },
     "updater:default",

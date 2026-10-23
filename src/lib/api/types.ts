@@ -55,6 +55,10 @@ export interface Settings {
   first_run_done: boolean;
   updates: UpdateSettings;
   last_server_tag: string | null;
+  /** How many times the window has opened (src/lib/state/support.ts). */
+  launches: number;
+  /** When the Garage last showed the support line, UTC. */
+  support_shown_utc: string | null;
 }
 
 export type OutputLine =
@@ -138,5 +142,7 @@ export function emptySettings(): Settings {
     first_run_done: false,
     updates: { mode: "ask", skipped_version: null },
     last_server_tag: null,
+    launches: 0,
+    support_shown_utc: null,
   };
 }
