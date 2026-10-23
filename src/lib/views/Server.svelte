@@ -147,19 +147,26 @@
     max-width: 320px;
     align-self: stretch;
   }
+  /* The card takes its height; the log takes the rest and scrolls inside
+     itself, never past the window's bottom edge. */
   .main {
     flex: 999 1 520px;
     min-width: 0;
+    min-height: 0;
+    max-height: 100%;
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
   }
   .console {
     flex: 1 1 auto;
-    min-height: 240px;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 6px;
+  }
+  .console > :global(.log) {
+    min-height: 120px;
   }
   .link {
     align-self: flex-start;

@@ -73,13 +73,29 @@ pub fn content_response(app: &AppHandle, path: &str) -> tauri::http::Response<Ve
     else {
         return missing();
     };
-    let answer = endpoint.send_bounded(
-        "GET",
-        &format!("/v1/content/{file}"),
-        &[],
-        Duration::from_secs(30),
-        MAX_PICTURE,
-    );
+    // The map asks for hundreds of tiles at once; the server's API takes a
+    // bounded number of connections, so fetches queue here a few at a time
+    // and a connection the server dropped is tried again.
+    let _slot = FETCH_SLOTS.take();
+    let mut answer = Err(String::new());
+    for attempt in 0..FETCH_ATTEMPTS {
+        if attempt > 0 {
+            std::thread::sleep(Duration::from_millis(150 * attempt as u64));
+        }
+        answer = endpoint.send_bounded(
+            "GET",
+            &format!("/v1/content/{file}"),
+            &[],
+            Duration::from_secs(30),
+            MAX_PICTURE,
+        );
+        match &answer {
+            // A refusal the server meant stands; a dropped connection or a
+            // busy answer is tried again.
+            Ok(a) if a.status != 503 => break,
+            _ => {}
+        }
+    }
     match answer {
         Ok(answer) if answer.status == 200 => tauri::http::Response::builder()
             .status(200)
@@ -112,6 +128,53 @@ pub fn content_response(app: &AppHandle, path: &str) -> tauri::http::Response<Ve
 /// The first failed picture fetch of this run was logged.
 static PICTURE_FAILURE_LOGGED: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
+
+/// How many pictures are fetched from the server at once, and how often
+/// one is tried.
+const FETCH_AT_ONCE: usize = 6;
+const FETCH_ATTEMPTS: u32 = 3;
+
+static FETCH_SLOTS: Slots = Slots::new(FETCH_AT_ONCE);
+
+/// A counting semaphore: `take` waits for a free slot and holds it until
+/// the guard is dropped.
+pub struct Slots {
+    free: std::sync::Mutex<usize>,
+    freed: std::sync::Condvar,
+}
+
+pub struct Slot<'a>(&'a Slots);
+
+impl Slots {
+    pub const fn new(count: usize) -> Self {
+        Self {
+            free: std::sync::Mutex::new(count),
+            freed: std::sync::Condvar::new(),
+        }
+    }
+
+    pub fn take(&self) -> Slot<'_> {
+        let mut free = self.free.lock().unwrap_or_else(|e| e.into_inner());
+        while *free == 0 {
+            free = self.freed.wait(free).unwrap_or_else(|e| e.into_inner());
+        }
+        *free -= 1;
+        Slot(self)
+    }
+
+    #[cfg(test)]
+    fn available(&self) -> usize {
+        *self.free.lock().unwrap_or_else(|e| e.into_inner())
+    }
+}
+
+impl Drop for Slot<'_> {
+    fn drop(&mut self) {
+        let mut free = self.0.free.lock().unwrap_or_else(|e| e.into_inner());
+        *free += 1;
+        self.0.freed.notify_one();
+    }
+}
 
 /// Longest picture or tile fetched from the server.
 const MAX_PICTURE: usize = 16 * 1024 * 1024;
@@ -225,6 +288,28 @@ async fn decode(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn picture_fetches_queue_a_few_at_a_time() {
+        let slots = Slots::new(2);
+        let a = slots.take();
+        let b = slots.take();
+        assert_eq!(slots.available(), 0);
+        // A third waits until one is given back.
+        let waited = std::thread::scope(|scope| {
+            let handle = scope.spawn(|| {
+                let started = std::time::Instant::now();
+                let _c = slots.take();
+                started.elapsed()
+            });
+            std::thread::sleep(Duration::from_millis(120));
+            drop(a);
+            handle.join().unwrap()
+        });
+        assert!(waited >= Duration::from_millis(100), "{waited:?}");
+        drop(b);
+        assert_eq!(slots.available(), 2);
+    }
 
     #[test]
     fn the_pictures_and_map_folders_are_in_the_data_directory_content_cache() {
