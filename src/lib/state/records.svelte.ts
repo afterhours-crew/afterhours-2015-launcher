@@ -346,6 +346,24 @@ export class Records {
     await api.openSessionFolder(id);
   }
 
+  /**
+   * The server in use changed (the Server screen picked another): every
+   * record came from the old one. Forget them and read the new server's
+   * profile now, for the header; the other screens read theirs when opened,
+   * and the map is decoded again for the new server.
+   */
+  async switchServer(): Promise<void> {
+    this.imagesTried = null;
+    this.profile = { kind: "idle" };
+    this.profiles = { kind: "idle" };
+    this.picked = null;
+    this.pickedProfile = { kind: "idle" };
+    this.sessions = { kind: "idle" };
+    this.world = { kind: "idle" };
+    this.map = { kind: "idle" };
+    await this.loadProfile();
+  }
+
   /** After a session ends the save and the session list have changed. */
   async refreshAfterSession(): Promise<void> {
     // A session may have prepared new content: pictures can be tried again.

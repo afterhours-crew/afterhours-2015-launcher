@@ -331,7 +331,7 @@ describe("the check before saving", () => {
     };
     expect(checkWords(refused, "Laptop", false)).toEqual({
       dot: "warn",
-      title: "Laptop did not answer",
+      title: "Laptop refused the token",
       features: [],
       line: "That server refused the token.",
       ok: false,

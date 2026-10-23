@@ -303,13 +303,13 @@ export function checkWords(check: ServerCheck, name: string, thisPcRuns: boolean
   }
   const who = name.trim() || check.address;
   if (check.state !== "online") {
-    return {
-      dot: "warn",
-      title: `${who} did not answer`,
-      features: [],
-      line: check.message,
-      ok: false,
-    };
+    const title =
+      check.state === "refused"
+        ? `${who} refused the token`
+        : check.state === "older"
+          ? `${who} is an older server`
+          : `${who} did not answer`;
+    return { dot: "warn", title, features: [], line: check.message, ok: false };
   }
   const parts: string[] = [];
   if (check.saves != null)

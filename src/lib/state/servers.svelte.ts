@@ -9,6 +9,7 @@ import { api, inTauri } from "$lib/api/tauri";
 import type { CloseAction, ServerCheck, ServerHealth, Servers } from "$lib/api/types";
 import { emptyServers } from "$lib/api/types";
 import { sampleMode } from "./preview";
+import { records } from "./records.svelte";
 import { session } from "./session.svelte";
 
 /** How often the Server screen checks every saved server while open. */
@@ -266,6 +267,8 @@ export class ServersStore {
     this.connectedAt = null;
     await session.refreshServer();
     if (session.adopted || session.running) this.connectedAt = new Date();
+    // Profile, World, Map and Logs now belong to the new server.
+    void records.switchServer();
     void this.refreshHealth();
   }
 
