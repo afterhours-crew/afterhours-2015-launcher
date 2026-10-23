@@ -8,17 +8,18 @@ design canvas.
 
 ## Tracks
 
-| Track | What                                                                                                                                                                                 | Where                                | State                                                                                                                                                                  |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1a    | Profile: `profile --json` reads one save without changing it (identity, REP, bank, garage slots, stats)                                                                              | afterhours-2015                      | Done on a local branch, awaiting validation                                                                                                                            |
-| 1b    | CLI contract v1: JSON Schemas generated from the server's Rust types, `version --json` capabilities, `sessions --json`, the supervise event stream (afterhours-2015 #86)             | afterhours-2015                      | Done on a local branch (`feature/launcher-contract`), awaiting validation                                                                                              |
-| 1c    | Launcher foundation: shell and routing, bundled server, NSIS installer, updater, release and pin-bump workflows, generated types, this roadmap                                       | this repository                      | This branch (`feature/launcher-foundation`)                                                                                                                            |
-| 2     | Screens: Garage, Profile (with Cars, every owned car in garage and warehouse, and Save data; Edit driver opens from it), World, Map, Host, Logs and Settings, built from the designs | this repository                      | Built on `feature/launcher-screens`, awaiting validation                                                                                                               |
-| 3     | Traffic and rivals: the server's `settings` command (`world-settings`), then the World screen's controls; settings that apply live need a live control endpoint in the server        | afterhours-2015, then here           | Server: afterhours-2015 #123; World: traffic Off, Default, 2x and 3x (more crashes the game), rivals 0 to 15 or Auto (#136). Changes apply live, within about a second |
-| 4     | Account edits: `account set` for name, bank and REP                                                                                                                                  | afterhours-2015, then Profile        | Planned                                                                                                                                                                |
-| 5     | Overlay: the in-game companion window (design C1)                                                                                                                                    | none                                 | Not planned (2026-10-19); nothing is built for it. The live control endpoint it needed is still wanted, for track 3                                                    |
-| 6     | v0.1 tester preview: the first published launcher release                                                                                                                            | this repository                      | Planned; uses the release machinery from 1c                                                                                                                            |
-| 7     | Live map: a read-only observer feed from the server (players, traffic and rival motion, spawns and clears) and a road map built from the tester's own installation                   | afterhours-2015, then the Map screen | Planned; waits for the current server milestone, like 3                                                                                                                |
+| Track | What                                                                                                                                                                                            | Where                                | State                                                                                                                                                                                                            |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1a    | Profile: `profile --json` reads one save without changing it (identity, REP, bank, garage slots, stats)                                                                                         | afterhours-2015                      | Done on a local branch, awaiting validation                                                                                                                                                                      |
+| 1b    | CLI contract v1: JSON Schemas generated from the server's Rust types, `version --json` capabilities, `sessions --json`, the supervise event stream (afterhours-2015 #86)                        | afterhours-2015                      | Done on a local branch (`feature/launcher-contract`), awaiting validation                                                                                                                                        |
+| 1c    | Launcher foundation: shell and routing, bundled server, NSIS installer, updater, release and pin-bump workflows, generated types, this roadmap                                                  | this repository                      | This branch (`feature/launcher-foundation`)                                                                                                                                                                      |
+| 2     | Screens: Garage, Profile (with Cars, every owned car in garage and warehouse, and Save data; Edit driver opens from it), World, Map, Host, Logs and Settings, built from the designs            | this repository                      | Built on `feature/launcher-screens`, awaiting validation                                                                                                                                                         |
+| 3     | Traffic and rivals: the server's `settings` command (`world-settings`), then the World screen's controls; settings that apply live need a live control endpoint in the server                   | afterhours-2015, then here           | Server: afterhours-2015 #123; World: traffic Off, Default, 2x and 3x (more crashes the game), rivals 0 to 15 or Auto (#136). Changes apply live, within about a second                                           |
+| 4     | Account edits: `account set` for name, bank and REP                                                                                                                                             | afterhours-2015, then Profile        | Planned                                                                                                                                                                                                          |
+| 5     | Overlay: the in-game companion window (design C1)                                                                                                                                               | none                                 | Not planned (2026-10-19); nothing is built for it. The live control endpoint it needed is still wanted, for track 3                                                                                              |
+| 6     | v0.1 tester preview: the first published launcher release                                                                                                                                       | this repository                      | Planned; uses the release machinery from 1c                                                                                                                                                                      |
+| 7     | Live map: the game's own world map decoded from the tester's installation (`map-images`), then a read-only observer feed from the server (players, traffic and rival motion, spawns and clears) | afterhours-2015, then the Map screen | Map with pan and zoom on `feature/map-screen` (server `map-images`: afterhours-2015 #158); live markers on `feature/map-markers` (server `map-feed`: #160)                                                       |
+| 8     | Server connection: the launcher reaches every server, its own included, through the server's HTTP API, as it would a server on another PC; see [Server connection](#server-connection-track-8)  | afterhours-2015, then here           | Steps 1 to 7 built and checked live on one PC (loopback and its network address, 2026-10-21); step 8, the Server screen with a server picker, built on `feature/server-picker`; a second PC is still to be tried |
 
 The launch bar never shows a car. Its left side reads "Playing on", then
 "Your server", then whether it runs: "Offline · this PC only" or
@@ -27,6 +28,141 @@ The launch bar never shows a car. Its left side reads "Playing on", then
 **Cops need research.** The server runs no police today. Nothing about cops is
 offered until research shows how the game expects them; the World screen's
 one note says so.
+
+## Server connection (track 8)
+
+The launcher will be able to connect to more than one server. So it treats
+its own bundled server like any other: a server it reaches over HTTP, which
+happens to run on this PC (`127.0.0.1`). Today it follows a session only
+through the process it started (console text or `--events` lines on that
+process's pipes, and `status --json` polled from files), so a window that
+closes, crashes or reopens loses the session's live output, and the window
+cannot close while its session runs.
+
+Decided (2026-10-20):
+
+- **Closing the launcher stops its own server.** It asks the server to stop,
+  waits until the session has finished, then closes.
+- **Local and remote work the same way.** The goal is one player using their
+  own server on another PC on their network, reached exactly as the
+  launcher reaches its own (see [Your server on another
+  PC](#your-server-on-another-pc-planned-2026-10-20)). Several players and
+  access by account are not planned.
+- **The game always runs on the player's PC**, started and routed by the
+  bundled `Afterhours.exe`, whichever server it plays on. Starting the
+  server process, the file check, decoding car pictures and the map from the
+  installation, and logs stay local commands.
+
+Steps, in order:
+
+1. **Server: the session API** (afterhours-2015 #163, `feature/server-api`).
+   `serve --api` (also `setup` and `start`) answers `GET /v1/info`,
+   `/v1/status`, `/v1/events` (status, diagnostics and map frames as
+   server-sent events, starting with the newest status and map frame) and
+   `POST /v1/stop`, `/v1/play`, on `127.0.0.1` only, with the same records
+   and schemas as the commands. A random token per session, in `api.json`
+   and printed by `api --json`, guards every request; web pages cannot
+   reach it.
+2. **Launcher: one server connection** (`feature/server-connection`). The
+   launcher runs its sessions with `--api`, reads `api --json`, and follows status,
+   console lines and map markers from the event stream; nothing depends on
+   the process's pipes. Closing stops the server as decided above; a
+   reopened launcher finds a running session and reconnects. Servers without
+   `api` keep today's path. Talking to its own server on `127.0.0.1` is not
+   a network call: nothing leaves the PC.
+3. **Settings and profile over the API** (afterhours-2015 #165, pull
+   request #166, `feature/api-settings-profile` in both repositories). The
+   server answers `GET /v1/settings` and `GET /v1/profile` with the
+   `settings` and `profile` records, and `PUT /v1/settings` saves a small
+   JSON body of the `settings` record's `traffic_percent` and `rival_limit`
+   (bounded at 1 KiB, checked as `--traffic` and `--rivals` are), which the
+   running server applies within about a second. While the launcher follows
+   a session, World reads and saves through it and Profile reads the
+   selected save through it; otherwise, or when the API cannot answer, they
+   run the commands as before.
+4. **Server: one address for everything** (afterhours-2015 #171).
+   `serve --server-only --api --listen <address>`: the API and every
+   game-facing listener (redirector, Blaze, QoS, the per-connection world
+   sockets and launcher services) bind that one address and advertise it;
+   `127.0.0.1` stays the default. The token is kept in the data folder
+   across sessions and shown as a pairing code, so a launcher reconnects
+   after a restart. `GET /v1/info` reports the game-facing addresses.
+5. **Server: play against a server** (afterhours-2015 #172). `play --server
+<url>` runs on the player's PC whatever the server's address: the game
+   checks, the game started and routed by the lease to `127.0.0.1`, where
+   a local relay forwards the redirector connection to the server, launcher
+   services on `127.0.0.1:3216` relayed the same way, and the game's
+   progress reported. The game's backend host is a 10-byte field that holds
+   `127.0.0.1` but not a typical network address (observed in the lease's
+   field layout), so the game is never given the server's address directly;
+   the server's own redirector reply and QoS give it the addresses it
+   listens on. `start` becomes `serve` plus `play` against `127.0.0.1`, the
+   same path.
+6. **Launcher: servers by address, only through the API**
+   (`feature/server-address`, then `feature/api-only`). Settings → General →
+   Your server: "This PC" or another PC's server by address and token,
+   checked before it is saved; Share lets your other PCs use this PC's
+   server (`--server-only --listen`) and shows its address and token. For
+   this PC the launcher chooses its server's port and token itself
+   (`--api-port`, `AFTERHOURS_API_TOKEN`) and starts it when it opens. While
+   it has an address and token it asks that API for everything (status,
+   World, Profile and saves, sessions and logs, pictures through
+   `afterhours://` and `GET /v1/content`) and runs no other command. Against
+   another PC, Play starts the game here with `start --remote`. The command
+   path stays only for servers without the API until the pin moves.
+7. **Launcher: the Server screen picks a server** (`feature/server-picker`,
+   design canvas row I). Host becomes Server, since a server on another PC
+   is not hosted here. Its Servers panel lists this PC's own server and
+   every saved server with a dot and a word (In use, Online, Not reachable,
+   New token, Older), checked every thirty seconds while the screen is
+   open; pressing a row uses that server, and Play, World, Profile, Map and
+   Logs follow it. A server is added with its pairing code
+   (`<address>:<port>/<token>`, copied from the other PC's Server screen)
+   after a check that says what answered, what works here and why a server
+   cannot be used. Saved servers live in `servers.json` with what the
+   launcher last saw of each. Sharing this PC's server moves from Settings
+   to This PC's card, with the pairing code and Copy. The launcher keeps a
+   bounded connection log per server, shown as Launcher rows in the live
+   log and under Logs → Connections. Closing while a shared server runs
+   asks whether to keep it running; the answer can be remembered. The
+   launch bar and the Garage name the server in use.
+8. **Live check.** The whole flow against this PC's network address, then
+   against a second PC.
+
+### Your server on another PC (planned, 2026-10-20)
+
+One player, your own saves, your server on another PC on your network. The
+launcher reaches every server the same way, its own included:
+
+- **A server is an address and a token.** It is a long-running
+  `Afterhours.exe serve --server-only --api` process that owns the saves,
+  World's settings and the world. On this PC it listens on `127.0.0.1`; on
+  another PC it listens on the address given with `--listen`, an explicit
+  opt-in. Nothing else differs.
+- **The launcher talks to a server only through its API**: status, events
+  (console and map), settings, profile and stop. For "This PC" it starts the
+  server and reads the address and token with `api --json`; for another PC
+  you enter the address and the pairing code once.
+- **Playing always happens on this PC**, the same way for every server:
+  `play --server` runs the game checks here, relays launcher services, starts
+  the game, routes it to the server's address and reports its progress.
+- **What stays local**: the file check, car pictures and the map (decoded
+  from this PC's installation, matched by car rather than by the server's
+  file paths), and this PC's logs.
+- **Closing the launcher** stops "This PC" only; another PC's server keeps
+  running.
+
+What is not established, and how it is treated:
+
+- **The game reaching a server that is not on its own PC** is assumed to
+  work (decision, 2026-10-20) and checked live in step 7. Today every
+  listener is loopback-only, the QoS reply refuses a non-loopback address,
+  and the supervisor requires a loopback redirector.
+- **Launcher services through a relay**: the game expects them on
+  `127.0.0.1:3216` (observed); relaying the connection to the server
+  unchanged is inferred to be enough, and step 5 tests it.
+- **Security on the network**: plain HTTP with a token on a home network;
+  the server only listens there when told to.
 
 ## Sync model
 
@@ -50,7 +186,7 @@ one note says so.
 - **Missing capabilities say so.** The launcher reads the server's
   capabilities from `version --json` (Settings → About this build lists
   them; v0.3.0 reports none). A screen whose capability is missing, such as
-  Map without `map` or Profile without `profile`, hides what it cannot
+  Map without `map-images` or Profile without `profile`, hides what it cannot
   show and gives one note instead, never sample data.
 - **Saves only move forward.** A new server may migrate the account SQLite
   forward, and older servers refuse upgraded saves. That is why saves are
@@ -128,6 +264,9 @@ the first release (track 6):
   `CREATE_NO_WINDOW` and its output piped to the window.
 - The window refuses to close while its session runs, because the v0.3.0
   server writes progress to pipes the window owns and would stop on a broken
-  pipe. Track 1b's `--events` mode silences the console and survives a
-  broken pipe; once the pin reaches a release with it, sessions should run
-  with `--events` and the window may close freely.
+  pipe. With a server that reports `api` (track 8), sessions run with
+  `--api` and closing stops the server, waits for it, then closes. The
+  connection's follow-and-stop path ran end to end against a real
+  `serve --server-only --api` session (2026-10-20); closing the desktop
+  window has not been tried in the app, and nothing ran with the game.
+  With older servers the window still refuses to close.

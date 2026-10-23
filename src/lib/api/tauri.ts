@@ -7,10 +7,15 @@ import type {
   AppInfo,
   BackupReport,
   CliResult,
+  CloseAction,
   Folder,
   OutputLine,
   Preflight,
   Recorded,
+  RemoteServer,
+  ServerCheck,
+  ServerHealth,
+  Servers,
   SessionAction,
   SessionFileText,
   Settings,
@@ -33,16 +38,58 @@ async function invoke<T>(command: string, args?: Record<string, unknown>): Promi
 export const api = {
   getSettings: () => invoke<Settings>("get_settings"),
   saveSettings: (settings: Settings) => invoke<Settings>("save_settings", { settings }),
+  /**
+   * Use the server on another PC (its API is asked first, with that token),
+   * or this PC's own again with `null`.
+   */
+  setServer: (server: RemoteServer | null) => invoke<Settings>("set_server", { server }),
+  /** Let your other PCs use this PC's server, from its next start. */
+  setSharing: (enabled: boolean) => invoke<Settings>("set_sharing", { enabled }),
+  /** Your servers (src-tauri/src/servers.rs): the list and which is in use. */
+  serversList: () => invoke<Servers>("servers_list"),
+  /** Look at a pairing code before saving it: what answers there. */
+  serverCheck: (pairing: string) => invoke<ServerCheck>("server_check", { pairing }),
+  /** Save a server from its pairing code (checked first); use it when `useNow`. */
+  serverAdd: (name: string, pairing: string, useNow: boolean) =>
+    invoke<Servers>("server_add", { name, pairing, useNow }),
+  /** Use a saved server by id, or this PC's own with `null`. */
+  serverUse: (id: string | null) => invoke<Servers>("server_use", { id }),
+  serverRename: (id: string, name: string) => invoke<Servers>("server_rename", { id, name }),
+  serverForget: (id: string) => invoke<Servers>("server_forget", { id }),
+  /** A new pairing code for a saved server whose token changed. */
+  serverSetToken: (id: string, pairing: string) =>
+    invoke<Servers>("server_set_token", { id, pairing }),
+  /** Check every saved server at once, two seconds each. */
+  serversHealth: () => invoke<ServerHealth[]>("servers_health"),
+  setCloseAction: (action: CloseAction) => invoke<Servers>("set_close_action", { action }),
+  /** The answer to "Keep your server running?" on close. */
+  closeDecision: (keep: boolean, remember: boolean) =>
+    invoke<void>("close_decision", { keep, remember }),
+  /** The launcher's log of one server (`null`: this PC's own), newest last. */
+  connectionLog: (id: string | null) => invoke<string>("connection_log", { id }),
   detectGameDirs: () => invoke<string[]>("detect_game_dirs"),
   runCheck: () => invoke<CliResult>("run_check"),
   sessionStatus: () => invoke<CliResult>("session_status"),
-  startSession: (action: SessionAction) => invoke<void>("start_session", { action }),
+  /**
+   * Start a session. `api` (capability `api`) has it report through the
+   * session API, else `events` (capability `events`) asks for the JSON
+   * event stream.
+   */
+  startSession: (action: SessionAction, events: boolean, api: boolean) =>
+    invoke<void>("start_session", { action, events, api }),
+  /** Follow a session already running, through its API; whether one is followed. */
+  connectSession: () => invoke<boolean>("connect_session"),
   stopSession: () => invoke<CliResult>("stop_session"),
   /** `play --json`: start the game in the running `serve` session. */
   playGame: () => invoke<CliResult>("play_game"),
   /** `car-images --json`: decode each car's pictures into the data folder. */
   carImages: () => invoke<CliResult>("car_images"),
-  /** `settings --json`: read the traffic and rival amounts, or save one of them. */
+  /** `map-images --json`: decode the game's world map into the data folder. */
+  mapImages: () => invoke<CliResult>("map_images"),
+  /**
+   * `settings --json`, or the followed session API's `/v1/settings`: read the
+   * traffic and rival amounts, or save one of them.
+   */
   worldSettings: (traffic: number | null = null, rivals: string | null = null) =>
     invoke<CliResult>("world_settings", { traffic, rivals }),
   recorded: () => invoke<Recorded>("recorded"),
@@ -50,7 +97,10 @@ export const api = {
   sessionActivity: () => invoke<Activity>("session_activity"),
   backupSaves: (from: string, to: string) => invoke<BackupReport>("backup_saves", { from, to }),
   appInfo: () => invoke<AppInfo>("app_info"),
-  /** `profile --json` for the active save, or the account named. */
+  /**
+   * `profile --json` for the active save (the followed session API's
+   * `/v1/profile`), or the account named.
+   */
   profile: (accountId: string | null = null) => invoke<CliResult>("profile", { accountId }),
   profileList: () => invoke<CliResult>("profile_list"),
   sessions: () => invoke<CliResult>("sessions"),
@@ -104,18 +154,33 @@ export async function onMaximizedChange(change: (maximized: boolean) => void): P
 export async function onSessionEvents(handlers: {
   output: (line: OutputLine) => void;
   status: (result: CliResult) => void;
+  /** A `map-feed` record of the session's event stream, unchecked. */
+  mapFeed: (event: unknown) => void;
   exit: (info: { action: SessionAction; code: number | null }) => void;
   closeBlocked: () => void;
+  /** Closing: the launcher's own server is stopping first. */
+  closing: () => void;
+  /** The server did not stop in time; the window stays open. */
+  closeFailed: (message: string) => void;
+  /** Closing while the shared server runs: keep it running, or stop it? */
+  closeAsk: () => void;
+  /** Picking another server: this PC's own is being stopped first. */
+  serverSwitching: (message: string) => void;
 }): Promise<Unlisten> {
   if (!inTauri) return () => {};
   const { listen } = await import("@tauri-apps/api/event");
   const stops = await Promise.all([
     listen<OutputLine>("session-output", (e) => handlers.output(e.payload)),
     listen<CliResult>("session-status", (e) => handlers.status(e.payload)),
+    listen<unknown>("map-feed", (e) => handlers.mapFeed(e.payload)),
     listen<{ action: SessionAction; code: number | null }>("session-exit", (e) =>
       handlers.exit(e.payload),
     ),
     listen("close-blocked", () => handlers.closeBlocked()),
+    listen("closing", () => handlers.closing()),
+    listen<string>("close-failed", (e) => handlers.closeFailed(e.payload)),
+    listen("close-ask", () => handlers.closeAsk()),
+    listen<string>("server-switching", (e) => handlers.serverSwitching(e.payload)),
   ]);
   return () => stops.forEach((stop) => stop());
 }

@@ -6,6 +6,12 @@ export type { State as SessionState, Status, StatusReport } from "./generated/st
 export type { Preflight } from "./generated/check";
 export type { VersionReport } from "./generated/version";
 export type { SettingsReport } from "./generated/settings";
+export type { MapImagesReport } from "./generated/map-images";
+import type { Event as SessionEvent } from "./generated/event";
+export type { SessionEvent };
+export type { MapCar, MapDriver, MapWorld, TrafficRing } from "./generated/event";
+/** A `map-feed` event of `--events`: where the cars are (capability `map-feed`). */
+export type MapFeed = Extract<SessionEvent, { event: "map-feed" }>;
 export type {
   Car,
   CarImage,
@@ -55,14 +61,97 @@ export interface Settings {
   first_run_done: boolean;
   updates: UpdateSettings;
   last_server_tag: string | null;
+  /** Your server on another PC on your network; `null` is this PC's own. */
+  server: RemoteServer | null;
+  /** The port and token the launcher gives its own server's API. */
+  local_api: { port: number; token: string } | null;
+  /** This PC's network address while your other PCs may use its server. */
+  share_address: string | null;
   /** How many times the window has opened (src/lib/state/support.ts). */
   launches: number;
   /** When the Garage last showed the support line, UTC. */
   support_shown_utc: string | null;
 }
 
+/** A server on another PC: what its `api --json` prints there. */
+export interface RemoteServer {
+  /** `http://<IPv4 address>:<port>`. */
+  url: string;
+  /** Its API token, 64 lowercase hexadecimal characters. */
+  token: string;
+}
+
 export type OutputLine =
-  { kind: "status"; time: string; state: string; message: string } | { kind: "text"; text: string };
+  | { kind: "status"; time: string; state: string; message: string }
+  | { kind: "text"; text: string }
+  /** The launcher's own line about the server in use (src-tauri/src/connlog.rs). */
+  | { kind: "launcher"; time: string; message: string; detail: string };
+
+/** What closing the launcher does while this PC's shared server runs. */
+export type CloseAction = "ask" | "keep" | "stop";
+
+/** A server on another PC, as paired (src-tauri/src/servers.rs). */
+export interface ServerEntry {
+  id: string;
+  name: string;
+  /** `http://<IPv4 address>:<port>`. */
+  url: string;
+  token: string;
+  added_utc: string;
+  last_seen_utc: string | null;
+  last_version: string | null;
+  last_capabilities: string[];
+  last_played_utc: string | null;
+}
+
+/** `servers.json`: your servers and which one is in use. */
+export interface Servers {
+  version: number;
+  servers: ServerEntry[];
+  /** The entry in use; `null` is this PC's own server. */
+  in_use: string | null;
+  close_action: CloseAction;
+  this_pc: { last_played_utc: string | null };
+}
+
+/** What a check of a server found. */
+export type Reach =
+  | {
+      state: "online";
+      version: string;
+      release: string;
+      capabilities: string[];
+      ping_ms: number;
+      session: string | null;
+      game_running: boolean;
+      saves: number | null;
+    }
+  | { state: "unreachable"; message: string }
+  | { state: "refused"; message: string }
+  | { state: "older"; message: string };
+
+/** `server_check`: a pairing code looked at before saving. */
+export type ServerCheck = Reach & {
+  url: string;
+  address: string;
+  /** That is this PC's own server. */
+  own: boolean;
+  /** Already saved, under this name. */
+  known_as: string | null;
+};
+
+/** One saved server as the Server screen last saw it. */
+export type ServerHealth = Reach & { id: string; checked_utc: string };
+
+export function emptyServers(): Servers {
+  return {
+    version: 1,
+    servers: [],
+    in_use: null,
+    close_action: "ask",
+    this_pc: { last_played_utc: null },
+  };
+}
 
 export type SessionAction = "setup" | "serve" | "start";
 
@@ -142,6 +231,9 @@ export function emptySettings(): Settings {
     first_run_done: false,
     updates: { mode: "ask", skipped_version: null },
     last_server_tag: null,
+    server: null,
+    local_api: null,
+    share_address: null,
     launches: 0,
     support_shown_utc: null,
   };

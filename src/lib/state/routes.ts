@@ -2,13 +2,15 @@
 // `#/logs/viewer`, `#/settings/about`) keep links working in the desktop window and in the
 // browser preview.
 
-export const VIEWS = ["garage", "profile", "world", "map", "host", "logs", "settings"] as const;
+import type { Feature } from "./capabilities";
+
+export const VIEWS = ["garage", "profile", "world", "map", "server", "logs", "settings"] as const;
 export type View = (typeof VIEWS)[number];
 
 /** Views with sub-views; the first one is where the view opens. */
 export const SECTIONS = {
   profile: ["overview", "cars", "save-data", "edit-driver"],
-  logs: ["sessions", "viewer"],
+  logs: ["sessions", "viewer", "connections"],
   settings: ["general", "updates", "about"],
 } as const;
 export type ProfileSection = (typeof SECTIONS.profile)[number];
@@ -28,6 +30,8 @@ export interface Route {
 export interface NavItem {
   id: View;
   label: string;
+  /** The screen needs this feature; without it the tab carries the clock mark. */
+  feature?: Feature;
   /** The screen is coming in a future update: its tab carries the clock mark. */
   upcoming?: boolean;
 }
@@ -36,11 +40,18 @@ export const NAV: NavItem[] = [
   { id: "garage", label: "Garage" },
   { id: "profile", label: "Profile" },
   { id: "world", label: "World" },
-  { id: "map", label: "Map", upcoming: true },
-  { id: "host", label: "Host" },
+  { id: "map", label: "Map", feature: "map" },
+  { id: "server", label: "Server" },
   { id: "logs", label: "Logs" },
   { id: "settings", label: "Settings" },
 ];
+
+/** The tabs, each marked as coming while `ready` says its feature is not there. */
+export function navItems(ready: (feature: Feature) => boolean): NavItem[] {
+  return NAV.map((item) =>
+    item.feature && !ready(item.feature) ? { ...item, upcoming: true } : item,
+  );
+}
 
 export const SECTION_LABELS: Record<Section, string> = {
   overview: "Overview",
@@ -49,6 +60,7 @@ export const SECTION_LABELS: Record<Section, string> = {
   "edit-driver": "Edit driver",
   sessions: "Sessions",
   viewer: "Log viewer",
+  connections: "Connections",
   general: "General",
   updates: "Updates",
   about: "About",
@@ -75,6 +87,8 @@ export function sectionFor(view: View, wanted: string | null | undefined): Secti
 export function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   if (parts[0] === "first-run") return { ...HOME, firstRun: true };
+  // The Server screen was called Host before it picked servers.
+  if (parts[0] === "host") parts[0] = "server";
   if (!isView(parts[0])) return HOME;
   return { view: parts[0], section: sectionFor(parts[0], parts[1]), firstRun: false };
 }

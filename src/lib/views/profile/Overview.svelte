@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { viaApi } from "$lib/state/server";
   import CountUp from "$lib/components/CountUp.svelte";
   import { staggerIn } from "$lib/motion";
   import { formatCount, formatMoney } from "$lib/state/format";
@@ -204,7 +205,13 @@
       </PanelHeading>
       {#if pictures && active}
         <CarImage
-          picture={carPicture(active.image, "large", pictures, profile.car_images)}
+          picture={carPicture(
+            active.image,
+            "large",
+            pictures,
+            profile.car_images,
+            viaApi(session.settings),
+          )}
           alt={carName(active)}
           ratio="16 / 9"
           icon={32}

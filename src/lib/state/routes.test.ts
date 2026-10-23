@@ -27,7 +27,13 @@ describe("routes", () => {
     // A section of another view does not carry over.
     expect(parseRoute("#/profile/updates").section).toBe("overview");
     expect(parseRoute("#/map/cars").section).toBeNull();
-    expect(sectionFor("host", "about")).toBeNull();
+    expect(sectionFor("server", "about")).toBeNull();
+    expect(parseRoute("#/logs/connections").section).toBe("connections");
+  });
+
+  it("still opens the Server screen at its old Host address", () => {
+    expect(parseRoute("#/host")).toEqual({ view: "server", section: null, firstRun: false });
+    expect(formatRoute(parseRoute("#/host"))).toBe("#/server");
   });
 
   it("sends anything unknown home", () => {
@@ -58,7 +64,7 @@ describe("routes", () => {
       "Profile",
       "World",
       "Map",
-      "Host",
+      "Server",
       "Logs",
       "Settings",
     ]);

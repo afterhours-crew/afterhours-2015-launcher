@@ -10,6 +10,7 @@
 import { api, inTauri } from "$lib/api/tauri";
 import type {
   CliResult,
+  MapImagesReport,
   Profile,
   ProfileList,
   SessionFileText,
@@ -27,7 +28,8 @@ export type Load<T> =
   | { kind: "idle" }
   | { kind: "loading"; last: T | null }
   | { kind: "ready"; value: T }
-  | { kind: "error"; message: string; last: T | null };
+  /** `exit` is the server's exit code when it answered; 4 means there was nothing to act on. */
+  | { kind: "error"; message: string; last: T | null; exit?: number };
 
 /** The value to draw: the loaded one, or the last one while reloading. */
 export function current<T>(load: Load<T>): T | null {
@@ -48,6 +50,7 @@ interface Source {
   sessions(): Promise<CliResult>;
   sessionFile(id: string, name: string): Promise<SessionFileText>;
   settings(change: WorldChange): Promise<CliResult>;
+  mapImages(): Promise<CliResult>;
 }
 
 async function sampleSource(): Promise<Source> {
@@ -115,6 +118,15 @@ async function sampleSource(): Promise<Source> {
         },
       } satisfies Profile);
     },
+    // `&nomap`: the data folder has no prepared content yet.
+    mapImages: async () =>
+      query.has("nomap")
+        ? {
+            kind: "error",
+            exit: 4,
+            message: "This data directory has no prepared content; run setup first.",
+          }
+        : ok(sample.SAMPLE_MAP),
     profileList: async () => ok(sample.SAMPLE_PROFILE_LIST),
     sessions: async () => ok(sample.SAMPLE_SESSIONS),
     sessionFile: async (id, name) => {
@@ -131,6 +143,7 @@ const live: Source = {
   sessions: () => api.sessions(),
   sessionFile: (id, name) => api.sessionFile(id, name),
   settings: (change) => api.worldSettings(change.traffic ?? null, change.rivals ?? null),
+  mapImages: () => api.mapImages(),
 };
 
 function message(e: unknown): string {
@@ -148,6 +161,8 @@ export class Records {
   sessions = $state<Load<SessionList>>({ kind: "idle" });
   /** Traffic and rivals, from `settings --json`. */
   world = $state<Load<SettingsReport>>({ kind: "idle" });
+  /** The world map's tiles and world box, from `map-images`. */
+  map = $state<Load<MapImagesReport>>({ kind: "idle" });
   /** `car-images` is running in the background. */
   imagesRunning = $state(false);
   /** The game folder `car-images` last ran for; a session's end clears it. */
@@ -172,6 +187,10 @@ export class Records {
     return hasCapability(session.info?.server, "world-settings");
   }
 
+  get canMap(): boolean {
+    return hasCapability(session.info?.server, "map-images");
+  }
+
   private async read<T>(
     can: boolean,
     get: (s: Source) => Promise<CliResult>,
@@ -186,7 +205,7 @@ export class Records {
     try {
       const result = await get(await this.from());
       if (result.kind === "ok") set({ kind: "ready", value: result.value as T });
-      else set({ kind: "error", message: result.message, last });
+      else set({ kind: "error", message: result.message, last, exit: result.exit });
     } catch (e) {
       set({ kind: "error", message: message(e), last });
     }
@@ -229,6 +248,21 @@ export class Records {
     } finally {
       this.imagesRunning = false;
     }
+  }
+
+  /**
+   * Decode the world map, or get the set already decoded: the first time
+   * takes seconds, later calls return at once. Asked for when the Map view
+   * opens without a map, and again when it is retried.
+   */
+  async loadMap(): Promise<void> {
+    if (this.map.kind === "loading" || this.map.kind === "ready") return;
+    await this.read<MapImagesReport>(
+      this.canMap,
+      (s) => s.mapImages(),
+      (l) => (this.map = l),
+      current(this.map),
+    );
   }
 
   async loadProfiles(): Promise<void> {
@@ -310,6 +344,24 @@ export class Records {
   async openSessionFolder(id: string): Promise<void> {
     if (sampleMode) throw new Error("The browser preview cannot open folders.");
     await api.openSessionFolder(id);
+  }
+
+  /**
+   * The server in use changed (the Server screen picked another): every
+   * record came from the old one. Forget them and read the new server's
+   * profile now, for the header; the other screens read theirs when opened,
+   * and the map is decoded again for the new server.
+   */
+  async switchServer(): Promise<void> {
+    this.imagesTried = null;
+    this.profile = { kind: "idle" };
+    this.profiles = { kind: "idle" };
+    this.picked = null;
+    this.pickedProfile = { kind: "idle" };
+    this.sessions = { kind: "idle" };
+    this.world = { kind: "idle" };
+    this.map = { kind: "idle" };
+    await this.loadProfile();
   }
 
   /** After a session ends the save and the session list have changed. */

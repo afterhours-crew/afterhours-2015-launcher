@@ -101,6 +101,7 @@
           class:soft={!row.tone}
           class:warn={row.tone === "warn"}
           class:error={row.tone === "error"}
+          class:info={row.tone === "info"}
           >{#if row.tone}<span class="dot" aria-hidden="true"></span>{/if}{row.level}</span
         >
         <span class="message"
@@ -179,6 +180,9 @@
   }
   .error {
     color: var(--style);
+  }
+  .info {
+    color: var(--speed);
   }
   .dot {
     display: inline-block;

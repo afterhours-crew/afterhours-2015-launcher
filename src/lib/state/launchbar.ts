@@ -28,6 +28,8 @@ export interface LaunchBarInput {
   running: boolean;
   /** The server reports `play`: it can start the game in a serve session. */
   canPlay: boolean;
+  /** The server in use when it is one on another PC; `null` is this PC's own. */
+  server?: { name: string; address: string } | null;
 }
 
 export interface LaunchBarModel {
@@ -113,12 +115,13 @@ export const RESTART_HINT = "Your server restarts: it stops, then starts again w
 export function launchBarModel(input: LaunchBarInput): LaunchBarModel {
   const serveOnly = input.platform !== "windows";
   const idleAction = serveOnly ? "serve" : "start";
-  // The bar names the server, never a car (owner decision, 2026-10-19).
-  // The server listens on loopback only, so it is always this PC only.
+  // The bar names the server, never a car (decision, 2026-10-19): this PC's
+  // own, or the one picked on the Server screen, by its name and address.
   const eyebrow = "Playing on";
-  const title = "Your server";
+  const title = input.server?.name ?? "Your server";
   const phase = sessionPhase(input.status);
-  const summary = `${phase === "idle" ? "Offline" : "Running"} · this PC only`;
+  const where = input.server ? input.server.address : "this PC only";
+  const summary = `${phase === "idle" ? "Offline" : "Running"} · ${where}`;
 
   if (phase !== "idle" && input.status) {
     const live = (

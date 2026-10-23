@@ -5,7 +5,15 @@
  * should say the feature is not available yet rather than fail.
  */
 export type Capability =
-  "profile" | "sessions" | "events" | "play" | "car-images" | "world-settings";
+  | "profile"
+  | "sessions"
+  | "events"
+  | "play"
+  | "car-images"
+  | "map-images"
+  | "world-settings"
+  | "map-feed"
+  | "api";
 
 /**
  * `version --json`.

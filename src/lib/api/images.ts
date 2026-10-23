@@ -8,7 +8,13 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { sampleImageSrc, sampleMode } from "$lib/state/preview";
 import { inTauri } from "./tauri";
 
-export function imageSrc(path: string | null): string | null {
+/**
+ * A picture's URL: through the server's API (`GET /v1/content/<file>`, by
+ * the app's `afterhours://` protocol) when `file` is given, else the file
+ * at `path` on this PC.
+ */
+export function imageSrc(path: string | null, file: string | null = null): string | null {
+  if (file && inTauri) return convertFileSrc(`content/${file}`, "afterhours");
   if (!path) return null;
   if (inTauri) return convertFileSrc(path);
   return sampleMode && sampleImageSrc ? sampleImageSrc(path) : null;

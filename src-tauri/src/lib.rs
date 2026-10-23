@@ -4,36 +4,45 @@
 
 //! The Rust side of the launcher window.
 //!
-//! The window never talks to the game or the server itself. Everything
-//! goes through `Afterhours.exe`, the single executable published by the
-//! afterhours-2015 repository and bundled here at the exact release pinned
-//! in `server-pin.json`: `check --json` for preflight, `status --json` for
-//! the current session, `stop --json` to end it, and `setup`, `serve` or
-//! `start` to run one. That keeps the safety logic (path rules, digests,
-//! process ownership, routing) in one place, and the session supervisor in
-//! its own process.
+//! The window never talks to the game itself. Everything goes through
+//! `Afterhours.exe`, the single executable published by the afterhours-2015
+//! repository and bundled here at the exact release pinned in
+//! `server-pin.json`: `check --json` for preflight, `status --json` for the
+//! current session, `stop --json` to end it, and `setup`, `serve` or `start`
+//! to run one. A server that reports `api` serves its session over HTTP on
+//! this PC, and the window follows and stops it there, as it would a server
+//! on another PC. That keeps the safety logic (path rules, digests, process
+//! ownership, routing) in one place, and the session supervisor in its own
+//! process.
 //!
 //! [`pin`] and [`server`] decide which executable runs, [`cli`] runs it and
-//! turns its output into events, [`settings`] stores the few things the
+//! turns its output into events, [`connection`] follows a session through
+//! its API and stops it when the window closes, [`settings`] stores the few things the
 //! window remembers, [`data`] reads the data directory's session records and
 //! copies saves aside, [`updates`] serves the updater's checks, [`reads`]
 //! runs the read-only commands behind the profile and logs screens,
-//! [`images`] runs `car-images` and scopes the asset protocol to its
-//! folder, and [`detect`] guesses where the game is installed. The window's
+//! [`images`] runs `car-images` and `map-images` and scopes the asset
+//! protocol to their folders, and [`detect`] guesses where the game is installed. The window's
 //! size, position and maximized state are remembered separately (see
 //! [`WINDOW_STATE_FILE`]).
 
 pub mod cli;
+pub mod connection;
+pub mod connlog;
 pub mod data;
 pub mod detect;
 pub mod images;
 pub mod pin;
 pub mod reads;
 pub mod server;
+pub mod servers;
 pub mod settings;
 pub mod updates;
 
-use std::sync::Mutex;
+use std::sync::{
+    Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 use tauri::{Emitter, Manager};
 use tauri_plugin_window_state::StateFlags;
 
@@ -51,8 +60,18 @@ pub struct AppState {
     /// game folder decision.
     pub settings: Mutex<settings::Settings>,
     pub session: Mutex<Option<cli::RunningSession>>,
+    /// The session followed through its API, this window's own or one it
+    /// found running.
+    pub connection: Mutex<Option<connection::Live>>,
+    /// Closing waits for the window's own server to stop.
+    pub closing: AtomicBool,
     /// The folder holding this launcher's executable.
     pub launcher_dir: Option<std::path::PathBuf>,
+    /// Your servers: the ones on other PCs and which one is in use.
+    pub servers: Mutex<servers::Servers>,
+    /// What each saved server last answered a check with, by id, so only
+    /// a change is written to its log.
+    pub health: Mutex<std::collections::HashMap<String, String>>,
 }
 
 impl AppState {
@@ -67,6 +86,41 @@ impl AppState {
         )
     }
 
+    /// Where the followed session's API answers, if one is followed.
+    pub fn endpoint(&self) -> Option<connection::Endpoint> {
+        self.connection
+            .lock()
+            .ok()?
+            .as_ref()
+            .map(|live| live.endpoint.clone())
+    }
+
+    /// The server the window reaches by address and token: another PC's,
+    /// or this PC's own once the launcher has started it with the API.
+    /// While there is one, the window asks it everything and runs no
+    /// command and reads no server file.
+    pub fn server_endpoint(&self) -> Option<connection::Endpoint> {
+        let settings = self.settings();
+        match (&settings.server, &settings.local_api) {
+            (Some(remote), _) => connection::Endpoint::remote(remote).ok(),
+            (None, Some(api)) => Some(connection::Endpoint::local(api, settings.share_address)),
+            (None, None) => None,
+        }
+    }
+
+    /// Whether the session this window started still runs, and if so
+    /// whether it reports through the API.
+    pub fn window_session(&self) -> Option<bool> {
+        let mut guard = self.session.lock().ok()?;
+        let running = guard.as_mut()?;
+        running.is_running().then_some(running.api)
+    }
+
+    /// Whether the session this window started still runs.
+    pub fn window_session_runs(&self) -> bool {
+        self.window_session().is_some()
+    }
+
     /// The settings in use, with the game folder decision applied.
     pub fn settings(&self) -> settings::Settings {
         let stored = self.settings.lock().map(|s| s.clone()).unwrap_or_default();
@@ -77,6 +131,12 @@ impl AppState {
 /// Build and run the application.
 pub fn run() {
     tauri::Builder::default()
+        // Pictures and map tiles from the server's API (`GET /v1/content`).
+        .register_asynchronous_uri_scheme_protocol("afterhours", |ctx, request, responder| {
+            let app = ctx.app_handle().clone();
+            let path = request.uri().path().to_owned();
+            std::thread::spawn(move || responder.respond(images::content_response(&app, &path)));
+        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
@@ -94,40 +154,106 @@ pub fn run() {
                 window.set_focus()?;
             }
             let settings = settings::load(app.handle())?;
+            let servers = servers::load(app.handle(), &settings)?;
             app.manage(AppState {
                 settings: Mutex::new(settings),
                 session: Mutex::new(None),
+                connection: Mutex::new(None),
+                closing: AtomicBool::new(false),
                 launcher_dir: detect::launcher_dir(),
+                servers: Mutex::new(servers),
+                health: Mutex::new(std::collections::HashMap::new()),
             });
             let state = app.state::<AppState>();
             images::allow(app.handle(), &state.settings());
             Ok(())
         })
         .on_window_event(|window, event| {
-            // The session's front-end writes its progress to pipes this
-            // process reads, and the supervisor inherits them. Closing the
-            // window while it runs would break those pipes under a live
-            // game, so the window stays until the session is stopped.
+            // Closing the launcher stops its own server: it asks the session
+            // to stop through its API, waits until it is over, then closes.
+            // A session started without the API writes to pipes this process
+            // reads, and breaking them could end a live game, so then the
+            // window stays until the session is stopped.
             if let tauri::WindowEvent::CloseRequested { api, .. } = event
                 && let Some(state) = window.try_state::<AppState>()
-                && let Ok(mut guard) = state.session.lock()
-                && guard.as_mut().is_some_and(cli::RunningSession::is_running)
             {
-                api.prevent_close();
-                let _ = window.emit("close-blocked", ());
+                // Only this PC's own server is stopped on close; the settings
+                // say which server that is, not its address.
+                let plan = connection::close_plan(
+                    state.window_session(),
+                    connection::follows_own(
+                        state.settings().server.as_ref(),
+                        state.endpoint().is_some(),
+                    ),
+                    state.closing.load(Ordering::SeqCst),
+                );
+                match plan {
+                    connection::ClosePlan::Close => {}
+                    connection::ClosePlan::Refuse => {
+                        api.prevent_close();
+                        let _ = window.emit("close-blocked", ());
+                    }
+                    connection::ClosePlan::Wait => api.prevent_close(),
+                    connection::ClosePlan::StopThenClose => {
+                        // A shared server may be in use by your other PCs:
+                        // ask whether to keep it running, unless the answer
+                        // was remembered.
+                        let shared = state.settings().share_address.is_some();
+                        let action = state
+                            .servers
+                            .lock()
+                            .map(|s| s.close_action)
+                            .unwrap_or_default();
+                        match connection::close_choice(shared, action) {
+                            connection::CloseChoice::Ask => {
+                                api.prevent_close();
+                                let _ = window.emit("close-ask", ());
+                            }
+                            connection::CloseChoice::Keep => {
+                                connlog::record(
+                                    window.app_handle(),
+                                    servers::THIS_PC,
+                                    "Launcher closed; the shared server keeps running",
+                                    String::new(),
+                                );
+                            }
+                            connection::CloseChoice::Stop => {
+                                api.prevent_close();
+                                state.closing.store(true, Ordering::SeqCst);
+                                let _ = window.emit("closing", ());
+                                connection::stop_then_close(window.app_handle().clone());
+                            }
+                        }
+                    }
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![
             settings::get_settings,
             settings::save_settings,
+            settings::set_server,
+            settings::set_sharing,
             detect::detect_game_dirs,
             cli::run_check,
             cli::session_status,
             cli::start_session,
             cli::stop_session,
             cli::play_game,
+            cli::connect_session,
             cli::world_settings,
+            servers::servers_list,
+            servers::server_check,
+            servers::server_add,
+            servers::server_use,
+            servers::server_rename,
+            servers::server_forget,
+            servers::server_set_token,
+            servers::servers_health,
+            servers::set_close_action,
+            servers::close_decision,
+            servers::connection_log,
             images::car_images,
+            images::map_images,
             data::recorded,
             data::open_folder,
             updates::session_activity,

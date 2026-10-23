@@ -14,6 +14,8 @@
   import { lastSession } from "$lib/state/garage";
   import { current, records } from "$lib/state/records.svelte";
   import { router } from "$lib/state/router.svelte";
+  import { inUseName } from "$lib/state/serverpicker";
+  import { servers } from "$lib/state/servers.svelte";
   import { session } from "$lib/state/session.svelte";
   import { supportLinks } from "$lib/state/support";
 
@@ -40,7 +42,7 @@
 
 <main use:staggerIn>
   <section class="floor ah-on-art" aria-label="Tonight" data-enter>
-    <span class="where">Your server · Ventura Bay</span>
+    <span class="where">{inUseName(servers.list) ?? "Your server"} · Ventura Bay</span>
     <Clock />
     {#if profile}
       <div class="chips">

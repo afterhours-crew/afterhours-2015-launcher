@@ -7,6 +7,9 @@
 
 import type {
   Car,
+  MapCar,
+  MapFeed,
+  MapImagesReport,
   Preflight,
   Profile,
   ProfileList,
@@ -27,8 +30,173 @@ export const SAMPLE_VERSION: VersionReport = {
   os: "windows",
   game_launch: true,
   records: { profile: 1, "profile-list": 1, sessions: 1, status: 1, version: 1 },
-  capabilities: ["profile", "sessions", "events", "play", "car-images", "world-settings"],
+  capabilities: [
+    "profile",
+    "sessions",
+    "events",
+    "play",
+    "car-images",
+    "world-settings",
+    "map-images",
+    "map-feed",
+    "api",
+  ],
 };
+
+/** Where `map-images` writes the decoded world map, for the current content. */
+export const SAMPLE_MAP_DIR =
+  "C:\\Users\\Driver\\AppData\\Local\\Afterhours2015\\artifacts\\content\\map-images\\5a3b1e0c";
+
+/**
+ * `map-images --json` for the supported build's layout. The preview draws a
+ * made-up grid map for its tiles; no game art.
+ */
+export const SAMPLE_MAP: MapImagesReport = {
+  version: 1,
+  directory: SAMPLE_MAP_DIR,
+  fingerprint: "5a3b1e0c".repeat(8),
+  game_directory: "C:\\Program Files\\EA Games\\Need for Speed",
+  built: false,
+  asset: "UI/Menu/WorldMapTiledTexture",
+  tile_size: 256,
+  full_size: 16384,
+  file_pattern: "{level}-{column}-{row}.png",
+  levels: [
+    { level: 1, tiles_per_side: 32, size: 8192, tiles: 1024 },
+    { level: 2, tiles_per_side: 16, size: 4096, tiles: 256 },
+    { level: 3, tiles_per_side: 8, size: 2048, tiles: 64 },
+  ],
+  world: { min_x: -8192, min_z: -8192, max_x: 8192, max_z: 8192 },
+  files: 1344,
+  formats: { BC3_UNORM: 1344 },
+  missing: [],
+  warnings: [],
+};
+
+/** Heading of a move by (dx, dz): degrees clockwise from up the map, to a tenth. */
+function headingOf(dx: number, dz: number): number {
+  const degrees = Math.round(((Math.atan2(dx, -dz) * 180) / Math.PI) * 10) / 10;
+  return ((degrees % 360) + 360) % 360;
+}
+
+const cm = (metres: number) => Math.round(metres * 100) / 100;
+
+/** A point `distance` metres round a rectangle of roads, and its direction. */
+function round(
+  corners: readonly (readonly [number, number])[],
+  distance: number,
+): { x: number; z: number; dx: number; dz: number; side: number } {
+  const sides = corners.map((from, i) => {
+    const to = corners[(i + 1) % corners.length]!;
+    return { from, to, length: Math.hypot(to[0] - from[0], to[1] - from[1]) };
+  });
+  const perimeter = sides.reduce((sum, side) => sum + side.length, 0);
+  let left = ((distance % perimeter) + perimeter) % perimeter;
+  for (const [i, side] of sides.entries()) {
+    if (left <= side.length || i === sides.length - 1) {
+      const dx = (side.to[0] - side.from[0]) / side.length;
+      const dz = (side.to[1] - side.from[1]) / side.length;
+      return { x: side.from[0] + dx * left, z: side.from[1] + dz * left, dx, dz, side: i };
+    }
+    left -= side.length;
+  }
+  throw new Error("unreachable");
+}
+
+/** The block the sample driver laps: the sample map has a road every 1024 m. */
+const DRIVER_BLOCK = [
+  [-1024, -1024],
+  [2048, -1024],
+  [2048, 2048],
+  [-1024, 2048],
+] as const;
+const DRIVER_SPEED = 80;
+const RING = { inner: 300, outer: 450 };
+
+/**
+ * `?sample`: frame `frame` of a made-up `map-feed` stream, four a second.
+ * The driver laps a block of the sample map's roads; traffic runs along
+ * the driver's road within the spawn ring, appearing at its edge under a
+ * new id and clearing at the other, as the server's do; three rivals lap
+ * blocks of their own, one without a heading (the server's simulation of a
+ * racer without a car). Pure, so tests can check every frame's shape.
+ */
+export function sampleMapFrame(frame: number): MapFeed {
+  const t = frame / 4;
+  const travelled = t * DRIVER_SPEED;
+  const at = round(DRIVER_BLOCK, travelled);
+  const lap = Math.floor(travelled / (4 * 3072));
+  const leg = lap * 4 + at.side;
+  const traffic: MapCar[] = [];
+  for (let i = 0; i < 10; i += 1) {
+    // Even cars overtake on the driver's side; odd ones come the other way.
+    const oncoming = i % 2 === 1;
+    const relative = oncoming ? DRIVER_SPEED + 14 + i : 6 + i;
+    const run = (i * 157 + relative * t) % (RING.outer * 2);
+    const wraps = Math.floor((i * 157 + relative * t) / (RING.outer * 2));
+    const along = oncoming ? RING.outer - run : run - RING.outer;
+    const lane = oncoming ? -4 : 4;
+    traffic.push({
+      id: 1 + i + 16 * (wraps + 100_000 * leg),
+      x: cm(at.x + at.dx * along - at.dz * lane),
+      y: 12,
+      z: cm(at.z + at.dz * along + at.dx * lane),
+      heading: oncoming ? headingOf(-at.dx, -at.dz) : headingOf(at.dx, at.dz),
+    });
+  }
+  traffic.sort((a, b) => a.id - b.id);
+  const rivals: MapCar[] = [
+    { block: [-5120, -4096, -2048, -1024], speed: 55, heading: true },
+    { block: [3072, -5120, 6144, -2048], speed: 48, heading: true },
+    { block: [1024, 4096, 5120, 6144], speed: 40, heading: false },
+  ].map((rival, i) => {
+    const [x0, z0, x1, z1] = rival.block as [number, number, number, number];
+    const where = round(
+      [
+        [x0, z0],
+        [x1, z0],
+        [x1, z1],
+        [x0, z1],
+      ],
+      t * rival.speed + i * 900,
+    );
+    return {
+      id: i + 1,
+      x: cm(where.x),
+      y: 10,
+      z: cm(where.z),
+      heading: rival.heading ? headingOf(where.dx, where.dz) : null,
+    };
+  });
+  return {
+    version: 1,
+    utc: new Date(Date.UTC(2026, 9, 20, 12, 0, 0) + frame * 250).toISOString().slice(0, 19) + "Z",
+    event: "map-feed",
+    frame,
+    skipped: 0,
+    worlds: [
+      {
+        connection: 1,
+        persona_id: SAMPLE_PROFILE.identity!.persona_id,
+        world_ms: 1_000 + frame * 250,
+        drivers: [
+          {
+            participant: 1,
+            x: cm(at.x),
+            y: 12.35,
+            z: cm(at.z),
+            heading: headingOf(at.dx, at.dz),
+            speed: DRIVER_SPEED,
+          },
+        ],
+        traffic,
+        rivals,
+        traffic_ring: { ...RING },
+        omitted: 0,
+      },
+    ],
+  };
+}
 
 /** `settings --json` before anything was saved: original traffic and rivals. */
 export const SAMPLE_SETTINGS: SettingsReport = {
@@ -74,6 +242,7 @@ function images(id: string, sizes: ("medium" | "large")[]): Car["image"] {
     sizes.includes(size)
       ? {
           path: `${SAMPLE_CAR_IMAGES}\\${id}-${size}.png`,
+          file: `car-images/f00d/${id}-${size}.png`,
           width: size === "medium" ? 256 : 512,
           height: size === "medium" ? 256 : 512,
           source_format: "BC1_UNORM",

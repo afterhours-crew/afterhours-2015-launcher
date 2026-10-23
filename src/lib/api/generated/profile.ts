@@ -138,6 +138,12 @@ export interface CarImages {
  * One cached image for `profile`.
  */
 export interface CarImage {
+  /**
+   * The file below the server's content folder,
+   * `car-images/<fingerprint>/<name>.png`, as the session API's
+   * `GET /v1/content/<file>` serves it to a client on any computer.
+   */
+  file: string;
   height: number;
   /**
    * Absolute path of the PNG file.

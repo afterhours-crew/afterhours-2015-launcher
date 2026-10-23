@@ -4,7 +4,10 @@
   import InfoButton from "$lib/components/InfoButton.svelte";
   import Note from "$lib/components/Note.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
+  import Segmented from "$lib/components/Segmented.svelte";
   import { sampleMode } from "$lib/state/preview";
+  import { router } from "$lib/state/router.svelte";
+  import { servers } from "$lib/state/servers.svelte";
   import { session } from "$lib/state/session.svelte";
 
   // Game and data (H9): where the game is and where the server keeps saves
@@ -51,6 +54,16 @@
     await session.refreshInfo();
   }
 
+  // Your servers, this PC's own and the ones on other PCs, are picked on
+  // Server; what closing does with a shared server is remembered there
+  // and changed here.
+  let closeAction = $derived(servers.list.close_action);
+  const closeOptions = [
+    { value: "ask" as const, label: "Ask me" },
+    { value: "keep" as const, label: "Keep it running" },
+    { value: "stop" as const, label: "Stop it" },
+  ];
+
   async function openData() {
     note = null;
     try {
@@ -62,42 +75,83 @@
   }
 </script>
 
-<Glass radius="panel" label="Game and data" class="panel rows-panel">
-  <div class="list-row tall">
-    <span class="grow text">
-      <span class="name">
-        Game folder
-        {#if inFolder}<InfoButton
-            label="About the game folder"
-            text="The launcher sits in this game folder, so it uses the game it is in and changes nothing there. To use another install, run the launcher from somewhere else."
-          />{/if}
+<div class="panels">
+  <Glass radius="panel" label="Game and data" class="panel rows-panel">
+    <div class="list-row tall">
+      <span class="grow text">
+        <span class="name">
+          Game folder
+          {#if inFolder}<InfoButton
+              label="About the game folder"
+              text="The launcher sits in this game folder, so it uses the game it is in and changes nothing there. To use another install, run the launcher from somewhere else."
+            />{/if}
+        </span>
+        <span class="t-data path">{gameDir ?? "Not chosen yet"}</span>
       </span>
-      <span class="t-data path">{gameDir ?? "Not chosen yet"}</span>
-    </span>
-    {#if !inFolder}
-      <PillButton onclick={changeGame} disabled={checking}
-        >{checking ? "Checking…" : "Change"}</PillButton
-      >
-    {/if}
-  </div>
-  <div class="list-row tall">
-    <span class="grow text">
-      <span class="name">
-        Saves and logs
-        <InfoButton
-          label="About the data folder"
-          text="Accounts, prepared content, logs, sessions and update backups. Keep it outside the game folder."
-        />
+      {#if !inFolder}
+        <PillButton onclick={changeGame} disabled={checking}
+          >{checking ? "Checking…" : "Change"}</PillButton
+        >
+      {/if}
+    </div>
+    <div class="list-row tall">
+      <span class="grow text">
+        <span class="name">
+          Saves and logs
+          <InfoButton
+            label="About the data folder"
+            text="Accounts, prepared content, logs, sessions and update backups. Keep it outside the game folder."
+          />
+        </span>
+        <span class="t-data path">{dataDir ?? "The server's default folder"}</span>
       </span>
-      <span class="t-data path">{dataDir ?? "The server's default folder"}</span>
-    </span>
-    <PillButton variant="text" onclick={changeData}>Change</PillButton>
-    <PillButton onclick={openData}>Open</PillButton>
-  </div>
-  {#if note}<div class="note"><Note kind={note.kind}>{note.text}</Note></div>{/if}
-</Glass>
+      <PillButton variant="text" onclick={changeData}>Change</PillButton>
+      <PillButton onclick={openData}>Open</PillButton>
+    </div>
+    {#if note}<div class="note"><Note kind={note.kind}>{note.text}</Note></div>{/if}
+  </Glass>
+
+  <Glass radius="panel" label="Your servers" class="panel rows-panel">
+    <div class="list-row tall">
+      <span class="grow text">
+        <span class="name">
+          Your servers
+          <InfoButton
+            label="About your servers"
+            text="This PC's own server and the ones on your other PCs are picked on Server, where you also share this PC's server and add others by their pairing code."
+          />
+        </span>
+        <span class="t-caption">Picked on Server.</span>
+      </span>
+      <PillButton variant="text" onclick={() => router.go("server")}>Open Server</PillButton>
+    </div>
+    <div class="list-row tall">
+      <span class="grow text">
+        <span class="name">
+          When I close while my shared server runs
+          <InfoButton
+            label="About closing"
+            text="Your other PCs may be on your shared server. Keep it running and the launcher closes without it; Server shows it next time. A server that is not shared stops when the launcher closes."
+          />
+        </span>
+      </span>
+      <Segmented
+        options={closeOptions}
+        value={closeAction}
+        label="When I close while my shared server runs"
+        onchange={(value) => void servers.setCloseAction(value)}
+      />
+    </div>
+  </Glass>
+</div>
 
 <style>
+  /* Two panels inside one view slot: the same gap the view keeps between its slots. */
+  .panels {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
   .tall {
     min-height: 72px;
   }

@@ -2,10 +2,20 @@
 // current session status and the session console.
 
 import { api, inTauri, onSessionEvents, statusFromResult, type Unlisten } from "$lib/api/tauri";
-import type { AppInfo, OutputLine, SessionAction, Settings, Status } from "$lib/api/types";
+import type {
+  AppInfo,
+  MapFeed,
+  OutputLine,
+  RemoteServer,
+  SessionAction,
+  Settings,
+  Status,
+} from "$lib/api/types";
 import { emptySettings } from "$lib/api/types";
+import { hasCapability } from "./capabilities";
 import { isLive } from "./launchbar";
-import { sampleAppInfo, sampleFeed, sampleMode, sampleStatus } from "./preview";
+import { feedSurvives, takeFeed } from "./mapfeed";
+import { sampleAppInfo, sampleFeed, sampleMapFeed, sampleMode, sampleStatus } from "./preview";
 import { shouldNudge } from "./support";
 
 export const MAX_CONSOLE_LINES = 400;
@@ -30,10 +40,24 @@ export class Session {
   loaded = $state(false);
   /** The window refused to close because its session still runs. */
   closeBlocked = $state(false);
+  /** Closing: the launcher's own server is stopping, then the window closes. */
+  closing = $state(false);
+  /** The window follows a session it did not start, through its API. */
+  adopted = $state(false);
   /** Restart with game is stopping the serve session before it starts again. */
   restarting = $state(false);
+  /** Closing while the shared server runs: the window asks what to do. */
+  closeAsk = $state(false);
+  /** Picking another server: this PC's own is being stopped first. */
+  switching = $state<string | null>(null);
   /** When this window started its session; `null` for one started elsewhere. */
   startedAt = $state<Date | null>(null);
+  /**
+   * The newest `map-feed` event of the window's session: where the cars
+   * are. `null` without one, after a frame with no world session, and once
+   * the session leaves `ready` or ends.
+   */
+  mapFeed = $state.raw<MapFeed | null>(null);
   /**
    * "Hide my user name": copied paths and summaries show %USERNAME%
    * instead. On by default, for this run of the launcher.
@@ -80,6 +104,8 @@ export class Session {
         if (this.running) this.startedAt = new Date(Date.now() - 4 * 60_000);
         // `?sample&feed`: server lines keep arriving, for the live log panels.
         void sampleFeed((line) => this.receive(line));
+        // `?sample`: cars drive around the sample map, for the Map's markers.
+        void sampleMapFeed((event) => this.receiveMapFeed(event));
         // `?sample&nudge`: the Garage's occasional support line.
         this.supportNudge = new URLSearchParams(window.location.search).has("nudge");
       }
@@ -90,7 +116,16 @@ export class Session {
       this.settings = await api.getSettings();
       this.info = await api.appInfo();
       if (this.serverReady) {
-        this.status = statusFromResult(await api.sessionStatus());
+        this.setStatus(statusFromResult(await api.sessionStatus()));
+        // A session still running (an earlier window closed or crashed):
+        // follow it through its API, as any server.
+        if (hasCapability(this.info.server, "api") && isLive(this.status?.state)) {
+          this.adopted = await api.connectSession();
+        } else if (this.hostsOnOpen()) {
+          // Your server runs while the launcher is open, reached through its
+          // API like any other: World, Profile and Play need it.
+          await this.start("serve");
+        }
       }
       this.error = null;
       await this.countOpen();
@@ -101,15 +136,28 @@ export class Session {
     }
     this.unlisten ??= await onSessionEvents({
       output: (line) => this.receive(line),
-      status: (result) => {
-        this.status = statusFromResult(result);
-      },
+      status: (result) => this.setStatus(statusFromResult(result)),
+      mapFeed: (event) => this.receiveMapFeed(event),
       exit: () => {
         this.running = false;
         this.closeBlocked = false;
+        this.mapFeed = null;
       },
       closeBlocked: () => {
         this.closeBlocked = true;
+      },
+      closing: () => {
+        this.closing = true;
+      },
+      closeFailed: (message) => {
+        this.closing = false;
+        this.error = message;
+      },
+      closeAsk: () => {
+        this.closeAsk = true;
+      },
+      serverSwitching: (message) => {
+        this.switching = message;
       },
     });
   }
@@ -138,6 +186,47 @@ export class Session {
     }
   }
 
+  /**
+   * Use the server on another PC (checked first), or this PC's own again
+   * with `null`; then follow the chosen one when a session runs there.
+   */
+  async useServer(server: RemoteServer | null): Promise<void> {
+    this.settings = await api.setServer(server);
+    await this.refreshServer();
+  }
+
+  /**
+   * The server in use changed (the Server screen picked one): read the
+   * settings again, follow the new server's session when one runs, and
+   * start this PC's own server when it is the one in use and is off.
+   */
+  async refreshServer(): Promise<void> {
+    this.switching = null;
+    if (!inTauri) return;
+    this.settings = await api.getSettings();
+    this.adopted = false;
+    this.console = [];
+    this.received = 0;
+    this.mapFeed = null;
+    this.setStatus(statusFromResult(await api.sessionStatus()));
+    if (this.info && hasCapability(this.info.server, "api") && isLive(this.status?.state)) {
+      this.adopted = await api.connectSession();
+    } else if (!this.running && this.hostsOnOpen()) {
+      await this.start("serve");
+    }
+  }
+
+  /** Whether opening the launcher starts this PC's own server. */
+  private hostsOnOpen(): boolean {
+    const game = this.info?.game_in_launcher_folder ?? this.settings.game_dir;
+    return (
+      this.settings.first_run_done &&
+      Boolean(game) &&
+      this.settings.server === null &&
+      hasCapability(this.info?.server, "api")
+    );
+  }
+
   async save(patch: Partial<Settings>): Promise<void> {
     if (!inTauri) {
       // The browser preview keeps settings for this page only.
@@ -151,8 +240,12 @@ export class Session {
     this.error = null;
     this.console = [];
     this.received = 0;
+    this.mapFeed = null;
     try {
-      await api.startSession(action);
+      // The session API, else the event stream: map positions come with either.
+      const server = this.info?.server;
+      await api.startSession(action, hasCapability(server, "events"), hasCapability(server, "api"));
+      this.adopted = false;
       this.running = true;
       this.startedAt = new Date();
       // The notice about a changed server ends with the first start on it.
@@ -206,7 +299,7 @@ export class Session {
       if (!this.running) {
         // The window stopped polling with its session; ask once more.
         try {
-          this.status = statusFromResult(await api.sessionStatus());
+          this.setStatus(statusFromResult(await api.sessionStatus()));
         } catch (e) {
           this.error = message(e);
           return false;
@@ -225,6 +318,17 @@ export class Session {
     } catch (e) {
       this.error = message(e);
     }
+  }
+
+  /** A new session status; the map's markers go when the session leaves `ready`. */
+  setStatus(next: Status | null): void {
+    if (!feedSurvives(this.status, next)) this.mapFeed = null;
+    this.status = next;
+  }
+
+  /** A `map-feed` event: the newest frame replaces the markers. */
+  receiveMapFeed(event: unknown): void {
+    this.mapFeed = takeFeed(this.mapFeed, event, this.status?.state);
   }
 
   /** Add one console line, dropping the oldest past the bound. */

@@ -31,11 +31,117 @@ pub struct Settings {
     /// bundled tag means an update arrived since, and the first start may
     /// rebuild the content cache.
     pub last_server_tag: Option<String>,
+    /// Your server on another PC on your network, reached through its API;
+    /// `None` is this PC's own server, which the launcher starts and stops.
+    pub server: Option<RemoteServer>,
+    /// This PC's own server's API, as the launcher starts it: the port and
+    /// token it chooses, so it reaches its own server by address and token
+    /// exactly as it reaches one on another PC. Created the first time it
+    /// starts a server with the API.
+    pub local_api: Option<LocalApi>,
+    /// This PC's network address when your other PCs may use this server:
+    /// the launcher then starts it with `--server-only --listen <address>`.
+    /// `None` keeps it on this PC only.
+    pub share_address: Option<std::net::Ipv4Addr>,
     /// How many times the window has opened, for the Garage's occasional
     /// support line (src/lib/state/support.ts decides when).
     pub launches: u32,
     /// When the Garage last showed the support line, UTC; `None` never.
     pub support_shown_utc: Option<String>,
+}
+
+/// This PC's IPv4 address on its network: the source a UDP socket would
+/// use toward a documentation address (connecting one sends nothing).
+pub fn this_pc_address() -> Option<std::net::Ipv4Addr> {
+    let socket = std::net::UdpSocket::bind(("0.0.0.0", 0)).ok()?;
+    socket.connect(("192.0.2.1", 9)).ok()?;
+    match socket.local_addr().ok()?.ip() {
+        std::net::IpAddr::V4(ip) if !ip.is_loopback() && !ip.is_unspecified() => Some(ip),
+        _ => None,
+    }
+}
+
+/// Let your other PCs use this PC's server, or keep it on this PC only.
+/// Takes effect when the server next starts; refused while it runs.
+#[tauri::command]
+pub fn set_sharing(
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+    enabled: bool,
+) -> Result<Settings, String> {
+    if state.window_session_runs() {
+        return Err("Stop your server first; sharing changes when it starts.".into());
+    }
+    let share_address = if enabled {
+        Some(this_pc_address().ok_or("This PC has no network address to share on.")?)
+    } else {
+        None
+    };
+    let mut current = state
+        .settings
+        .lock()
+        .map_err(|_| "settings state poisoned")?;
+    let next = Settings {
+        share_address,
+        ..current.clone()
+    };
+    write(&file(&app)?, &next)?;
+    *current = next;
+    Ok(effective(&current, &state.game_folder(&current)))
+}
+
+/// The API address and token the launcher gives its own server.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LocalApi {
+    pub port: u16,
+    /// 64 lowercase hexadecimal characters from the system's random source.
+    pub token: String,
+}
+
+impl LocalApi {
+    /// A free loopback port and a new token.
+    pub fn new() -> Result<Self, String> {
+        let port = std::net::TcpListener::bind(("127.0.0.1", 0))
+            .and_then(|listener| listener.local_addr())
+            .map_err(|e| format!("No free port for your server's API: {e}"))?
+            .port();
+        let mut bytes = [0u8; 32];
+        getrandom::getrandom(&mut bytes)
+            .map_err(|e| format!("No random source for your server's token: {e}"))?;
+        Ok(Self {
+            port,
+            token: bytes.iter().map(|b| format!("{b:02x}")).collect(),
+        })
+    }
+}
+
+/// This PC's own server's API, created and saved on first use.
+pub fn ensure_local_api(app: &AppHandle, state: &crate::AppState) -> Result<LocalApi, String> {
+    let mut current = state
+        .settings
+        .lock()
+        .map_err(|_| "settings state poisoned")?;
+    if let Some(api) = &current.local_api {
+        return Ok(api.clone());
+    }
+    let api = LocalApi::new()?;
+    let next = Settings {
+        local_api: Some(api.clone()),
+        ..current.clone()
+    };
+    write(&file(app)?, &next)?;
+    *current = next;
+    Ok(api)
+}
+
+/// A server on another PC: what its `api --json` prints there.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RemoteServer {
+    /// `http://<IPv4 address>:<port>`, started there with `serve
+    /// --server-only --api --listen <address> --api-port <port>`.
+    pub url: String,
+    /// Its API token: 64 lowercase hexadecimal characters.
+    pub token: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -128,12 +234,69 @@ pub fn save_settings(
         .settings
         .lock()
         .map_err(|_| "settings state poisoned")?;
+    // The window never chooses this PC's API; keep the launcher's own.
+    let settings = Settings {
+        local_api: current.local_api.clone(),
+        ..settings
+    };
     let stored = to_store(settings, &current, &state.game_folder(&current));
     write(&file(&app)?, &stored)?;
     *current = stored;
     let saved = effective(&current, &state.game_folder(&current));
     // A new data folder brings its own pictures folder.
     crate::images::allow(&app, &saved);
+    Ok(saved)
+}
+
+/// Use the server on another PC at `server` (checked first: its API must
+/// answer with that token), or this PC's own server again with `None`.
+/// Refused while this window's own session runs.
+#[tauri::command]
+pub async fn set_server(
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+    server: Option<RemoteServer>,
+) -> Result<Settings, String> {
+    if state.window_session_runs() {
+        return Err("Stop your server on this PC first.".into());
+    }
+    if let Some(remote) = &server {
+        let endpoint = crate::connection::Endpoint::remote(remote)?;
+        let info =
+            tauri::async_runtime::spawn_blocking(move || endpoint.request("GET", "/v1/info"))
+                .await
+                .map_err(|e| e.to_string())??;
+        if info.status != 200 {
+            return Err(info.message());
+        }
+    }
+    write_server(&app, &state, server)
+}
+
+/// Save which server the window reaches (`None`: this PC's own) and follow
+/// it from now on, without checking it; the Server screen checks first.
+pub fn write_server(
+    app: &AppHandle,
+    state: &crate::AppState,
+    server: Option<RemoteServer>,
+) -> Result<Settings, String> {
+    let saved = {
+        let mut current = state
+            .settings
+            .lock()
+            .map_err(|_| "settings state poisoned")?;
+        let next = Settings {
+            server,
+            ..current.clone()
+        };
+        write(&file(app)?, &next)?;
+        *current = next;
+        effective(&current, &state.game_folder(&current))
+    };
+    // Follow the chosen server from now on.
+    if let Ok(mut connection) = state.connection.lock() {
+        *connection = None;
+    }
     Ok(saved)
 }
 
@@ -158,11 +321,30 @@ mod tests {
                 skipped_version: Some("0.2.0".into()),
             },
             last_server_tag: Some("v0.3.0".into()),
+            server: Some(RemoteServer {
+                url: "http://192.168.1.20:61000".into(),
+                token: "a".repeat(64),
+            }),
+            local_api: Some(LocalApi::new().unwrap()),
+            share_address: Some([192, 168, 1, 20].into()),
             launches: 12,
             support_shown_utc: Some("2026-10-23T08:00:00Z".into()),
         };
         write(&path, &settings).unwrap();
         assert_eq!(read(&path), settings);
+        // Files from before this setting use this PC's own server.
+        std::fs::write(&path, br#"{"first_run_done": true}"#).unwrap();
+        assert_eq!(read(&path).server, None);
+        assert_eq!(read(&path).local_api, None);
+        assert_eq!(read(&path).share_address, None);
+        let a = LocalApi::new().unwrap();
+        let b = LocalApi::new().unwrap();
+        assert!(a.port != 0 && a.token.len() == 64 && a.token != b.token);
+        assert!(
+            a.token
+                .bytes()
+                .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
+        );
         // Files from before the support line count from zero.
         std::fs::write(&path, br#"{"first_run_done": true}"#).unwrap();
         assert_eq!(read(&path).launches, 0);

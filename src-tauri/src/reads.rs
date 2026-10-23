@@ -9,6 +9,8 @@
 //! read-only commands (contract v1). The window asks for them only when the
 //! server reports the `profile` or `sessions` capability, and they run like
 //! `status`: with `--json`, within a deadline, their one object returned.
+//! While the window follows a session's API, the selected save's profile
+//! comes from its `GET /v1/profile` instead, the same record.
 //!
 //! The log viewer opens one file of one session folder by name: the server
 //! names the session folders and their files in `sessions --json`, and this
@@ -161,6 +163,37 @@ fn settings_of(state: &State<'_, crate::AppState>) -> Settings {
     state.settings()
 }
 
+/// Most bytes kept from one record the server answers.
+const MAX_RECORD: usize = 4 * 1024 * 1024;
+/// A session file's record holds up to the 4 MiB log bound as JSON text.
+const MAX_FILE_RECORD: usize = 12 * 1024 * 1024;
+
+/// One read through the server's API; an unreachable server says so.
+async fn api_read(
+    endpoint: crate::connection::Endpoint,
+    path: String,
+    max: usize,
+) -> Result<cli::CliResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        endpoint
+            .read(&path, READ_TIMEOUT, max)
+            .ok_or_else(|| "Your server is not running.".to_owned())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// The window's view of the server's `session-file` record.
+pub fn session_file_text(value: &serde_json::Value) -> Result<SessionFileText, String> {
+    let malformed = || "The server's session-file record is malformed.".to_owned();
+    Ok(SessionFileText {
+        name: value["name"].as_str().ok_or_else(malformed)?.to_owned(),
+        bytes: value["bytes"].as_u64().ok_or_else(malformed)?,
+        text: value["text"].as_str().ok_or_else(malformed)?.to_owned(),
+        truncated: value["truncated"].as_bool().ok_or_else(malformed)?,
+    })
+}
+
 async fn run_read(args: Vec<String>) -> Result<cli::CliResult, String> {
     let server = server::current()?;
     tauri::async_runtime::spawn_blocking(move || cli::run_json(&server.path, &args, READ_TIMEOUT))
@@ -168,25 +201,60 @@ async fn run_read(args: Vec<String>) -> Result<cli::CliResult, String> {
         .map_err(|e| e.to_string())?
 }
 
-/// `profile --json`, for the active save or `account_id`.
+/// `profile --json`, for the active save or `account_id`. The active save
+/// comes through the session API when the window follows one.
 #[tauri::command]
 pub async fn profile(
     state: State<'_, crate::AppState>,
     account_id: Option<String>,
 ) -> Result<cli::CliResult, String> {
-    let args = profile_args(&settings_of(&state), account_id.as_deref())?;
-    run_read(args).await
+    let settings = settings_of(&state);
+    let args = profile_args(&settings, account_id.as_deref())?;
+    if let Some(remote) = settings.server.clone() {
+        // Another PC's server shows the save it selects.
+        let endpoint = crate::connection::Endpoint::remote(&remote)?;
+        return tauri::async_runtime::spawn_blocking(move || {
+            endpoint
+                .profile(READ_TIMEOUT)
+                .ok_or_else(|| format!("Your server at {} does not answer.", remote.url))
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    }
+    if let Some(endpoint) = state.server_endpoint() {
+        let path = match &account_id {
+            Some(id) => format!("/v1/profiles/{id}"),
+            None => "/v1/profile".to_owned(),
+        };
+        return api_read(endpoint, path, MAX_RECORD).await;
+    }
+    let Some(endpoint) = state.endpoint().filter(|_| account_id.is_none()) else {
+        return run_read(args).await;
+    };
+    let server = server::current()?;
+    tauri::async_runtime::spawn_blocking(move || match endpoint.profile(READ_TIMEOUT) {
+        Some(result) => Ok(result),
+        None => cli::run_json(&server.path, &args, READ_TIMEOUT),
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// `profile --list --json`.
 #[tauri::command]
 pub async fn profile_list(state: State<'_, crate::AppState>) -> Result<cli::CliResult, String> {
+    if let Some(endpoint) = state.server_endpoint() {
+        return api_read(endpoint, "/v1/profiles".into(), MAX_RECORD).await;
+    }
     run_read(profile_list_args(&settings_of(&state))).await
 }
 
 /// `sessions --json`.
 #[tauri::command]
 pub async fn sessions(state: State<'_, crate::AppState>) -> Result<cli::CliResult, String> {
+    if let Some(endpoint) = state.server_endpoint() {
+        return api_read(endpoint, "/v1/sessions".into(), MAX_RECORD).await;
+    }
     run_read(sessions_args(&settings_of(&state))).await
 }
 
@@ -197,6 +265,16 @@ pub async fn session_file(
     id: String,
     name: String,
 ) -> Result<SessionFileText, String> {
+    if let Some(endpoint) = state.server_endpoint() {
+        if !is_session_id(&id) {
+            return Err("Not a session ID.".into());
+        }
+        let path = format!("/v1/sessions/{id}/files/{name}");
+        return match api_read(endpoint, path, MAX_FILE_RECORD).await? {
+            cli::CliResult::Ok { value } => session_file_text(&value),
+            cli::CliResult::Error { message, .. } => Err(message),
+        };
+    }
     let data =
         data::data_dir(&settings_of(&state)).ok_or("No data folder is known on this system.")?;
     tauri::async_runtime::spawn_blocking(move || read_session_file(&data, &id, &name))
@@ -320,6 +398,30 @@ mod tests {
         // A listed name that is missing is an error, not an empty file.
         assert!(read_session_file(&data, ID, "game.stderr.log").is_err());
         let _ = std::fs::remove_dir_all(&data);
+    }
+
+    #[test]
+    fn the_servers_session_file_record_becomes_the_viewers_text() {
+        let record = serde_json::json!({"version": 1, "id": "a".repeat(32),
+            "name": "server.stderr.log", "bytes": 12, "text": "hello
+", "truncated": false});
+        let text = session_file_text(&record).unwrap();
+        assert_eq!(
+            (
+                text.name.as_str(),
+                text.bytes,
+                text.text.as_str(),
+                text.truncated
+            ),
+            (
+                "server.stderr.log",
+                12,
+                "hello
+",
+                false
+            )
+        );
+        assert!(session_file_text(&serde_json::json!({"name": "x"})).is_err());
     }
 
     #[test]
