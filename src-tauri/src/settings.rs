@@ -31,6 +31,11 @@ pub struct Settings {
     /// bundled tag means an update arrived since, and the first start may
     /// rebuild the content cache.
     pub last_server_tag: Option<String>,
+    /// How many times the window has opened, for the Garage's occasional
+    /// support line (src/lib/state/support.ts decides when).
+    pub launches: u32,
+    /// When the Garage last showed the support line, UTC; `None` never.
+    pub support_shown_utc: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -153,9 +158,15 @@ mod tests {
                 skipped_version: Some("0.2.0".into()),
             },
             last_server_tag: Some("v0.3.0".into()),
+            launches: 12,
+            support_shown_utc: Some("2026-10-23T08:00:00Z".into()),
         };
         write(&path, &settings).unwrap();
         assert_eq!(read(&path), settings);
+        // Files from before the support line count from zero.
+        std::fs::write(&path, br#"{"first_run_done": true}"#).unwrap();
+        assert_eq!(read(&path).launches, 0);
+        assert_eq!(read(&path).support_shown_utc, None);
         std::fs::write(&path, b"{ not json").unwrap();
         assert_eq!(read(&path), Settings::default());
         std::fs::remove_dir_all(dir).unwrap();
