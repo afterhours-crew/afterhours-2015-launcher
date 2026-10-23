@@ -113,11 +113,15 @@ impl Endpoint {
         })
     }
 
-    /// This PC's own server, at the port and token the launcher gave it.
-    pub fn local(api: &crate::settings::LocalApi) -> Self {
+    /// This PC's own server, at the port and token the launcher gave it:
+    /// on `127.0.0.1`, or on this PC's network address while the server
+    /// is shared, since a `--listen` session binds its API there and
+    /// nowhere else.
+    pub fn local(api: &crate::settings::LocalApi, share: Option<std::net::Ipv4Addr>) -> Self {
+        let ip = share.unwrap_or(std::net::Ipv4Addr::LOCALHOST);
         Self {
             id: String::new(),
-            address: SocketAddr::from(([127, 0, 0, 1], api.port)),
+            address: SocketAddr::from((ip, api.port)),
             token: api.token.clone(),
         }
     }

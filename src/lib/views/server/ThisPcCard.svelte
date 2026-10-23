@@ -27,7 +27,9 @@
       running: session.running,
     }),
   );
-  let running = $derived(isLive(session.status?.state));
+  // Sharing changes when the server next starts, so the switch rests while
+  // a session is live or this window's own is still finishing.
+  let running = $derived(isLive(session.status?.state) || session.running);
   let runningFor = $derived(
     running && session.startedAt ? formatDuration(now - session.startedAt.getTime()) : null,
   );

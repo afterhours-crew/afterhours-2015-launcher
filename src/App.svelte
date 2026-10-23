@@ -149,7 +149,7 @@
   {#if session.switching && view !== "server"}
     <p class="banner" role="status" in:toastIn>{session.switching}</p>
   {/if}
-  {#if session.closeAsk}<ClosePrompt />{/if}
+  {#if session.closeAsk}<div class="prompt-layer"><ClosePrompt /></div>{/if}
   {#if !firstRun && notice}
     <div class="banner row" in:toastIn>
       <span>{notice}</span>
@@ -204,6 +204,12 @@
   .window > :global(:not(:first-child)) {
     position: relative;
     z-index: 1;
+  }
+  /* The close prompt covers the window instead of taking a place in it. */
+  .window > .prompt-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
   }
   .banner {
     margin: 12px var(--space-6) 0;

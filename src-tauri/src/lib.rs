@@ -103,7 +103,7 @@ impl AppState {
         let settings = self.settings();
         match (&settings.server, &settings.local_api) {
             (Some(remote), _) => connection::Endpoint::remote(remote).ok(),
-            (None, Some(api)) => Some(connection::Endpoint::local(api)),
+            (None, Some(api)) => Some(connection::Endpoint::local(api, settings.share_address)),
             (None, None) => None,
         }
     }

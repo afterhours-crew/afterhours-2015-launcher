@@ -27,8 +27,11 @@
   class="track"
   class:on={checked}
   onclick={() => {
-    checked = !checked;
-    onchange?.(checked);
+    // With `onchange` the value lives elsewhere: the switch asks for the
+    // change and shows what it is given back, so a refused change does
+    // not leave it flipped.
+    if (onchange) onchange(!checked);
+    else checked = !checked;
   }}
 >
   <span class="knob"></span>

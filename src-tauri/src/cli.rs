@@ -865,8 +865,9 @@ fn launch(
         let stop = Arc::clone(&stop_polling);
         let settings = settings.clone();
         if let Some(local) = &local {
-            // The API's event stream brings every status once it is up.
-            let endpoint = crate::connection::Endpoint::local(local);
+            // The API's event stream brings every status once it is up. A
+            // shared session serves its API on this PC's network address.
+            let endpoint = crate::connection::Endpoint::local(local, settings.share_address);
             std::thread::spawn(move || crate::connection::await_api(&app, endpoint, &stop));
         } else {
             std::thread::spawn(move || {
