@@ -16,6 +16,7 @@ import { hasCapability } from "./capabilities";
 import { isLive } from "./launchbar";
 import { feedSurvives, takeFeed } from "./mapfeed";
 import { sampleAppInfo, sampleFeed, sampleMapFeed, sampleMode, sampleStatus } from "./preview";
+import { shouldNudge } from "./support";
 
 export const MAX_CONSOLE_LINES = 400;
 
@@ -62,6 +63,16 @@ export class Session {
    * instead. On by default, for this run of the launcher.
    */
   hideUserName = $state(true);
+  /**
+   * The Garage shows its support line this open (src/lib/state/support.ts
+   * decides: not the first few opens, then at most once a fortnight).
+   */
+  supportNudge = $state(false);
+
+  /** Close the support line for this open; it stays away until its next turn. */
+  dismissNudge(): void {
+    this.supportNudge = false;
+  }
 
   /** What copy actions need to hide the user name. */
   get privacy(): { on: boolean; userName: string | null } {
@@ -95,6 +106,8 @@ export class Session {
         void sampleFeed((line) => this.receive(line));
         // `?sample`: cars drive around the sample map, for the Map's markers.
         void sampleMapFeed((event) => this.receiveMapFeed(event));
+        // `?sample&nudge`: the Garage's occasional support line.
+        this.supportNudge = new URLSearchParams(window.location.search).has("nudge");
       }
       this.loaded = true;
       return;
@@ -115,6 +128,7 @@ export class Session {
         }
       }
       this.error = null;
+      await this.countOpen();
     } catch (e) {
       this.error = message(e);
     } finally {
@@ -146,6 +160,22 @@ export class Session {
         this.switching = message;
       },
     });
+  }
+
+  /**
+   * One more open of the window, and whether this one shows the Garage's
+   * support line; a showing is stamped so the next comes a fortnight later.
+   */
+  private async countOpen(): Promise<void> {
+    if (!this.settings.first_run_done) return;
+    const launches = (this.settings.launches ?? 0) + 1;
+    const now = new Date();
+    const nudge = shouldNudge(launches, this.settings.support_shown_utc ?? null, now);
+    await this.save({
+      launches,
+      ...(nudge ? { support_shown_utc: now.toISOString() } : {}),
+    });
+    this.supportNudge = nudge;
   }
 
   async refreshInfo(): Promise<void> {

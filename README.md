@@ -274,6 +274,16 @@ The types for the server's JSON are generated from the JSON Schemas in
 `schemas/` (`pnpm types`), and CI runs the pinned executable's JSON commands
 against those schemas (`pnpm contract`).
 
+**Support the project** (Settings → Support the project; `src/lib/state/support.ts`).
+One link for now, Patreon (monthly), with Open, which goes to the system
+browser through the opener plugin (its host is in
+`src-tauri/capabilities/default.json`). The Garage's side panel ends with the
+same link now and then: not in the first three opens, then at most once a
+fortnight, with a Hide for now button; `settings.json` counts the opens
+(`launches`) and stamps each showing (`support_shown_utc`). More places to
+chip in are entries in the same table; one whose page name is not filled in is
+left out everywhere. Nothing is gated on it.
+
 ## Security
 
 - **Content Security Policy** (`tauri.conf.json`): scripts, styles and

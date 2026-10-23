@@ -43,6 +43,11 @@ pub struct Settings {
     /// the launcher then starts it with `--server-only --listen <address>`.
     /// `None` keeps it on this PC only.
     pub share_address: Option<std::net::Ipv4Addr>,
+    /// How many times the window has opened, for the Garage's occasional
+    /// support line (src/lib/state/support.ts decides when).
+    pub launches: u32,
+    /// When the Garage last showed the support line, UTC; `None` never.
+    pub support_shown_utc: Option<String>,
 }
 
 /// This PC's IPv4 address on its network: the source a UDP socket would
@@ -322,6 +327,8 @@ mod tests {
             }),
             local_api: Some(LocalApi::new().unwrap()),
             share_address: Some([192, 168, 1, 20].into()),
+            launches: 12,
+            support_shown_utc: Some("2026-10-23T08:00:00Z".into()),
         };
         write(&path, &settings).unwrap();
         assert_eq!(read(&path), settings);
@@ -338,6 +345,10 @@ mod tests {
                 .bytes()
                 .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
         );
+        // Files from before the support line count from zero.
+        std::fs::write(&path, br#"{"first_run_done": true}"#).unwrap();
+        assert_eq!(read(&path).launches, 0);
+        assert_eq!(read(&path).support_shown_utc, None);
         std::fs::write(&path, b"{ not json").unwrap();
         assert_eq!(read(&path), Settings::default());
         std::fs::remove_dir_all(dir).unwrap();

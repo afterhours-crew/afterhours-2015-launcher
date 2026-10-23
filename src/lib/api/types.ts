@@ -67,6 +67,10 @@ export interface Settings {
   local_api: { port: number; token: string } | null;
   /** This PC's network address while your other PCs may use its server. */
   share_address: string | null;
+  /** How many times the window has opened (src/lib/state/support.ts). */
+  launches: number;
+  /** When the Garage last showed the support line, UTC. */
+  support_shown_utc: string | null;
 }
 
 /** A server on another PC: what its `api --json` prints there. */
@@ -230,5 +234,7 @@ export function emptySettings(): Settings {
     server: null,
     local_api: null,
     share_address: null,
+    launches: 0,
+    support_shown_utc: null,
   };
 }
