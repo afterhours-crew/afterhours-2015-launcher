@@ -1,16 +1,10 @@
-// Supporting the project: the Ko-fi and Patreon links (Settings › Support
-// the project, canvas J1) and the Garage's occasional line (J2), which
-// shows on some launcher opens, never all of them. Pure: the session store
-// feeds it the saved counters and records what it decides.
+// Supporting the project: the Patreon link (Settings › Support the
+// project, canvas J1) and the Garage's occasional line (J2), which shows
+// on some launcher opens, never all of them. Pure: the session store feeds
+// it the saved counters and records what it decides. More places to chip
+// in are added here as entries; a placeholder `url` hides a row everywhere.
 
-/** The two places to chip in. An empty `url` hides that row everywhere. */
 export const SUPPORT_LINKS = {
-  kofi: {
-    label: "Buy a coffee on Ko-fi",
-    short: "Buy a coffee",
-    about: "One-off, no account needed",
-    url: "https://ko-fi.com/afterhourscrew",
-  },
   patreon: {
     label: "Join on Patreon",
     short: "Join on Patreon",

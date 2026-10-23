@@ -2,7 +2,7 @@
   import { untrack } from "svelte";
   import { staggerIn } from "$lib/motion";
   import IconAlertTriangle from "@tabler/icons-svelte/icons/alert-triangle";
-  import IconCoffee from "@tabler/icons-svelte/icons/coffee";
+  import IconBrandPatreon from "@tabler/icons-svelte/icons/brand-patreon";
   import IconX from "@tabler/icons-svelte/icons/x";
   import { openUrl } from "$lib/api/tauri";
   import Clock from "$lib/components/Clock.svelte";
@@ -21,7 +21,7 @@
   // the save; the side panel says how the last session went. World
   // settings live on World, where the server's support decides what shows.
   // Now and then (not every open: src/lib/state/support.ts) the panel ends
-  // with one quiet line and the Ko-fi and Patreon links (canvas J2).
+  // with one quiet line and the Patreon link (canvas J2).
   let profile = $derived(current(records.profile));
   let support = $derived(session.supportNudge ? supportLinks() : []);
   let sessions = $derived(current(records.sessions)?.sessions ?? null);
@@ -96,7 +96,7 @@
       {/if}
       {#if support.length > 0}
         <div class="support" role="note" aria-label="Support the project">
-          <IconCoffee size={20} stroke={1.6} aria-hidden="true" class="cup" />
+          <IconBrandPatreon size={20} stroke={1.6} aria-hidden="true" class="cup" />
           <span class="support-body">
             <span class="t-caption"
               >Afterhours is free. If it keeps your garage open, you can chip in.</span

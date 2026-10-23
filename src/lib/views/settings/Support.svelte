@@ -1,6 +1,5 @@
 <script lang="ts">
   import IconBrandPatreon from "@tabler/icons-svelte/icons/brand-patreon";
-  import IconCoffee from "@tabler/icons-svelte/icons/coffee";
   import IconExternalLink from "@tabler/icons-svelte/icons/external-link";
   import { openUrl } from "$lib/api/tauri";
   import Glass from "$lib/components/Glass.svelte";
@@ -8,9 +7,9 @@
   import PillButton from "$lib/components/PillButton.svelte";
   import { supportHost, supportLinks } from "$lib/state/support";
 
-  // Support the project (canvas J1): the permanent home of the Ko-fi and
-  // Patreon links. One line of context, then a row per link with Open,
-  // which goes to the system browser. Rows without a page name stay out.
+  // Support the project (canvas J1): the permanent home of the Patreon
+  // link. One line of context, then a row per link with Open, which goes
+  // to the system browser. Rows without a page name stay out.
   let links = $derived(supportLinks());
   let note = $state<string | null>(null);
 
@@ -36,12 +35,7 @@
     </div>
     {#each links as link (link.key)}
       <div class="list-row tall">
-        <span class="tile" aria-hidden="true">
-          {#if link.key === "kofi"}<IconCoffee size={20} stroke={1.6} />{:else}<IconBrandPatreon
-              size={20}
-              stroke={1.6}
-            />{/if}
-        </span>
+        <span class="tile" aria-hidden="true"><IconBrandPatreon size={20} stroke={1.6} /></span>
         <span class="grow text">
           <span class="name">{link.label}</span>
           <span class="t-caption">{link.about} · {supportHost(link.url)}</span>

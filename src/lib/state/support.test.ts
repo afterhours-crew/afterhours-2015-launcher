@@ -13,15 +13,16 @@ const NOW = new Date("2026-10-23T12:00:00Z");
 const daysAgo = (days: number) => new Date(NOW.getTime() - days * 86_400_000).toISOString();
 
 describe("the support links", () => {
-  it("name Ko-fi and Patreon with what each one is", () => {
-    expect(SUPPORT_LINKS.kofi.about).toBe("One-off, no account needed");
+  it("name Patreon with what it is", () => {
     expect(SUPPORT_LINKS.patreon.about).toBe("Monthly, cancel any time");
-    expect(supportHost("https://www.patreon.com/afterhours/")).toBe("patreon.com/afterhours");
-    expect(supportHost("https://ko-fi.com/afterhours")).toBe("ko-fi.com/afterhours");
+    expect(supportHost("https://www.patreon.com/cw/AfterhoursCrew/")).toBe(
+      "patreon.com/cw/AfterhoursCrew",
+    );
+    expect(supportLinks().map((l) => l.key)).toEqual(["patreon"]);
   });
 
   it("show a link only once its page name is filled in", () => {
-    for (const key of ["kofi", "patreon"] as const) {
+    for (const key of ["patreon"] as const) {
       expect(supportReady(key)).toBe(!SUPPORT_LINKS[key].url.includes("REPLACE_WITH_YOUR_PAGE"));
     }
     expect(supportLinks().every((l) => !l.url.includes("REPLACE"))).toBe(true);
