@@ -353,6 +353,9 @@ describe("the connection log", () => {
       { kind: "launcher", time: "20:00:01", message: "Connected to Garage PC", detail: "" },
       { kind: "text", text: "not a log line" },
     ]);
+    expect(parseConnectionLog("20261023T073714Z\tPicked Loopback\t127.0.0.1:61234\n")).toEqual([
+      { kind: "launcher", time: "07:37:14", message: "Picked Loopback", detail: "127.0.0.1:61234" },
+    ]);
     expect(parseConnectionLog("")).toEqual([]);
   });
 });
@@ -361,7 +364,7 @@ describe("the list's note and the name in use", () => {
   it("say what picking does", () => {
     expect(pickNote(true, false, true)).toMatch(/stops this PC's/);
     expect(pickNote(true, true, true)).toMatch(/keeps running/);
-    expect(pickNote(true, false, false)).toMatch(/Play, World, Profile and Map/);
+    expect(pickNote(true, false, false)).toMatch(/Use on its card/);
     expect(pickNote(false, false, false)).toMatch(/saves stay/);
   });
 

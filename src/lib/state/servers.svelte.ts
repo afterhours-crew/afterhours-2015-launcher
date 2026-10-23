@@ -6,10 +6,11 @@
 // The browser preview's sample mode keeps a made-up list in memory.
 
 import { api, inTauri } from "$lib/api/tauri";
-import type { CloseAction, ServerCheck, ServerHealth, Servers } from "$lib/api/types";
+import type { CloseAction, OutputLine, ServerCheck, ServerHealth, Servers } from "$lib/api/types";
 import { emptyServers } from "$lib/api/types";
 import { sampleMode } from "./preview";
 import { records } from "./records.svelte";
+import { parseConnectionLog } from "./serverpicker";
 import { session } from "./session.svelte";
 
 /** How often the Server screen checks every saved server while open. */
@@ -98,6 +99,37 @@ export class ServersStore {
   error = $state<string | null>(null);
   /** When the window started following the server in use. */
   connectedAt = $state<Date | null>(null);
+  /**
+   * The row being looked at: an entry id, `null` for this PC, `undefined`
+   * for the server in use. Looking changes nothing; Use does.
+   */
+  selected = $state<string | null | undefined>(undefined);
+  /** The connection log of a server looked at while another is in use. */
+  browseLog = $state<OutputLine[]>([]);
+
+  /** The server whose card shows: the one looked at, else the one in use. */
+  get shown(): string | null {
+    return this.selected === undefined ? this.list.in_use : this.selected;
+  }
+
+  /** Look at a server's card without using it. */
+  browse(id: string | null): void {
+    this.adding = false;
+    this.selected = id === this.list.in_use ? undefined : id;
+  }
+
+  /** Read the connection log of the server looked at, for its card. */
+  async loadBrowseLog(id: string | null): Promise<void> {
+    if (sampleMode || !inTauri) {
+      this.browseLog = [];
+      return;
+    }
+    try {
+      this.browseLog = parseConnectionLog(await api.connectionLog(id));
+    } catch {
+      this.browseLog = [];
+    }
+  }
 
   private timer: ReturnType<typeof setInterval> | null = null;
 
@@ -245,6 +277,7 @@ export class ServersStore {
 
   /** Use a saved server, or this PC's own with `null`. */
   async use(id: string | null): Promise<void> {
+    this.selected = undefined;
     if (id === this.list.in_use) return;
     this.error = null;
     if (sampleMode) {

@@ -17,7 +17,9 @@
 
   // This PC's own server (I1): what it is doing, Serve or Stop, its facts,
   // and sharing it with your other PCs, with the pairing code they paste.
-  let { now }: { now: number } = $props();
+  // Looked at while another server is in use, it has Use this PC instead,
+  // which switches back and starts the server.
+  let { now, inUse }: { now: number; inUse: boolean } = $props();
 
   let model = $derived(
     hostModel({
@@ -103,18 +105,32 @@
 <Glass radius="panel" label="This PC" class="card">
   <div class="head">
     <h2 class="t-panel-title">This PC</h2>
-    <span class="chip"
-      >{#if model.dot}<span class="dot" style="background: {dots[model.dot]}" aria-hidden="true"
-        ></span>{/if}{model.state}{#if running && session.settings.share_address}
-        · {session.settings.share_address}{/if}</span
-    >
-    <PillButton
-      variant={model.button.action === "serve" ? "solid" : "outline"}
-      disabled={model.button.disabled}
-      onclick={act}>{model.button.label}</PillButton
-    >
+    {#if inUse}
+      <span class="chip"
+        >{#if model.dot}<span class="dot" style="background: {dots[model.dot]}" aria-hidden="true"
+          ></span>{/if}{model.state}{#if running && session.settings.share_address}
+          · {session.settings.share_address}{/if}</span
+      >
+      <PillButton
+        variant={model.button.action === "serve" ? "solid" : "outline"}
+        disabled={model.button.disabled}
+        onclick={act}>{model.button.label}</PillButton
+      >
+    {:else}
+      <span class="chip">Not in use</span>
+      <PillButton
+        variant="solid"
+        onclick={() => void servers.use(null)}
+        disabled={servers.busy !== null}>Use this PC</PillButton
+      >
+    {/if}
   </div>
-  {#if model.reason}<p class="t-caption reason">{model.reason}</p>{/if}
+  {#if inUse && model.reason}<p class="t-caption reason">{model.reason}</p>{/if}
+  {#if !inUse}
+    <p class="t-caption reason">
+      Use this PC switches back and starts its server; Play, World, Profile and Map then follow it.
+    </p>
+  {/if}
   <div class="facts">
     {#each facts as fact (fact.label)}
       <div class="fact">

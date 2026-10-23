@@ -56,6 +56,25 @@ fn clock_of(utc: &str) -> String {
     utc.get(11..19).unwrap_or("").to_owned()
 }
 
+/// Now, UTC, as `2026-10-23T07:37:14Z`: the form the server's own records
+/// use, which the screens' date formatting reads.
+pub fn now_iso() -> String {
+    let compact = data::utc_stamp(SystemTime::now());
+    match (
+        compact.get(0..4),
+        compact.get(4..6),
+        compact.get(6..8),
+        compact.get(9..11),
+        compact.get(11..13),
+        compact.get(13..15),
+    ) {
+        (Some(y), Some(mo), Some(d), Some(h), Some(mi), Some(s)) => {
+            format!("{y}-{mo}-{d}T{h}:{mi}:{s}Z")
+        }
+        _ => compact,
+    }
+}
+
 /// One line as stored: `<utc>\t<message>\t<detail>`.
 pub fn format_line(utc: &str, message: &str, detail: &str) -> String {
     format!("{utc}\t{}\t{}\n", clean(message), clean(detail))
@@ -78,12 +97,7 @@ pub fn append(path: &std::path::Path, line: &str) -> Result<(), String> {
             .position(|&b| b == b'\n')
             .map(|i| start + i + 1)
             .unwrap_or(bytes.len());
-        let mut kept = format!(
-            "{}\t{}\t\n",
-            data::utc_stamp(SystemTime::now()),
-            "Older lines were trimmed"
-        )
-        .into_bytes();
+        let mut kept = format!("{}\t{}\t\n", now_iso(), "Older lines were trimmed").into_bytes();
         kept.extend_from_slice(&bytes[cut..]);
         std::fs::write(path, kept).map_err(|e| e.to_string())?;
     }
@@ -98,7 +112,7 @@ pub fn append(path: &std::path::Path, line: &str) -> Result<(), String> {
 
 /// Record one event for the server `key` and show it in the window's log.
 pub fn record(app: &AppHandle, key: &str, message: &str, detail: String) {
-    let utc = data::utc_stamp(SystemTime::now());
+    let utc = now_iso();
     if let Ok(path) = path(app, key) {
         let _ = append(&path, &format_line(&utc, message, &detail));
     }
@@ -143,6 +157,17 @@ fn unique() -> u128 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn now_is_an_iso_stamp_with_a_clock() {
+        let now = now_iso();
+        assert_eq!(now.len(), 20, "{now}");
+        assert_eq!(&now[4..5], "-");
+        assert_eq!(&now[10..11], "T");
+        assert_eq!(&now[13..14], ":");
+        assert!(now.ends_with('Z'));
+        assert_eq!(clock_of(&now).len(), 8);
+    }
 
     #[test]
     fn keys_are_entry_ids_or_this_pc() {

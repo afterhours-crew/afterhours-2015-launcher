@@ -15,12 +15,17 @@
   import ThisPcCard from "./server/ThisPcCard.svelte";
 
   // Server (I1 to I3): pick a server, your own included. The Servers panel
-  // on the left lists this PC's own server and every saved one; the right
-  // side shows the picked server's card and its live log, or the Add form.
-  // Play, World, Profile, Map and Logs all use the server picked here.
+  // on the left lists this PC's own server and every saved one; pressing a
+  // row shows its card on the right, and the card's Use button switches to
+  // it. Play, World, Profile, Map and Logs all use the server in use. The
+  // card of the server in use ends with its live log; another server's
+  // card ends with the launcher's log of it.
   let entry = $derived(inUseEntry(servers.list));
+  let shownId = $derived(servers.shown);
+  let shownEntry = $derived(servers.list.servers.find((s) => s.id === shownId) ?? null);
+  let shownInUse = $derived(shownId === servers.inUse);
   let running = $derived(isLive(session.status?.state));
-  let logName = $derived(entry ? entry.name : "This PC");
+  let logName = $derived(shownEntry ? shownEntry.name : "This PC");
 
   // "Running for" and "Checked … ago" tick every second while shown.
   let now = $state(Date.now());
@@ -35,6 +40,12 @@
   $effect(() => {
     if (records.canProfile) untrack(() => void records.loadProfiles());
   });
+  // A server looked at from another one shows the launcher's log of it.
+  $effect(() => {
+    const id = shownId;
+    const inUse = shownInUse;
+    if (!inUse) untrack(() => void servers.loadBrowseLog(id));
+  });
 </script>
 
 <main use:staggerIn>
@@ -43,13 +54,13 @@
     <span class="t-caption"
       >{entry
         ? `Play starts the game on this PC and connects it to ${entry.name}.`
-        : "Play, World, Profile and Map use the server you pick here."}</span
+        : "Play, World, Profile and Map use the server in use."}</span
     >
   </div>
   {#if servers.busy || session.switching}
     <p class="t-caption busy" role="status" data-enter>{session.switching ?? servers.busy}</p>
   {/if}
-  {#if servers.error && !servers.adding && !entry}
+  {#if servers.error && !servers.adding && !shownEntry}
     <div data-enter><Note kind="warn">{servers.error}</Note></div>
   {/if}
 
@@ -60,26 +71,34 @@
       {#if servers.adding}
         <AddServer />
       {:else}
-        {#if entry}
-          <RemoteCard {entry} {now} />
+        {#if shownEntry}
+          <RemoteCard entry={shownEntry} {now} inUse={shownInUse} />
         {:else}
-          <ThisPcCard {now} />
+          <ThisPcCard {now} inUse={shownInUse} />
         {/if}
         <div class="console">
-          <LogPanel
-            title="Log · {logName}"
-            lines={session.console}
-            received={session.received}
-            empty={running
-              ? "Waiting for output…"
-              : entry
-                ? `Nothing yet. ${entry.name}'s log shows here while it answers.`
-                : "Nothing yet. Serve starts your server here, and its log shows up as it runs."}
-          />
+          {#if shownInUse}
+            <LogPanel
+              title="Log · {logName}"
+              lines={session.console}
+              received={session.received}
+              empty={running
+                ? "Waiting for output…"
+                : entry
+                  ? `Nothing yet. ${entry.name}'s log shows here while it answers.`
+                  : "Nothing yet. Serve starts your server here, and its log shows up as it runs."}
+            />
+          {:else}
+            <LogPanel
+              title="Connections · {logName}"
+              lines={servers.browseLog}
+              empty="Nothing yet. Using {logName}, connecting to it and stopping it will be noted here."
+            />
+          {/if}
           <button
             type="button"
             class="link"
-            onclick={() => router.go("logs", entry ? "connections" : "sessions")}
+            onclick={() => router.go("logs", shownEntry ? "connections" : "sessions")}
             >Earlier sessions and connections are in Logs</button
           >
         </div>

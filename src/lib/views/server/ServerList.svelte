@@ -12,8 +12,9 @@
 
   // The Servers panel (I1): this PC's own server first, then every saved
   // one, each a row with its name, what is known of it and a dot plus a
-  // word. Pressing a row uses that server; the one in use says so. "Add a
-  // server" opens the form in place of the card.
+  // word. Pressing a row shows its card; the card's Use button switches,
+  // and the one in use says so. "Add a server" opens the form in place of
+  // the card.
   let { now }: { now: number } = $props();
 
   let shared = $derived(session.settings.share_address !== null);
@@ -38,8 +39,7 @@
   };
 
   function pick(id: string | null) {
-    servers.adding = false;
-    void servers.use(id);
+    servers.browse(id);
   }
 </script>
 
@@ -51,7 +51,7 @@
   <button
     type="button"
     class="srv"
-    aria-pressed={thisPcInUse && !servers.adding}
+    aria-pressed={servers.shown === null && !servers.adding}
     disabled={servers.busy !== null}
     onclick={() => pick(null)}
   >
@@ -75,7 +75,7 @@
     <button
       type="button"
       class="srv"
-      aria-pressed={servers.inUse === entry.id && !servers.adding}
+      aria-pressed={servers.shown === entry.id && !servers.adding}
       disabled={servers.busy !== null}
       onclick={() => pick(entry.id)}
     >

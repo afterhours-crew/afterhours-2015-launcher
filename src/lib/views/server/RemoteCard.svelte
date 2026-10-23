@@ -5,22 +5,26 @@
   import Note from "$lib/components/Note.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
   import { formatDuration } from "$lib/state/format";
+  import { isLive } from "$lib/state/launchbar";
   import { featureWords, remoteChip, remoteFacts } from "$lib/state/serverpicker";
   import { servers } from "$lib/state/servers.svelte";
   import { session } from "$lib/state/session.svelte";
 
-  // A server on another PC in use (I2): what the last check found, its
-  // facts, what works here, and Rename, Forget, a new pairing code when the
-  // token was refused, and Stop server (asked twice).
-  let { entry, now }: { entry: ServerEntry; now: number } = $props();
+  // A server on another PC (I2): what the last check found, its facts,
+  // what works here, and Rename, Forget, a new pairing code when the token
+  // was refused. In use it has Stop server (asked twice); looked at from
+  // another server it has Use this server, which switches.
+  let { entry, now, inUse }: { entry: ServerEntry; now: number; inUse: boolean } = $props();
 
   let health = $derived(servers.healthOf(entry.id));
   let chip = $derived(remoteChip(health));
   let connectedFor = $derived(
-    servers.connectedAt && (session.adopted || session.running)
+    inUse && servers.connectedAt && (session.adopted || session.running)
       ? formatDuration(now - servers.connectedAt.getTime())
       : null,
   );
+  let thisPcRuns = $derived(servers.inUse === null && isLive(session.status?.state));
+  let shared = $derived(session.settings.share_address !== null);
   let facts = $derived(remoteFacts(entry, health, connectedFor, new Date(now)));
   let features = $derived(
     featureWords(health?.state === "online" ? health.capabilities : entry.last_capabilities),
@@ -53,8 +57,10 @@
 
   async function forget() {
     // The server in use cannot be forgotten: switch to this PC first.
-    await servers.use(null);
-    if (servers.error) return;
+    if (inUse) {
+      await servers.use(null);
+      if (servers.error) return;
+    }
     await servers.forget(entry.id);
     forgetting = false;
   }
@@ -100,7 +106,13 @@
       {:else}
         <PillButton variant="text" onclick={() => (forgetting = true)}>Forget</PillButton>
       {/if}
-      {#if stopping}
+      {#if !inUse}
+        <PillButton
+          variant="solid"
+          onclick={() => void servers.use(entry.id)}
+          disabled={servers.busy !== null || health?.state !== "online"}>Use this server</PillButton
+        >
+      {:else if stopping}
         <span class="t-caption">Stop {entry.name} for everyone on it?</span>
         <PillButton variant="solid" onclick={stop}>Stop</PillButton>
         <PillButton variant="text" onclick={() => (stopping = false)}>Cancel</PillButton>
@@ -112,6 +124,15 @@
       {/if}
     {/if}
   </div>
+  {#if !inUse}
+    <p class="t-caption using">
+      {health?.state === "online"
+        ? thisPcRuns && !shared
+          ? `Use this server stops this PC's server; Play, World, Profile and Map then follow ${entry.name}.`
+          : `Play, World, Profile and Map follow ${entry.name} once you use it.`
+        : `${entry.name} has to answer before it can be used.`}
+    </p>
+  {/if}
   <div class="facts">
     {#each facts as fact (fact.label)}
       <div class="fact">
@@ -155,6 +176,9 @@
   }
   h2 {
     margin: 0 auto 0 0;
+  }
+  .using {
+    margin: -6px 0 0;
   }
   .rename {
     flex: 1 1 auto;

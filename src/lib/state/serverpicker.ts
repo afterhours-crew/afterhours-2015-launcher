@@ -336,9 +336,9 @@ export function checkWords(check: ServerCheck, name: string, thisPcRuns: boolean
 export function pickNote(inUseIsThisPc: boolean, shared: boolean, thisPcRuns: boolean): string {
   if (!inUseIsThisPc) return "Your saves stay on the server you play on.";
   if (shared && thisPcRuns)
-    return "This PC's server is shared, so it keeps running when you pick another.";
-  if (thisPcRuns) return "Picking another server stops this PC's, unless it is shared.";
-  return "Play, World, Profile and Map use the server you pick here.";
+    return "This PC's server is shared, so it keeps running when you use another.";
+  if (thisPcRuns) return "Using another server stops this PC's, unless it is shared.";
+  return "Press a row to look; Use on its card switches.";
 }
 
 /** The name of the server in use, for the launch bar and the Garage. */
@@ -368,7 +368,19 @@ export function parseConnectionLog(text: string): OutputLine[] {
     .filter((line) => line.length > 0)
     .map((line) => {
       const [utc = "", message = "", detail = ""] = line.split("\t");
-      if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d/.test(utc)) return { kind: "text", text: line };
-      return { kind: "launcher", time: utc.slice(11, 19), message, detail };
+      if (/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d/.test(utc)) {
+        return { kind: "launcher", time: utc.slice(11, 19), message, detail };
+      }
+      // Lines written by the first build, `20261023T073714Z`.
+      const compact = /^\d{8}T(\d\d)(\d\d)(\d\d)Z$/.exec(utc);
+      if (compact) {
+        return {
+          kind: "launcher",
+          time: `${compact[1]}:${compact[2]}:${compact[3]}`,
+          message,
+          detail,
+        };
+      }
+      return { kind: "text", text: line };
     });
 }

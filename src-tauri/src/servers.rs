@@ -22,13 +22,13 @@
 
 use crate::{
     connection::{self, Endpoint},
-    connlog, data,
+    connlog,
     settings::{self, RemoteServer},
 };
 use serde::{Deserialize, Serialize};
 use std::{
     path::{Path, PathBuf},
-    time::{Duration, Instant, SystemTime},
+    time::{Duration, Instant},
 };
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -229,7 +229,7 @@ fn new_id() -> Result<String, String> {
 }
 
 fn now_utc() -> String {
-    data::utc_stamp(SystemTime::now())
+    connlog::now_iso()
 }
 
 pub(crate) fn file(app: &AppHandle) -> Result<PathBuf, String> {
