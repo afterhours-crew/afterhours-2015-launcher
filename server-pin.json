@@ -1,9 +1,9 @@
 {
   "repository": "afterhours-crew/afterhours-2015",
-  "tag": "v0.4.1",
+  "tag": "v0.5.0",
   "asset": "Afterhours-windows-x64.zip",
-  "asset_sha256": "1fea0d75871b253125d3bb143bef80786df9708cec14dd56fbff7f6ec9d2e350",
+  "asset_sha256": "19b7f67faeb6d5a00ff21ea78867a718de70f9d36d703cffbf4e486ac478a4b8",
   "executable": "Afterhours.exe",
-  "executable_sha256": "1ceac933a47186bdd1d5c637032fe1cff7ebc8bf8b71ffd485299baba6d68221",
+  "executable_sha256": "39ecdc0163e1452a9f55f9f448852e477999bc52e4f0af87915441b3ed934b7c",
   "schemas": "release"
 }
