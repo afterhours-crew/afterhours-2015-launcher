@@ -9,13 +9,13 @@ export const SUPPORT_LINKS = {
     label: "Buy a coffee on Ko-fi",
     short: "Buy a coffee",
     about: "One-off, no account needed",
-    url: "https://ko-fi.com/REPLACE_WITH_YOUR_PAGE",
+    url: "https://ko-fi.com/afterhourscrew",
   },
   patreon: {
     label: "Join on Patreon",
     short: "Join on Patreon",
     about: "Monthly, cancel any time",
-    url: "https://www.patreon.com/REPLACE_WITH_YOUR_PAGE",
+    url: "https://www.patreon.com/cw/AfterhoursCrew",
   },
 } as const;
 
