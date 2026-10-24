@@ -17,6 +17,7 @@ import type {
   SessionList,
   SettingsReport,
   StoryReport,
+  StoryPreview,
 } from "$lib/api/types";
 import { hasCapability } from "./capabilities";
 import { needsCarImages } from "./carimages";
@@ -47,6 +48,8 @@ interface WorldChange {
 
 interface Source {
   story(): Promise<CliResult>;
+  storyPreview(account: string, target: string): Promise<CliResult>;
+  storyApply(preview: StoryPreview): Promise<CliResult>;
   profile(accountId: string | null): Promise<CliResult>;
   profileList(): Promise<CliResult>;
   sessions(): Promise<CliResult>;
@@ -67,6 +70,36 @@ async function sampleSource(): Promise<Source> {
     : sample.SAMPLE_SETTINGS;
   return {
     story: async () => ok(sample.SAMPLE_STORY),
+    storyPreview: async (account, target) => {
+      const story = sample.SAMPLE_STORY;
+      const at = story.checkpoints.findIndex((p) => p.id === target);
+      if (account !== story.account_id || at < 0)
+        return { kind: "error", exit: 1, message: "Unknown sample checkpoint." };
+      return ok({
+        version: 1,
+        account_id: account,
+        generation: story.generation,
+        source_checkpoint: story.current_checkpoint,
+        target_checkpoint: target,
+        operation_id: "43",
+        plan_id: "a".repeat(64),
+        completes: story.checkpoints
+          .slice(0, at)
+          .filter((p) => !p.completed)
+          .map(({ id, label }) => ({ id, label })),
+        reopens: story.checkpoints
+          .slice(at)
+          .filter((p) => p.completed)
+          .map(({ id, label }) => ({ id, label })),
+        can_apply: false,
+        reasons: ["Sample mode cannot change a save."],
+      } satisfies StoryPreview);
+    },
+    storyApply: async () => ({
+      kind: "error",
+      exit: 1,
+      message: "Sample mode cannot change a save.",
+    }),
     settings: async (change) => {
       if (change.traffic === undefined && change.rivals === undefined) return ok(world);
       if (query.has("savefail") || isLive(session.status?.state)) {
@@ -142,6 +175,8 @@ async function sampleSource(): Promise<Source> {
 
 const live: Source = {
   story: () => api.story(),
+  storyPreview: (account, target) => api.storyPreview(account, target),
+  storyApply: (p) => api.storyApply(p.account_id, p.target_checkpoint, p.generation, p.plan_id),
   profile: (accountId) => api.profile(accountId),
   profileList: () => api.profileList(),
   sessions: () => api.sessions(),
@@ -174,6 +209,7 @@ export class Records {
   private imagesTried: string | null = null;
 
   private source: Promise<Source> | null = null;
+  private storyRead = 0;
 
   private async from(): Promise<Source> {
     this.source ??= sampleMode ? sampleSource() : Promise.resolve(live);
@@ -185,12 +221,21 @@ export class Records {
   }
 
   async loadStory(): Promise<void> {
+    const ticket = ++this.storyRead;
     await this.read<StoryReport>(
       hasCapability(session.info?.server, "story"),
       (s) => s.story(),
-      (l) => (this.story = l),
+      (l) => {
+        if (ticket === this.storyRead) this.story = l;
+      },
       current(this.story),
     );
+  }
+  async previewStory(account: string, target: string): Promise<CliResult> {
+    return (await this.from()).storyPreview(account, target);
+  }
+  async applyStory(preview: StoryPreview): Promise<CliResult> {
+    return (await this.from()).storyApply(preview);
   }
 
   get canSessions(): boolean {
@@ -367,6 +412,7 @@ export class Records {
    * and the map is decoded again for the new server.
    */
   async switchServer(): Promise<void> {
+    ++this.storyRead;
     this.story = { kind: "idle" };
     this.imagesTried = null;
     this.profile = { kind: "idle" };

@@ -103,6 +103,10 @@ export const api = {
    */
   profile: (accountId: string | null = null) => invoke<CliResult>("profile", { accountId }),
   story: () => invoke<CliResult>("story"),
+  storyPreview: (accountId: string, target: string) =>
+    invoke<CliResult>("story_preview", { accountId, target }),
+  storyApply: (accountId: string, target: string, expectedGeneration: string, planId: string) =>
+    invoke<CliResult>("story_apply", { accountId, target, expectedGeneration, planId }),
   profileList: () => invoke<CliResult>("profile_list"),
   sessions: () => invoke<CliResult>("sessions"),
   sessionFile: (id: string, name: string) => invoke<SessionFileText>("session_file", { id, name }),

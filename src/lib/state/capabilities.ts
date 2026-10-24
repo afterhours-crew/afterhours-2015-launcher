@@ -18,6 +18,7 @@ import type { ServerInfo } from "$lib/api/types";
 export type Capability =
   | "profile"
   | "story"
+  | "story-preview"
   | "sessions"
   | "events"
   | "play"

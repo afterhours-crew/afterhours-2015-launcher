@@ -269,6 +269,23 @@ const cases = [
       return line;
     },
   },
+  ...[
+    ["story", []],
+    ["story-preview", ["--preview", "after-intro"]],
+    [
+      "story-preview",
+      ["--apply", "after-intro", "--expected-generation", "1", "--plan-id", "a".repeat(64)],
+    ],
+  ].map(([capability, action], index) => ({
+    name: `story ${action[0] ?? "read"} refuses an unprepared save without writing`,
+    capability,
+    run: () => {
+      const dir = dataDir(`story-empty-${index}`);
+      const line = refusal(["story", "--json", "--data-dir", dir, ...action], 4);
+      if (readdirSync(dir).length !== 0) throw new Error("story wrote into the empty data folder");
+      return line;
+    },
+  })),
   {
     name: "settings --json reads the original amounts and creates nothing",
     capability: "world-settings",

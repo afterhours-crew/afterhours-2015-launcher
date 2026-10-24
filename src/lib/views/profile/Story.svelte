@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { untrack } from "svelte";
+  import { onDestroy, untrack } from "svelte";
   import Note from "$lib/components/Note.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
   import ViewNote from "$lib/components/ViewNote.svelte";
-  import { featureReady } from "$lib/state/capabilities";
+  import { featureReady, hasCapability } from "$lib/state/capabilities";
   import { current, records } from "$lib/state/records.svelte";
   import { session } from "$lib/state/session.svelte";
+  import { StoryEditor, type StoryEdit } from "$lib/state/story-editor";
 
   let ready = $derived(featureReady(session.info?.server, "story"));
   let load = $derived(records.story);
@@ -15,14 +16,52 @@
     Math.max(0, story?.checkpoints.findIndex((c) => c.id === story.current_checkpoint) ?? 0),
   );
   let checkpoint = $derived(story?.checkpoints[selected]);
+  let edit = $state<StoryEdit>({ kind: "idle" });
+  const scope = () =>
+    JSON.stringify([session.settings.data_dir, session.settings.server?.url ?? null]);
+  const editor = new StoryEditor(
+    {
+      preview: (account, target) => records.previewStory(account, target),
+      apply: (preview) => records.applyStory(preview),
+    },
+    () => ({
+      scope: scope(),
+      story,
+      fresh: load.kind === "ready",
+      canPreview: hasCapability(session.info?.server, "story-preview"),
+    }),
+    (value) => (edit = value),
+    () => records.loadStory(),
+  );
+  let applying = $derived(edit.kind === "applying");
+  let canApply = $derived(edit.kind === "ready" && editor.canApply);
+  function previewSelection() {
+    if (checkpoint) editor.select(checkpoint.id);
+  }
+  function choose(index: number) {
+    selected = index;
+    previewSelection();
+  }
+  function cancel() {
+    editor.cancel();
+    selected = saved;
+  }
+  onDestroy(() => editor.cancel());
 
   $effect(() => {
-    if (ready) untrack(() => void records.loadStory());
+    const selectedScope = scope();
+    if (ready && selectedScope) untrack(() => void records.loadStory());
   });
   $effect(() => {
     // A new saved generation replaces the preview. Dragging itself never writes.
     const generation = story?.generation;
-    if (generation !== undefined) selected = untrack(() => saved);
+    const account = story?.account_id;
+    const selectedScope = scope();
+    if (generation !== undefined && account && selectedScope)
+      untrack(() => {
+        selected = saved;
+        editor.cancel();
+      });
   });
 </script>
 
@@ -44,7 +83,13 @@
     <section class="panel" aria-labelledby="prologue-title">
       <div class="heading">
         <h2 id="prologue-title" class="t-panel-title">Prologue</h2>
-        <PillButton onclick={() => records.loadStory()}>Refresh</PillButton>
+        <PillButton
+          disabled={applying}
+          onclick={() => {
+            editor.cancel();
+            void records.loadStory();
+          }}>Refresh</PillButton
+        >
       </div>
       <p class="t-caption">Saved position: {story.checkpoints[saved]?.label}</p>
       <label for="story-position" class="t-caption">Preview a checkpoint</label>
@@ -55,6 +100,9 @@
         max={story.checkpoints.length - 1}
         step="1"
         bind:value={selected}
+        disabled={applying}
+        oninput={() => editor.cancel()}
+        onchange={previewSelection}
         aria-valuetext={`${checkpoint?.label}${selected === saved ? ", saved position" : ", preview only"}`}
       />
       <ol class="checkpoints">
@@ -66,7 +114,8 @@
               class:completed={point.completed}
               aria-current={index === saved ? "step" : undefined}
               aria-pressed={index === selected}
-              onclick={() => (selected = index)}
+              disabled={applying}
+              onclick={() => choose(index)}
             >
               <span class="marker" aria-hidden="true">{point.completed ? "✓" : index + 1}</span>
               <span>
@@ -91,18 +140,41 @@
       <div class="preview" aria-live="polite">
         <strong>{checkpoint?.label}</strong>
         <p class="t-caption">
-          {selected === saved ? "Your saved position." : "Preview only. Your save has not changed."}
+          {applying
+            ? "Updating your saved position…"
+            : edit.kind === "applied"
+              ? "Story progress updated."
+              : selected === saved
+                ? "Your saved position."
+                : "Preview only. Your save has not changed."}
         </p>
+        {#if edit.kind === "loading"}<p class="t-caption">Reviewing this checkpoint…</p>{/if}
+        {#if edit.kind === "ready"}
+          {#if edit.preview.completes.length}
+            <p class="t-caption">
+              Will mark complete: {edit.preview.completes.map((point) => point.label).join(", ")}
+            </p>
+          {/if}
+          {#if edit.preview.reopens.length}
+            <p class="t-caption">
+              Will reopen: {edit.preview.reopens.map((point) => point.label).join(", ")}
+            </p>
+          {/if}
+          {#each edit.preview.reasons as reason}<Note>{reason}</Note>{/each}
+        {:else if edit.kind === "error"}<Note kind="warn">{edit.message}</Note>{/if}
       </div>
       <div class="actions">
-        <PillButton onclick={() => (selected = 0)}>Replay prologue</PillButton>
-        <PillButton onclick={() => (selected = story!.checkpoints.length - 1)}
+        <PillButton disabled={applying} onclick={() => choose(0)}>Replay prologue</PillButton>
+        <PillButton disabled={applying} onclick={() => choose(story!.checkpoints.length - 1)}
           >Skip prologue</PillButton
         >
-        <PillButton disabled={selected === saved} onclick={() => (selected = saved)}
-          >Cancel</PillButton
+        <PillButton
+          disabled={applying || (selected === saved && edit.kind === "idle")}
+          onclick={cancel}>Cancel</PillButton
         >
-        <PillButton disabled>Apply</PillButton>
+        <PillButton disabled={!canApply} onclick={() => void editor.apply()}
+          >{applying ? "Applying…" : "Apply"}</PillButton
+        >
       </div>
       {#if story.session_running}
         <Note>Close the game and stop the server before changing story progress.</Note>

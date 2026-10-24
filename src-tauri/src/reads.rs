@@ -159,7 +159,7 @@ pub fn read_session_file(data: &Path, id: &str, name: &str) -> Result<SessionFil
     })
 }
 
-fn settings_of(state: &State<'_, crate::AppState>) -> Settings {
+pub(crate) fn settings_of(state: &State<'_, crate::AppState>) -> Settings {
     state.settings()
 }
 

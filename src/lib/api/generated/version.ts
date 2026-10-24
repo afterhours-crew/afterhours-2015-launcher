@@ -13,6 +13,7 @@ export type Capability =
   | "map-images"
   | "world-settings"
   | "story"
+  | "story-preview"
   | "map-feed"
   | "api";
 

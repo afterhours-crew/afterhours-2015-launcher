@@ -34,6 +34,7 @@ export const SAMPLE_VERSION: VersionReport = {
   capabilities: [
     "profile",
     "story",
+    "story-preview",
     "sessions",
     "events",
     "play",

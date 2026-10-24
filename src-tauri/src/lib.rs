@@ -37,6 +37,7 @@ pub mod reads;
 pub mod server;
 pub mod servers;
 pub mod settings;
+mod story;
 pub mod updates;
 
 use std::sync::{
@@ -261,6 +262,8 @@ pub fn run() {
             updates::app_info,
             reads::profile,
             reads::story,
+            story::story_preview,
+            story::story_apply,
             reads::profile_list,
             reads::sessions,
             reads::session_file,

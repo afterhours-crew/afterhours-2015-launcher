@@ -105,6 +105,17 @@ the game and keeps the usual first run. The decision is
 
 ## How it works
 
+Profile → Story shows the saved prologue position and previews another checkpoint
+without changing the save. Replay prologue and Skip prologue select its endpoints;
+Cancel returns to the saved marker. With a server that reports `story-preview`,
+the selection requests an exact server preview of objectives to complete or reopen.
+Apply sends that same preview proof back to the server, which owns process checks,
+the save backup and the transaction. A timed-out reply causes a fresh read rather
+than an automatic retry. Remote saves are read from their selected server; edit
+them from the launcher on that server's PC. Checkpoints remain unavailable for
+Apply until the server supports their native game restart path. The development
+sample previews changes but cannot write a save.
+
 ```text
 window (Svelte)  --invoke-->  src-tauri (Rust)  --spawn-->  Afterhours.exe  --spawn-->  Afterhours.exe supervise
                  <--events--                   <--stdout--  (bundled, pinned)          --> server role, NFS16.exe

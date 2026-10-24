@@ -7,6 +7,8 @@ export type { Preflight } from "./generated/check";
 export type { VersionReport } from "./generated/version";
 export type { SettingsReport } from "./generated/settings";
 export type { StoryReport, StoryCheckpoint } from "./generated/story";
+export type { Preview as StoryPreview } from "./generated/story-preview";
+export type { Applied as StoryApplied } from "./generated/story-apply";
 export type { MapImagesReport } from "./generated/map-images";
 import type { Event as SessionEvent } from "./generated/event";
 export type { SessionEvent };
