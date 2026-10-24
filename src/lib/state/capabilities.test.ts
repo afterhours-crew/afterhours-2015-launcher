@@ -37,6 +37,7 @@ describe("features", () => {
       "profile",
       "rivals",
       "save-data",
+      "story",
       "traffic",
       "world-presets",
     ]);

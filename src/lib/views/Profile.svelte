@@ -14,12 +14,13 @@
   import EditDriver from "./profile/EditDriver.svelte";
   import Overview from "./profile/Overview.svelte";
   import SaveData from "./profile/SaveData.svelte";
+  import Story from "./profile/Story.svelte";
 
   // Profile from the save (G1b) with Cars (H2) and Save data (H3) as tabs;
   // Edit driver (H4) opens from here. All read the server's
   // `profile --json`, so without the `profile` capability the view gives
   // one note instead. Edit driver's launcher-only picture works regardless.
-  const tabs: ProfileSection[] = ["overview", "cars", "save-data"];
+  const tabs: ProfileSection[] = ["overview", "cars", "story", "save-data"];
   let section = $derived((router.route.section ?? "overview") as ProfileSection);
   let ready = $derived(featureReady(session.info?.server, "profile"));
   let load = $derived(records.profile);
@@ -52,6 +53,8 @@
   <Stage key={section} flow>
     {#if section === "edit-driver"}
       <EditDriver {profile} {ready} />
+    {:else if section === "story"}
+      <Story />
     {:else if !ready}
       <div class="column" use:staggerIn>
         <h1 class="t-view-title" data-enter>Profile</h1>

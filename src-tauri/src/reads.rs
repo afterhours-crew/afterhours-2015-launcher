@@ -201,6 +201,23 @@ async fn run_read(args: Vec<String>) -> Result<cli::CliResult, String> {
         .map_err(|e| e.to_string())?
 }
 
+/// Story belongs to the selected server, including when it is another PC.
+/// Never substitute this PC's save when that server cannot answer.
+#[tauri::command]
+pub async fn story(state: State<'_, crate::AppState>) -> Result<cli::CliResult, String> {
+    let settings = settings_of(&state);
+    if let Some(remote) = settings.server.as_ref() {
+        let endpoint = crate::connection::Endpoint::remote(remote)?;
+        return api_read(endpoint, "/v1/story".into(), MAX_RECORD).await;
+    }
+    if let Some(endpoint) = state.server_endpoint().or_else(|| state.endpoint()) {
+        return api_read(endpoint, "/v1/story".into(), MAX_RECORD).await;
+    }
+    let mut args = cli::global_args(&settings);
+    args.push("story".into());
+    run_read(args).await
+}
+
 /// `profile --json`, for the active save or `account_id`. The active save
 /// comes through the session API when the window follows one.
 #[tauri::command]

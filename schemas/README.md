@@ -13,6 +13,14 @@ replaced this folder with them. Each later pin bump does the same
 (RELEASING.md). Do not edit these files by hand; fix a schema in the server
 repository, where it is generated from the Rust types, and bump the pin.
 
+The story timeline is being developed against the server branch
+`codex/prologue-story`: `story.schema.json` and `version.schema.json` come
+from that branch's generated schemas, formatted by Prettier. The release pin
+stays unchanged until this contract ships. The pinned server has no `story`
+capability and displays the usual coming note; a development `AFTERHOURS_EXE`
+build exercises the story view. Checkpoint apply remains disabled until the
+runtime supports starting from those boundaries.
+
 **Ahead of the next release:** `map-images.schema.json` is new, copied unchanged
 from afterhours-2015 `feature/map-images` (pull request #158), which the Map screen
 is built against. `event.schema.json` adds the `map-feed` event, copied unchanged

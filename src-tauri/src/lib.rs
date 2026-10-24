@@ -260,6 +260,7 @@ pub fn run() {
             updates::backup_saves,
             updates::app_info,
             reads::profile,
+            reads::story,
             reads::profile_list,
             reads::sessions,
             reads::session_file,

@@ -102,6 +102,7 @@ export const api = {
    * `/v1/profile`), or the account named.
    */
   profile: (accountId: string | null = null) => invoke<CliResult>("profile", { accountId }),
+  story: () => invoke<CliResult>("story"),
   profileList: () => invoke<CliResult>("profile_list"),
   sessions: () => invoke<CliResult>("sessions"),
   sessionFile: (id: string, name: string) => invoke<SessionFileText>("session_file", { id, name }),

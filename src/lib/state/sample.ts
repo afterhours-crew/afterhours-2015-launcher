@@ -17,6 +17,7 @@ import type {
   SessionList,
   SettingsReport,
   Status,
+  StoryReport,
   VersionReport,
 } from "$lib/api/types";
 
@@ -32,6 +33,7 @@ export const SAMPLE_VERSION: VersionReport = {
   records: { profile: 1, "profile-list": 1, sessions: 1, status: 1, version: 1 },
   capabilities: [
     "profile",
+    "story",
     "sessions",
     "events",
     "play",
@@ -41,6 +43,36 @@ export const SAMPLE_VERSION: VersionReport = {
     "map-feed",
     "api",
   ],
+};
+
+/** Made-up story state for the development preview; never a gameplay claim. */
+export const SAMPLE_STORY: StoryReport = {
+  version: 1,
+  account_id: "0123456789abcdef0123456789abcdef",
+  generation: "42",
+  current_checkpoint: "intro-race",
+  intro_completed: false,
+  session_running: false,
+  can_edit: false,
+  warnings: ["Story checkpoint editing awaits playable prologue integration."],
+  checkpoints: [
+    ["intro-drive", "Meet the crew"],
+    ["intro-car", "Choose your first car"],
+    ["intro-race", "House Calls"],
+    ["intro-diner", "Diner Dash"],
+    ["intro-garage", "Return to the garage"],
+    ["after-intro", "Prologue complete"],
+  ].map(([id, label], i) => ({
+    id: id!,
+    label: label!,
+    active: i === 2,
+    completed: i < 2,
+    played: i < 2,
+    edited: false,
+    existing: false,
+    reward_claimed: i === 1,
+    selectable: false,
+  })),
 };
 
 /** Where `map-images` writes the decoded world map, for the current content. */

@@ -16,6 +16,7 @@ import type {
   SessionFileText,
   SessionList,
   SettingsReport,
+  StoryReport,
 } from "$lib/api/types";
 import { hasCapability } from "./capabilities";
 import { needsCarImages } from "./carimages";
@@ -45,6 +46,7 @@ interface WorldChange {
 }
 
 interface Source {
+  story(): Promise<CliResult>;
   profile(accountId: string | null): Promise<CliResult>;
   profileList(): Promise<CliResult>;
   sessions(): Promise<CliResult>;
@@ -64,6 +66,7 @@ async function sampleSource(): Promise<Source> {
     ? { ...sample.SAMPLE_SETTINGS, traffic_percent: 150, rival_limit: 2 }
     : sample.SAMPLE_SETTINGS;
   return {
+    story: async () => ok(sample.SAMPLE_STORY),
     settings: async (change) => {
       if (change.traffic === undefined && change.rivals === undefined) return ok(world);
       if (query.has("savefail") || isLive(session.status?.state)) {
@@ -138,6 +141,7 @@ async function sampleSource(): Promise<Source> {
 }
 
 const live: Source = {
+  story: () => api.story(),
   profile: (accountId) => api.profile(accountId),
   profileList: () => api.profileList(),
   sessions: () => api.sessions(),
@@ -151,6 +155,7 @@ function message(e: unknown): string {
 }
 
 export class Records {
+  story = $state<Load<StoryReport>>({ kind: "idle" });
   /** The active save, for the header, Garage and Profile. */
   profile = $state<Load<Profile>>({ kind: "idle" });
   /** Every save in the data folder, for Save data. */
@@ -177,6 +182,15 @@ export class Records {
 
   get canProfile(): boolean {
     return hasCapability(session.info?.server, "profile");
+  }
+
+  async loadStory(): Promise<void> {
+    await this.read<StoryReport>(
+      hasCapability(session.info?.server, "story"),
+      (s) => s.story(),
+      (l) => (this.story = l),
+      current(this.story),
+    );
   }
 
   get canSessions(): boolean {
@@ -353,6 +367,7 @@ export class Records {
    * and the map is decoded again for the new server.
    */
   async switchServer(): Promise<void> {
+    this.story = { kind: "idle" };
     this.imagesTried = null;
     this.profile = { kind: "idle" };
     this.profiles = { kind: "idle" };
@@ -369,7 +384,7 @@ export class Records {
     // A session may have prepared new content: pictures can be tried again.
     this.imagesTried = null;
     void this.loadWorld();
-    await Promise.all([this.loadProfile(), this.loadSessions()]);
+    await Promise.all([this.loadProfile(), this.loadSessions(), this.loadStory()]);
   }
 }
 

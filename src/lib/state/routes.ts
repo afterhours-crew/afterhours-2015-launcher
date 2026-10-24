@@ -9,7 +9,7 @@ export type View = (typeof VIEWS)[number];
 
 /** Views with sub-views; the first one is where the view opens. */
 export const SECTIONS = {
-  profile: ["overview", "cars", "save-data", "edit-driver"],
+  profile: ["overview", "cars", "story", "save-data", "edit-driver"],
   logs: ["sessions", "viewer", "connections"],
   settings: ["general", "updates", "about"],
 } as const;
@@ -56,6 +56,7 @@ export function navItems(ready: (feature: Feature) => boolean): NavItem[] {
 export const SECTION_LABELS: Record<Section, string> = {
   overview: "Overview",
   cars: "Cars",
+  story: "Story",
   "save-data": "Save data",
   "edit-driver": "Edit driver",
   sessions: "Sessions",
