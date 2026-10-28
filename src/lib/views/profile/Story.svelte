@@ -1,22 +1,81 @@
 <script lang="ts">
   import { onDestroy, untrack } from "svelte";
+  import { fade } from "svelte/transition";
+  import IconArchive from "@tabler/icons-svelte/icons/archive";
+  import IconCheck from "@tabler/icons-svelte/icons/check";
+  import IconEye from "@tabler/icons-svelte/icons/eye";
+  import IconFlag3 from "@tabler/icons-svelte/icons/flag-3";
+  import IconListCheck from "@tabler/icons-svelte/icons/list-check";
+  import IconMap2 from "@tabler/icons-svelte/icons/map-2";
+  import IconRefresh from "@tabler/icons-svelte/icons/refresh";
+  import garage from "$lib/../assets/backdrops/garage-home.jpg";
+  import CarImage from "$lib/components/CarImage.svelte";
+  import EmptyLine from "$lib/components/EmptyLine.svelte";
+  import Glass from "$lib/components/Glass.svelte";
   import Note from "$lib/components/Note.svelte";
+  import PanelHeading from "$lib/components/PanelHeading.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
+  import Upcoming from "$lib/components/Upcoming.svelte";
   import ViewNote from "$lib/components/ViewNote.svelte";
+  import { slideUp, staggerIn, toastIn } from "$lib/motion";
   import { featureReady, hasCapability } from "$lib/state/capabilities";
+  import { carPicture } from "$lib/state/carimages";
+  import { carName } from "$lib/state/cars";
+  import { isLive } from "$lib/state/launchbar";
+  import { staggerDelay } from "$lib/state/motion";
   import { current, records } from "$lib/state/records.svelte";
+  import { viaApi } from "$lib/state/server";
   import { session } from "$lib/state/session.svelte";
+  import { newlyDone, previewMarks, storyStops, storySummary } from "$lib/state/story";
+  import { followStory } from "$lib/state/story-follow.svelte";
   import { StoryEditor, type StoryEdit } from "$lib/state/story-editor";
+  import { listText } from "$lib/state/upcoming";
+  import type { StoryReport } from "$lib/api/types";
+
+  // Profile › Story (canvas row K). One stop per intro objective, then
+  // Prologue complete. Green is played, dashed peach is set in the launcher,
+  // the archive mark is complete in an older save; the white ring is where
+  // the save is. Picking a stop only previews: the server answers with the
+  // exact change, Apply asks it to make that change, Cancel goes back.
+  // While a game runs, the window reads the story again every few seconds
+  // (src/lib/state/story-live.ts) and newly finished steps fill in.
 
   let ready = $derived(featureReady(session.info?.server, "story"));
   let load = $derived(records.story);
   let story = $derived(current(load));
-  let selected = $state(0);
+  let stops = $derived(story ? storyStops(story) : []);
+  let summary = $derived(story ? storySummary(story) : null);
   let saved = $derived(
-    Math.max(0, story?.checkpoints.findIndex((c) => c.id === story.current_checkpoint) ?? 0),
+    Math.max(
+      0,
+      stops.findIndex((s) => s.saved),
+    ),
   );
-  let checkpoint = $derived(story?.checkpoints[selected]);
+  let selected = $state(0);
+  let chosen = $derived(stops[selected]);
+  let previewing = $derived(stops.length > 0 && selected !== saved);
   let edit = $state<StoryEdit>({ kind: "idle" });
+  let preview = $derived(edit.kind === "ready" || edit.kind === "applying" ? edit.preview : null);
+  let marks = $derived(preview ? previewMarks(stops, preview.completes, preview.reopens) : []);
+
+  let profile = $derived(current(records.profile));
+  let car = $derived(profile?.cars?.find((c) => c.location === "active") ?? null);
+  let picture = $derived(
+    car && profile
+      ? carPicture(
+          car.image,
+          "large",
+          featureReady(session.info?.server, "car-images"),
+          profile.car_images,
+          viaApi(session.settings),
+        )
+      : null,
+  );
+  // A save that has been read and has no car yet: the prologue gives the first one.
+  let noCar = $derived(profile?.cars != null && car === null);
+
+  let live = $derived(isLive(session.status?.state) && session.status?.game_running === true);
+
   const scope = () =>
     JSON.stringify([session.settings.data_dir, session.settings.server?.url ?? null]);
   const editor = new StoryEditor(
@@ -35,18 +94,29 @@
   );
   let applying = $derived(edit.kind === "applying");
   let canApply = $derived(edit.kind === "ready" && editor.canApply);
-  function previewSelection() {
-    if (checkpoint) editor.select(checkpoint.id);
-  }
+
   function choose(index: number) {
+    if (applying || index < 0 || index >= stops.length) return;
     selected = index;
-    previewSelection();
+    const stop = stops[index];
+    if (stop) editor.select(stop.id);
   }
   function cancel() {
     editor.cancel();
     selected = saved;
   }
-  onDestroy(() => editor.cancel());
+
+  // Steps a live read found finished: they fill in, and one line says so.
+  let justDone = $state<string[]>([]);
+  let finished = $state<string | null>(null);
+  let previous: StoryReport | null = null;
+  let clearDone: ReturnType<typeof setTimeout> | undefined;
+
+  followStory();
+  onDestroy(() => {
+    editor.cancel();
+    clearTimeout(clearDone);
+  });
 
   $effect(() => {
     const selectedScope = scope();
@@ -63,13 +133,97 @@
         editor.cancel();
       });
   });
+  $effect(() => {
+    const next = story;
+    if (!next) return;
+    untrack(() => {
+      const done = newlyDone(previous, next);
+      previous = next;
+      if (done.length === 0) return;
+      justDone = done;
+      const last = next.checkpoints.find((p) => p.id === done.at(-1));
+      finished = last ? `${last.label} done` : null;
+      clearTimeout(clearDone);
+      clearDone = setTimeout(() => {
+        justDone = [];
+        finished = null;
+      }, 4000);
+    });
+  });
+
+  // The banner says where things stand, or what the preview would do.
+  let banner = $derived.by(() => {
+    if (!summary || !chosen) return null;
+    const carLine = car ? `In your ${carName(car)}` : null;
+    if (previewing) {
+      const skip = chosen.terminal && !summary.complete;
+      return {
+        tone: "var(--peach)",
+        eyebrow: "Preview · not saved yet",
+        title: skip ? "Skip the prologue" : `Preview: ${chosen.label}`,
+        line: skip ? "Go straight to the garage and free roam." : carLine,
+      };
+    }
+    if (summary.complete)
+      return {
+        tone: "var(--status-ready)",
+        eyebrow: "Prologue complete",
+        title: "Ventura Bay is open",
+        line: carLine,
+      };
+    if (!summary.started)
+      return {
+        tone: "var(--status-info)",
+        eyebrow: "Prologue · not started",
+        title: "Your story starts tonight",
+        line: "Press Play to begin with the game's opening scene.",
+      };
+    return {
+      tone: "var(--status-ready)",
+      eyebrow: `Prologue · ${summary.done} of ${summary.total} done`,
+      title: `Next: ${summary.next}`,
+      line: carLine,
+    };
+  });
+
+  function tag(index: number): { text: string; quiet: boolean } | null {
+    if (index === selected && previewing) return { text: "Preview", quiet: false };
+    if (index !== saved) return null;
+    if (previewing) return { text: "Saved", quiet: true };
+    return {
+      text: summary?.started || summary?.complete ? "You are here" : "Start here",
+      quiet: false,
+    };
+  }
+
+  function stepLine(index: number): string {
+    const stop = stops[index];
+    if (!stop || !summary) return "";
+    if (stop.terminal) return "Your saved position";
+    return `Step ${index + 1} of ${summary.total} · your saved position`;
+  }
+
+  function savedText(): string {
+    if (!summary || !chosen) return "";
+    if (summary.complete) {
+      if (summary.how === "set")
+        return "You skipped the prologue here, so its races were not played.";
+      if (summary.how === "kept")
+        return "Your save finished the prologue before Afterhours kept a record of how.";
+      return "You played the prologue through. The rest of the story is open in the game.";
+    }
+    if (!summary.started)
+      return "Press Play to start with the game's opening scene. You choose your first car along the way.";
+    return "Play carries on from here. Pick another stop to preview a change; nothing is saved until you apply it.";
+  }
 </script>
 
-<div class="story">
-  <h1 class="t-view-title">Story</h1>
+<div class="story" use:staggerIn>
   {#if !ready}
+    <h1 class="t-view-title">Story</h1>
     <ViewNote>Your prologue progress and a timeline for replaying or skipping it.</ViewNote>
   {:else if !story}
+    <h1 class="t-view-title">Story</h1>
     {#if load.kind === "error"}
       <Note kind="warn">Could not read your story: {load.message}</Note>
       <div><PillButton onclick={() => records.loadStory()}>Try again</PillButton></div>
@@ -77,121 +231,286 @@
       <p class="t-caption">Reading your story…</p>
     {/if}
   {:else}
-    {#if load.kind === "error"}
-      <Note kind="warn">Showing the last read. {load.message}</Note>
-    {/if}
-    <section class="panel" aria-labelledby="prologue-title">
-      <div class="heading">
-        <h2 id="prologue-title" class="t-panel-title">Prologue</h2>
-        <PillButton
-          disabled={applying}
-          onclick={() => {
-            editor.cancel();
-            void records.loadStory();
-          }}>Refresh</PillButton
-        >
-      </div>
-      <p class="t-caption">Saved position: {story.checkpoints[saved]?.label}</p>
-      <label for="story-position" class="t-caption">Preview a checkpoint</label>
-      <input
-        id="story-position"
-        type="range"
-        min="0"
-        max={story.checkpoints.length - 1}
-        step="1"
-        bind:value={selected}
-        disabled={applying}
-        oninput={() => editor.cancel()}
-        onchange={previewSelection}
-        aria-valuetext={`${checkpoint?.label}${selected === saved ? ", saved position" : ", preview only"}`}
-      />
-      <ol class="checkpoints">
-        {#each story.checkpoints as point, index (point.id)}
-          <li>
-            <button
-              type="button"
-              class:selected={index === selected}
-              class:completed={point.completed}
-              aria-current={index === saved ? "step" : undefined}
-              aria-pressed={index === selected}
-              disabled={applying}
-              onclick={() => choose(index)}
-            >
-              <span class="marker" aria-hidden="true">{point.completed ? "✓" : index + 1}</span>
-              <span>
-                <span class="name">{point.label}</span>
-                <span class="t-caption status">
-                  {index === saved ? "Saved position · " : ""}
-                  {point.played
-                    ? "Played"
-                    : point.completed
+    <div class="columns">
+      <div class="main">
+        {#if banner}
+          <div class="banner" data-enter>
+            {#if picture && car}
+              <CarImage {picture} alt={carName(car)} ratio="4 / 1" icon={36} radius="0" />
+            {:else}
+              <span class="art" style="background-image: url({garage})" aria-hidden="true"></span>
+            {/if}
+            <span class="shade" aria-hidden="true"></span>
+            {#key banner.title}
+              <div class="banner-text" in:toastIn>
+                <span class="eyebrow"
+                  ><span class="dot" style="background: {banner.tone}" aria-hidden="true"
+                  ></span>{banner.eyebrow}</span
+                >
+                <h1 class="banner-title">{banner.title}</h1>
+                {#if banner.line}<span class="banner-line">{banner.line}</span>{/if}
+              </div>
+            {/key}
+          </div>
+        {/if}
+
+        {#if load.kind === "error"}
+          <Note kind="warn">Showing the last read. {load.message}</Note>
+        {/if}
+
+        <Glass radius="panel" label="Prologue" class="panel">
+          <PanelHeading icon={IconFlag3}>
+            Prologue
+            {#snippet aside()}
+              <span class="heading-aside">
+                {#if live}
+                  <span
+                    class="live"
+                    title="Your story is read again every few seconds while the game runs."
+                    ><span class="dot" aria-hidden="true"></span>Live</span
+                  >
+                {/if}
+                {#if summary}
+                  <span class="chip"
+                    ><span
+                      class="dot"
+                      style="background: {summary.complete || summary.started
+                        ? 'var(--status-ready)'
+                        : 'var(--status-info)'}"
+                      aria-hidden="true"
+                    ></span>{summary.complete
                       ? "Complete"
-                      : point.active
-                        ? "Current"
-                        : "Ahead"}
-                  {point.edited ? " · Set in launcher" : ""}
-                  {point.existing ? " · Existing save" : ""}
-                </span>
+                      : summary.started
+                        ? `${summary.done} of ${summary.total} done`
+                        : "Not started"}</span
+                  >
+                {/if}
+                <button
+                  type="button"
+                  class="icon-button"
+                  aria-label="Read again from your save"
+                  title="Read again from your save"
+                  disabled={applying}
+                  onclick={() => {
+                    editor.cancel();
+                    void records.loadStory();
+                  }}><IconRefresh size={18} stroke={1.6} /></button
+                >
               </span>
-            </button>
-          </li>
+            {/snippet}
+          </PanelHeading>
+
+          <div class="track" style="--count: {stops.length}">
+            <input
+              class="range"
+              type="range"
+              min="0"
+              max={stops.length - 1}
+              step="1"
+              bind:value={selected}
+              disabled={applying}
+              aria-label="Story position"
+              oninput={() => editor.cancel()}
+              onchange={() => choose(selected)}
+              aria-valuetext={`${chosen?.label}${selected === saved ? ", your saved position" : ", preview only"}`}
+            />
+            <ol class="stops" aria-hidden="true">
+              {#each stops as stop, i (stop.id)}
+                {@const mark = marks[i] ?? null}
+                {@const label = tag(i)}
+                <li
+                  class="stop {stop.kind}"
+                  class:picked={i === selected}
+                  class:fresh={justDone.includes(stop.id)}
+                  class:will={mark === "will-complete"}
+                  class:reopen={mark === "will-reopen"}
+                >
+                  {#if i < stops.length - 1}
+                    <span class="line"
+                      ><span
+                        class="fill grow-x"
+                        class:on={stop.done || mark === "will-complete"}
+                        style="--grow-delay: {120 + staggerDelay(i, 40)}ms"
+                      ></span></span
+                    >
+                  {/if}
+                  {#if label}
+                    {#key label.text}
+                      <span class="tag" class:quiet={label.quiet} in:toastIn>{label.text}</span>
+                    {/key}
+                  {/if}
+                  <span class="marker">
+                    {#if stop.done}
+                      {#if stop.kind === "kept"}<IconArchive
+                          size={14}
+                          stroke={2}
+                        />{:else}<IconCheck size={14} stroke={3} />{/if}
+                    {:else if stop.terminal}<IconFlag3 size={14} stroke={2} />
+                    {:else if !stop.saved}{i + 1}{/if}
+                  </span>
+                  <span class="name">{stop.label}</span>
+                  <span class="word"
+                    >{mark === "will-complete"
+                      ? "Will be done"
+                      : mark === "will-reopen"
+                        ? "Opens again"
+                        : stop.word}</span
+                  >
+                </li>
+              {/each}
+            </ol>
+          </div>
+
+          {#if stops.some((s) => s.kind === "set" || s.kind === "kept")}
+            <div class="key t-caption" aria-label="Key">
+              <span><span class="mini played" aria-hidden="true"></span>Played</span>
+              <span><span class="mini set" aria-hidden="true"></span>Set in launcher</span>
+              <span
+                ><IconArchive size={16} stroke={1.8} aria-hidden="true" />From an older save</span
+              >
+            </div>
+          {/if}
+
+          {#if finished}
+            <div class="finished" role="status" in:toastIn out:fade={{ duration: 150 }}>
+              <span class="dot" aria-hidden="true"></span>{finished}
+            </div>
+          {/if}
+
+          <div class="detail" class:previewing aria-live="polite">
+            {#if previewing && chosen}
+              <span class="t-caption eyebrow-line"
+                ><IconEye size={16} stroke={1.6} aria-hidden="true" />Preview only · your save has
+                not changed</span
+              >
+              <h2 class="detail-title">{chosen.label}</h2>
+              {#if edit.kind === "loading"}
+                <span class="t-caption">Checking this change with your server…</span>
+              {:else if preview}
+                <div class="rows" in:slideUp>
+                  {#if preview.completes.length}
+                    <div class="list-row">
+                      <IconListCheck size={20} stroke={1.6} aria-hidden="true" class="row-icon" />
+                      <span class="grow"
+                        >Marks as done: {listText(preview.completes.map((p) => p.label))}</span
+                      >
+                    </div>
+                  {/if}
+                  {#if preview.reopens.length}
+                    <div class="list-row">
+                      <IconRefresh size={20} stroke={1.6} aria-hidden="true" class="row-icon" />
+                      <span class="grow"
+                        >Opens again: {listText(preview.reopens.map((p) => p.label))}</span
+                      >
+                    </div>
+                  {/if}
+                  {#if noCar && preview.completes.length}
+                    <div class="list-row">
+                      <span class="grow">Picking your first car when you skip</span>
+                      <Upcoming />
+                    </div>
+                  {/if}
+                  <div class="list-row">
+                    <IconArchive size={20} stroke={1.6} aria-hidden="true" class="row-icon" />
+                    <span class="grow">Backs up your save before the change.</span>
+                  </div>
+                </div>
+                {#each preview.reasons as reason (reason)}<Note>{reason}</Note>{/each}
+              {:else if edit.kind === "error"}
+                <Note kind="warn">{edit.message}</Note>
+              {/if}
+              {#if story.session_running}
+                <Note>Close the game and stop the server before changing story progress.</Note>
+              {/if}
+              <div class="detail-actions">
+                <PillButton variant="text" disabled={applying} onclick={cancel}>Cancel</PillButton>
+                <PillButton variant="solid" disabled={!canApply} onclick={() => void editor.apply()}
+                  >{applying ? "Applying…" : "Apply"}</PillButton
+                >
+              </div>
+            {:else if chosen}
+              <span class="t-caption">{stepLine(selected)}</span>
+              <h2 class="detail-title">{chosen.label}</h2>
+              <span class="soft">{savedText()}</span>
+              {#if edit.kind === "applied"}
+                <span class="t-caption eyebrow-line" in:toastIn
+                  ><IconArchive size={16} stroke={1.6} aria-hidden="true" />Story progress updated.
+                  Backed up first: {edit.result.backup.id}</span
+                >
+              {/if}
+            {/if}
+          </div>
+
+          <div class="actions">
+            {#if summary?.started || summary?.complete}
+              <PillButton disabled={applying} onclick={() => choose(0)}>Replay prologue</PillButton>
+            {/if}
+            {#if !summary?.complete}
+              <PillButton disabled={applying} onclick={() => choose(stops.length - 1)}
+                >Skip prologue</PillButton
+              >
+            {/if}
+          </div>
+        </Glass>
+
+        {#if summary?.complete}
+          <Glass radius="panel" label="Main story" class="panel">
+            <PanelHeading icon={IconMap2}>
+              Main story
+              {#snippet aside()}<Upcoming />{/snippet}
+            </PanelHeading>
+            <EmptyLine
+              >The story objectives that open after the prologue will be listed here, with what's
+              done and what's next.</EmptyLine
+            >
+          </Glass>
+        {/if}
+
+        <ViewNote>Starting the game from a step you pick here.</ViewNote>
+        {#each story.warnings as warning (warning)}
+          <Note>{warning}</Note>
         {/each}
-      </ol>
-      <div class="preview" aria-live="polite">
-        <strong>{checkpoint?.label}</strong>
-        <p class="t-caption">
-          {applying
-            ? "Updating your saved position…"
-            : edit.kind === "applied"
-              ? "Story progress updated."
-              : selected === saved
-                ? "Your saved position."
-                : "Preview only. Your save has not changed."}
-        </p>
-        {#if edit.kind === "loading"}<p class="t-caption">Reviewing this checkpoint…</p>{/if}
-        {#if edit.kind === "ready"}
-          {#if edit.preview.completes.length}
-            <p class="t-caption">
-              Will mark complete: {edit.preview.completes.map((point) => point.label).join(", ")}
-            </p>
-          {/if}
-          {#if edit.preview.reopens.length}
-            <p class="t-caption">
-              Will reopen: {edit.preview.reopens.map((point) => point.label).join(", ")}
-            </p>
-          {/if}
-          {#each edit.preview.reasons as reason}<Note>{reason}</Note>{/each}
-        {:else if edit.kind === "error"}<Note kind="warn">{edit.message}</Note>{/if}
       </div>
-      <div class="actions">
-        <PillButton disabled={applying} onclick={() => choose(0)}>Replay prologue</PillButton>
-        <PillButton disabled={applying} onclick={() => choose(story!.checkpoints.length - 1)}
-          >Skip prologue</PillButton
-        >
-        <PillButton
-          disabled={applying || (selected === saved && edit.kind === "idle")}
-          onclick={cancel}>Cancel</PillButton
-        >
-        <PillButton disabled={!canApply} onclick={() => void editor.apply()}
-          >{applying ? "Applying…" : "Apply"}</PillButton
-        >
-      </div>
-      {#if story.session_running}
-        <Note>Close the game and stop the server before changing story progress.</Note>
-      {/if}
-      <ViewNote>Starting the game from a selected story checkpoint.</ViewNote>
-    </section>
-    {#each story.warnings as warning}
-      <Note>{warning}</Note>
-    {/each}
+
+      <aside>
+        <Glass radius="phone" label="Your progress" class="panel side">
+          <h2 class="t-panel-title">Your progress</h2>
+          {#if car}
+            <CarImage {picture} alt={carName(car)} ratio="16 / 9" icon={32} />
+            <div class="list-row stacked">
+              <span class="t-caption">Current car</span>
+              <span class="t-body-strong">{carName(car)}</span>
+            </div>
+          {:else if noCar}
+            <EmptyLine>No car yet. You pick your first one in the prologue.</EmptyLine>
+          {/if}
+          {#if profile?.reputation?.level != null}
+            <div class="list-row">
+              <span class="grow">REP level</span><span class="t-num"
+                >{profile.reputation.level}</span
+              >
+            </div>
+          {/if}
+          <div class="list-row">
+            <span class="grow">Main story</span>
+            <span class="t-caption"
+              >{summary?.complete ? "Open in the game" : "Opens after the prologue"}</span
+            >
+          </div>
+          <span class="t-caption foot"
+            >{live
+              ? "Following your game: finished steps show here within seconds."
+              : "Read from your save. It updates when a session ends."}</span
+          >
+        </Glass>
+      </aside>
+    </div>
   {/if}
 </div>
 
 <style>
   .story {
     width: 100%;
-    max-width: 820px;
-    align-self: center;
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -202,79 +521,422 @@
   p {
     margin: 0;
   }
-  .panel {
+  .columns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: flex-start;
+    justify-content: center;
+  }
+  .main {
+    flex: 999 1 560px;
+    min-width: 0;
+    max-width: 820px;
     display: flex;
     flex-direction: column;
     gap: 20px;
+  }
+  aside {
+    flex: 1 1 300px;
+    max-width: 360px;
+  }
+  .columns :global(.panel) {
     padding: 24px;
-    border: 1px solid var(--graphite-edge);
-    border-radius: var(--radius-panel);
-    background: var(--graphite);
-  }
-  .heading,
-  .actions {
     display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  aside :global(.side) {
+    gap: 8px;
+  }
+
+  /* The banner: the active car's own picture, or the garage art. */
+  .banner {
+    position: relative;
+    aspect-ratio: 4 / 1;
+    min-height: 180px;
+    border-radius: var(--radius-panel);
+    overflow: hidden;
+    border: 1px solid var(--graphite-edge);
+    background: var(--floor);
+    box-shadow: var(--shadow-panel);
+  }
+  .banner :global(.box) {
+    position: absolute !important;
+    inset: 0;
+    width: 100% !important;
+    height: 100%;
+  }
+  .art {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: 46% 58%;
+  }
+  .shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      rgba(14, 12, 17, 0.92) 0%,
+      rgba(14, 12, 17, 0.6) 45%,
+      rgba(14, 12, 17, 0) 80%
+    );
+  }
+  .banner-text {
+    position: absolute;
+    inset: 0;
+    max-width: 62%;
+    padding: 24px 28px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+  .eyebrow {
+    display: inline-flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 12px;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
   }
-  .heading {
-    justify-content: space-between;
+  .banner-title {
+    font-size: 30px;
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.01em;
   }
-  input[type="range"] {
-    width: 100%;
-    min-height: 38px;
-    accent-color: var(--play);
+  .banner-line {
+    color: #d6d7db;
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    display: inline-block;
+  }
+
+  /* Heading: live state, progress chip and refresh. */
+  .heading-aside {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .chip,
+  .live {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: var(--radius-pill);
+    background: var(--graphite-raised);
+    border: 1px solid var(--graphite-edge);
+    font-size: 14px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .live {
+    color: var(--crew);
+  }
+  .live .dot {
+    background: var(--crew);
+  }
+  .icon-button {
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: var(--ink-soft);
+  }
+  .icon-button:hover:not(:disabled) {
+    background: var(--hover);
+    color: var(--ink);
+  }
+  .icon-button:hover:not(:disabled) :global(svg) {
+    transform: rotate(-60deg);
+  }
+  .icon-button :global(svg) {
+    transition: transform var(--motion-base) var(--ease-out);
+  }
+
+  /* The track: a native range on top of the drawn stops. */
+  .track {
+    position: relative;
+    padding-top: 34px;
+  }
+  /* Invisible, over the whole track: a click or drag anywhere snaps to the
+     nearest stop, and its ends sit on the first and last stop's centre. */
+  .range {
+    position: absolute;
+    left: calc(50% / var(--count));
+    right: calc(50% / var(--count));
+    top: 34px;
+    bottom: 0;
+    width: auto;
+    height: auto;
+    margin: 0;
+    opacity: 0;
     cursor: pointer;
+    z-index: 2;
   }
-  .checkpoints {
+  .range:hover:not(:disabled) + .stops .name {
+    color: var(--ink);
+  }
+  .range:focus-visible + .stops .picked .marker {
+    outline: 2px solid var(--ink);
+    outline-offset: 6px;
+  }
+  .stops {
     list-style: none;
     margin: 0;
     padding: 0;
     display: grid;
-    gap: 4px;
+    grid-template-columns: repeat(var(--count), minmax(0, 1fr));
+    align-items: start;
   }
-  .checkpoints button {
+  .stop {
+    position: relative;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 12px;
+    gap: 6px;
+    text-align: center;
+    padding: 0 4px;
+  }
+  .line {
+    position: absolute;
+    top: 13px;
+    left: 50%;
     width: 100%;
-    min-height: 54px;
-    padding: 10px 12px;
-    border: 1px solid transparent;
-    border-radius: var(--radius-field);
-    text-align: left;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--graphite-edge);
+    overflow: hidden;
   }
-  .checkpoints button:hover,
-  .selected {
-    background: var(--graphite-raised);
+  .fill {
+    position: absolute;
+    inset: 0;
+    transform-origin: left center;
+    transform: scaleX(0);
+    transition: transform var(--motion-slow) var(--ease-out);
   }
-  .checkpoints button.selected {
-    border-color: var(--play);
+  .fill.on {
+    transform: scaleX(1);
+  }
+  .fill:not(.on) {
+    animation: none;
+  }
+  .played .fill {
+    background: var(--crew);
+  }
+  .set .fill,
+  .will .fill {
+    background: repeating-linear-gradient(90deg, var(--peach) 0 6px, transparent 6px 12px);
+  }
+  .kept .fill {
+    background: var(--ink-soft);
   }
   .marker {
-    display: grid;
-    place-items: center;
+    position: relative;
+    z-index: 1;
+    box-sizing: border-box;
     width: 28px;
     height: 28px;
-    flex: 0 0 28px;
-    border: 1px solid var(--graphite-edge);
     border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--graphite);
+    border: 2px solid var(--graphite-edge);
+    color: var(--ink-soft);
+    font-size: 13px;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
+    transition:
+      transform var(--motion-fast) var(--ease-out),
+      background-color var(--motion-slow) var(--ease-out),
+      border-color var(--motion-slow) var(--ease-out),
+      box-shadow var(--motion-base) var(--ease-out);
   }
-  .completed .marker {
-    color: var(--play);
+  .played .marker {
+    background: var(--crew);
+    border-color: var(--crew);
+    color: var(--on-ink);
   }
-  .name,
-  .status {
-    display: block;
+  .set .marker,
+  .will .marker {
+    border-color: var(--peach);
+    border-style: dashed;
+    color: var(--peach);
   }
-  .status {
+  .kept .marker {
+    border-color: var(--ink-soft);
+    color: var(--ink);
+  }
+  .here .marker {
+    border: 3px solid var(--ink);
+  }
+  .here .marker::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--ink);
+  }
+  .reopen .marker {
+    opacity: 0.55;
+  }
+  .picked .marker {
+    box-shadow:
+      0 0 0 4px var(--graphite),
+      0 0 0 6px var(--ink);
+  }
+  .fresh .marker {
+    animation: arrive var(--motion-slow) var(--ease-out) both;
+  }
+  @keyframes arrive {
+    from {
+      transform: scale(0.7);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+  .name {
+    font-size: 14px;
+    line-height: 1.3;
+    font-weight: 600;
+    transition: color var(--motion-base) var(--ease-out);
+  }
+  .ahead .name {
+    color: var(--ink-soft);
+    font-weight: 500;
+  }
+  .word {
+    font-size: 13px;
+    line-height: 1.3;
     color: var(--ink-soft);
   }
-  .preview {
-    padding: 16px;
-    border-radius: var(--radius-field);
+  .played .word {
+    color: var(--crew);
+  }
+  .set .word,
+  .will .word {
+    color: var(--peach);
+  }
+  .tag {
+    position: absolute;
+    top: -32px;
+    left: 50%;
+    translate: -50% 0;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: var(--radius-pill);
+    background: var(--ink);
+    color: var(--on-ink);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 24px;
+    white-space: nowrap;
+  }
+  .tag.quiet {
     background: var(--graphite-raised);
+    color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--graphite-ring);
+  }
+
+  .key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+  }
+  .key > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mini {
+    box-sizing: border-box;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+  }
+  .mini.played {
+    background: var(--crew);
+  }
+  .mini.set {
+    border: 2px dashed var(--peach);
+  }
+  .finished {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    align-self: flex-start;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: var(--radius-pill);
+    background: var(--graphite-raised);
+    color: var(--crew);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .finished .dot {
+    background: var(--crew);
+  }
+
+  /* The selected stop: the saved one, or what a preview would change. */
+  .detail {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 18px 20px;
+    border-radius: var(--radius-row);
+    background: var(--graphite-raised);
+    transition: box-shadow var(--motion-base) var(--ease-out);
+  }
+  .detail.previewing {
+    box-shadow: inset 0 0 0 1px var(--graphite-ring);
+  }
+  .detail-title {
+    font-size: 20px;
+    line-height: 1.3;
+    font-weight: 700;
+  }
+  .soft {
+    color: var(--ink-soft);
+  }
+  .eyebrow-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .detail :global(.row-icon) {
+    flex: 0 0 auto;
+    color: var(--ink-soft);
+  }
+  .detail-actions,
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .detail-actions {
+    justify-content: flex-end;
+    padding-top: 6px;
+  }
+  .stacked {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
+    border-top: 0;
+  }
+  .foot {
+    padding-top: 10px;
+    border-top: 1px solid var(--graphite-edge);
   }
 </style>

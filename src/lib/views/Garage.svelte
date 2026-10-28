@@ -9,6 +9,7 @@
   import EmptyLine from "$lib/components/EmptyLine.svelte";
   import Glass from "$lib/components/Glass.svelte";
   import Mark from "$lib/components/Mark.svelte";
+  import PrologueLine from "$lib/components/PrologueLine.svelte";
   import StatChip from "$lib/components/StatChip.svelte";
   import { formatCount, formatMoney } from "$lib/state/format";
   import { lastSession } from "$lib/state/garage";
@@ -20,7 +21,8 @@
   import { supportLinks } from "$lib/state/support";
 
   // Garage home (H1). The floor holds the clock and tonight's facts from
-  // the save; the side panel says how the last session went. World
+  // the save; the side panel says how the last session went, after the
+  // prologue's progress while it is under way (canvas K5). World
   // settings live on World, where the server's support decides what shows.
   // Now and then (not every open: src/lib/state/support.ts) the panel ends
   // with one quiet line and the Patreon link (canvas J2).
@@ -59,6 +61,7 @@
 
   <aside data-enter>
     <Glass radius="phone" label="Last session and messages" class="side">
+      <PrologueLine />
       {#if last}
         <h2 class="t-panel-title">{last.title}</h2>
         <div class="rows">

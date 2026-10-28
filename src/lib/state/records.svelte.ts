@@ -25,6 +25,8 @@ import { isLive } from "./launchbar";
 import { applyChoice, saveArgs } from "./world";
 import { loadSample, sampleMode } from "./preview";
 import { session } from "./session.svelte";
+import { sameProgress } from "./story";
+import { StoryFollower } from "./story-live";
 
 export type Load<T> =
   | { kind: "idle" }
@@ -68,10 +70,18 @@ async function sampleSource(): Promise<Source> {
   let world: SettingsReport = query.has("offscale")
     ? { ...sample.SAMPLE_SETTINGS, traffic_percent: 150, rival_limit: 2 }
     : sample.SAMPLE_SETTINGS;
+  // `&story=fresh|done|skipped|older`: other saved positions. `&storylive`
+  // with `&hosting=game`: the game finishes one more objective every few reads.
+  const variant = query.get("story");
+  let reads = 0;
+  const story = () =>
+    query.has("storylive")
+      ? sample.sampleStory("progress", 1 + Math.floor(reads++ / 3))
+      : sample.sampleStory(variant);
   return {
-    story: async () => ok(sample.SAMPLE_STORY),
+    story: async () => ok(story()),
     storyPreview: async (account, target) => {
-      const story = sample.SAMPLE_STORY;
+      const story = sample.sampleStory(variant);
       const at = story.checkpoints.findIndex((p) => p.id === target);
       if (account !== story.account_id || at < 0)
         return { kind: "error", exit: 1, message: "Unknown sample checkpoint." };
@@ -210,6 +220,8 @@ export class Records {
 
   private source: Promise<Source> | null = null;
   private storyRead = 0;
+  /** Reads the story again while a game runs and a screen shows it. */
+  readonly storyLive = new StoryFollower(() => this.pollStory());
 
   private async from(): Promise<Source> {
     this.source ??= sampleMode ? sampleSource() : Promise.resolve(live);
@@ -230,6 +242,19 @@ export class Records {
       },
       current(this.story),
     );
+  }
+  /**
+   * A live read while the game runs: quiet, unlike `loadStory`. What is shown
+   * stays until a read brings different progress; a failed read changes
+   * nothing, and a newer read or a server switch wins over this one.
+   */
+  async pollStory(): Promise<void> {
+    if (!hasCapability(session.info?.server, "story")) return;
+    const ticket = ++this.storyRead;
+    const result = await (await this.from()).story();
+    if (ticket !== this.storyRead || result.kind !== "ok") return;
+    const next = result.value as StoryReport;
+    if (!sameProgress(current(this.story), next)) this.story = { kind: "ready", value: next };
   }
   async previewStory(account: string, target: string): Promise<CliResult> {
     return (await this.from()).storyPreview(account, target);

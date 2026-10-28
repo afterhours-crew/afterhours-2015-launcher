@@ -17,6 +17,7 @@
   import PanelHeading from "$lib/components/PanelHeading.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
   import ShowMore from "$lib/components/ShowMore.svelte";
+  import StoryCard from "$lib/components/StoryCard.svelte";
   import { featureReady } from "$lib/state/capabilities";
   import { carPicture } from "$lib/state/carimages";
   import { carName, garageList } from "$lib/state/cars";
@@ -106,6 +107,8 @@
         <PillButton onclick={() => router.go("profile", "edit-driver")}>Edit driver</PillButton>
       </div>
     </Glass>
+
+    <StoryCard />
 
     {#if categories}
       <Glass radius="panel" label="REP by category" class="panel">
