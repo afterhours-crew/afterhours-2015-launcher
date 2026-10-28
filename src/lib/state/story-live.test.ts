@@ -91,4 +91,39 @@ describe("StoryFollower", () => {
     expect(t.pending()).toBe(0);
     expect(read).not.toHaveBeenCalled();
   });
+
+  it("does not read a complete story, even while the game runs", () => {
+    const t = manualTimers();
+    const read = vi.fn(async () => {});
+    const f = new StoryFollower(read, t.timers);
+    f.retain();
+    f.setLive(true, true);
+    expect(t.pending()).toBe(0);
+    f.setLive(false, true);
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("stops at once when a read finds the story complete", async () => {
+    const t = manualTimers();
+    const read = vi.fn(async () => {});
+    const f = new StoryFollower(read, t.timers);
+    f.retain();
+    f.setLive(true);
+    await t.fire();
+    expect(t.pending()).toBe(1);
+    // The read brought intro_completed: the next setLive comes from the new record.
+    f.setLive(true, true);
+    expect(t.pending()).toBe(0);
+    await t.fire().catch(() => {});
+    expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  it("follows again when a replayed prologue is under way in the next game", () => {
+    const t = manualTimers();
+    const f = new StoryFollower(async () => {}, t.timers);
+    f.retain();
+    f.setLive(false, true);
+    f.setLive(true, false);
+    expect(f.following).toBe(true);
+  });
 });

@@ -3,7 +3,9 @@
 // save for `GET /v1/story`; the event stream carries no story events. So
 // while a game is running and a screen that shows the story is open, the
 // window reads the story again every few seconds. Nothing is read while no
-// game runs or nothing shows it, and one more read follows the game closing.
+// game runs, nothing shows it, or the story shown is already complete (a
+// complete prologue cannot advance while the game runs: changing it needs
+// the session stopped). One more read follows a game closing mid-story.
 
 /** How often a running game's story is read again. */
 export const LIVE_POLL_MS = 4000;
@@ -21,6 +23,7 @@ const browserTimers: Timers = {
 export class StoryFollower {
   private holders = 0;
   private live = false;
+  private complete = false;
   private handle: unknown = null;
   private reading = false;
 
@@ -43,13 +46,17 @@ export class StoryFollower {
     };
   }
 
-  /** Whether a game is running in the session the window follows. */
-  setLive(live: boolean): void {
+  /**
+   * Whether a game is running in the session the window follows, and
+   * whether the story last read is complete.
+   */
+  setLive(live: boolean, complete = false): void {
     const ended = this.live && !live;
     this.live = live;
+    this.complete = complete;
     this.sync();
-    // The game closed: its last objective may have been saved since the last read.
-    if (ended && this.holders > 0) void this.tick();
+    // The game closed mid-story: its last objective may have been saved since the last read.
+    if (ended && !complete && this.holders > 0) void this.tick();
   }
 
   /** A read is scheduled. */
@@ -58,7 +65,7 @@ export class StoryFollower {
   }
 
   private get wanted(): boolean {
-    return this.holders > 0 && this.live;
+    return this.holders > 0 && this.live && !this.complete;
   }
 
   private sync(): void {
