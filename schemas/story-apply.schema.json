@@ -36,6 +36,11 @@
     "replayed": {
       "type": "boolean"
     },
+    "starter": {
+      "default": null,
+      "description": "The first car granted into garage slot 0 by this edit, once.",
+      "type": ["string", "null"]
+    },
     "target_checkpoint": {
       "type": "string"
     },
@@ -53,7 +58,8 @@
     "generation",
     "target_checkpoint",
     "replayed",
-    "backup"
+    "backup",
+    "starter"
   ],
   "title": "Applied",
   "type": "object"

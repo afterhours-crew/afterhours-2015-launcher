@@ -6,6 +6,10 @@ export interface Applied {
   generation: string;
   previous_generation: string;
   replayed: boolean;
+  /**
+   * The first car granted into garage slot 0 by this edit, once.
+   */
+  starter: string | null;
   target_checkpoint: string;
   version: 1;
 }

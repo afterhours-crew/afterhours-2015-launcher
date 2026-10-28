@@ -101,6 +101,13 @@ export function sampleStory(variant: string | null, done?: number): StoryReport 
 
 export const SAMPLE_STORY: StoryReport = sampleStory("progress");
 
+/** The first cars a skip past the car choice offers (`story-preview` `starters`). */
+export const SAMPLE_STARTERS = [
+  { id: "592ac0f528a4f4a56d80ff6c290f2f54", name: "Subaru BRZ Premium" },
+  { id: "cdb48f852999625a8cfe5bab8332df47", name: "Ford Mustang Foxbody (1990)" },
+  { id: "0b18c9413a0f38f4815a80342a62dc4e", name: "Honda Civic Type-R (2000)" },
+];
+
 /** Where `map-images` writes the decoded world map, for the current content. */
 export const SAMPLE_MAP_DIR =
   "C:\\Users\\Driver\\AppData\\Local\\Afterhours2015\\artifacts\\content\\map-images\\5a3b1e0c";

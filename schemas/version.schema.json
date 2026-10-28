@@ -50,6 +50,11 @@
           "type": "string"
         },
         {
+          "const": "story-starter",
+          "description": "First-car choices in `story-preview` (`starters`), and `--starter` on\n`story --preview` and `--apply` to grant one when a skip passes the\ncar choice.",
+          "type": "string"
+        },
+        {
           "const": "map-feed",
           "description": "`map-feed` events with `--events` on `serve` and `start`: live\npositions of the players' cars, traffic and roaming rivals.",
           "type": "string"

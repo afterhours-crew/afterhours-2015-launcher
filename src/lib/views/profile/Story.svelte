@@ -55,7 +55,17 @@
   let chosen = $derived(stops[selected]);
   let previewing = $derived(stops.length > 0 && selected !== saved);
   let edit = $state<StoryEdit>({ kind: "idle" });
-  let preview = $derived(edit.kind === "ready" || edit.kind === "applying" ? edit.preview : null);
+  // While a picked first car is checked again, the last preview stays in view.
+  let preview = $derived(
+    edit.kind === "ready" || edit.kind === "applying"
+      ? edit.preview
+      : edit.kind === "loading"
+        ? edit.last
+        : null,
+  );
+  let starters = $derived(preview?.starters ?? []);
+  let picked = $derived(edit.kind === "loading" ? edit.starter : (preview?.starter ?? null));
+  let pickedName = $derived(starters.find((c) => c.id === picked)?.name ?? null);
   let marks = $derived(preview ? previewMarks(stops, preview.completes, preview.reopens) : []);
 
   let profile = $derived(current(records.profile));
@@ -80,7 +90,7 @@
     JSON.stringify([session.settings.data_dir, session.settings.server?.url ?? null]);
   const editor = new StoryEditor(
     {
-      preview: (account, target) => records.previewStory(account, target),
+      preview: (account, target, starter) => records.previewStory(account, target, starter),
       apply: (preview) => records.applyStory(preview),
     },
     () => ({
@@ -384,15 +394,55 @@
                 not changed</span
               >
               <h2 class="detail-title">{chosen.label}</h2>
-              {#if edit.kind === "loading"}
+              {#if edit.kind === "loading" && !preview}
                 <span class="t-caption">Checking this change with your server…</span>
               {:else if preview}
+                {#if starters.length}
+                  <fieldset class="starters" disabled={applying}>
+                    <legend class="t-body-strong">Choose your first car</legend>
+                    <span class="t-caption"
+                      >The prologue normally gives you this choice. Skipping it, you pick here.</span
+                    >
+                    <div class="cars">
+                      {#each starters as starter (starter.id)}
+                        <label class="car" class:on={picked === starter.id}>
+                          <input
+                            type="radio"
+                            name="starter"
+                            value={starter.id}
+                            aria-label={starter.name ?? "Unnamed car"}
+                            checked={picked === starter.id}
+                            onchange={() => editor.pickStarter(starter.id)}
+                          />
+                          <CarImage
+                            picture={null}
+                            alt={starter.name ?? "First car"}
+                            ratio="16 / 9"
+                            icon={28}
+                            radius="var(--radius-thumb)"
+                          />
+                          {#if picked === starter.id}<span
+                              class="badge"
+                              aria-hidden="true"
+                              in:toastIn><IconCheck size={14} stroke={3} /></span
+                            >{/if}
+                          <span class="car-name">{starter.name ?? "Unnamed car"}</span>
+                        </label>
+                      {/each}
+                    </div>
+                    {#if edit.kind === "loading"}
+                      <span class="t-caption">Checking your pick with your server…</span>
+                    {/if}
+                  </fieldset>
+                {/if}
                 <div class="rows" in:slideUp>
                   {#if preview.completes.length}
                     <div class="list-row">
                       <IconListCheck size={20} stroke={1.6} aria-hidden="true" class="row-icon" />
                       <span class="grow"
-                        >Marks as done: {listText(preview.completes.map((p) => p.label))}</span
+                        >Marks as done: {listText(
+                          preview.completes.map((p) => p.label),
+                        )}{#if pickedName}, and puts the {pickedName} in garage slot 0{/if}</span
                       >
                     </div>
                   {/if}
@@ -402,12 +452,6 @@
                       <span class="grow"
                         >Opens again: {listText(preview.reopens.map((p) => p.label))}</span
                       >
-                    </div>
-                  {/if}
-                  {#if noCar && preview.completes.length}
-                    <div class="list-row">
-                      <span class="grow">Picking your first car when you skip</span>
-                      <Upcoming />
                     </div>
                   {/if}
                   <div class="list-row">
@@ -917,6 +961,74 @@
   .detail :global(.row-icon) {
     flex: 0 0 auto;
     color: var(--ink-soft);
+  }
+  .starters {
+    margin: 4px 0;
+    padding: 0;
+    border: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+  .starters legend {
+    padding: 0;
+  }
+  .cars {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 6px;
+  }
+  .car {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 8px 10px;
+    border-radius: var(--radius-card);
+    background: var(--graphite);
+    border: 1px solid var(--graphite-edge);
+    cursor: pointer;
+    transition:
+      border-color var(--motion-base) var(--ease-out),
+      box-shadow var(--motion-base) var(--ease-out),
+      transform var(--motion-fast) var(--ease-out);
+  }
+  .car:hover {
+    transform: translateY(-2px);
+    border-color: var(--graphite-ring);
+  }
+  .car.on {
+    border-color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--ink);
+  }
+  .car:has(input:focus-visible) {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+  .car input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+  }
+  .badge {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--on-ink);
+    display: grid;
+    place-items: center;
+  }
+  .car-name {
+    font-size: 14px;
+    line-height: 1.3;
+    font-weight: 600;
   }
   .detail-actions,
   .actions {

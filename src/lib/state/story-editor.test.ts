@@ -40,6 +40,22 @@ function preview(target = "after-intro"): StoryPreview {
     reopens: [],
     can_apply: true,
     reasons: [],
+    starters: [],
+    starter: null,
+  };
+}
+const BRZ = "592ac0f528a4f4a56d80ff6c290f2f54";
+const CIVIC = "0b18c9413a0f38f4815a80342a62dc4e";
+/** A skip past the car choice: the server lists the cars and binds the picked one. */
+function skip(starter: string | null): StoryPreview {
+  return {
+    ...preview(),
+    starters: [
+      { id: BRZ, name: "Subaru BRZ Premium" },
+      { id: CIVIC, name: "Honda Civic Type-R (2000)" },
+    ],
+    starter,
+    can_apply: starter !== null,
   };
 }
 function applied(p: StoryPreview): StoryApplied {
@@ -51,6 +67,7 @@ function applied(p: StoryPreview): StoryApplied {
     target_checkpoint: p.target_checkpoint,
     replayed: false,
     backup: { id: "b".repeat(64), generation: p.generation, database_sha256: "c".repeat(64) },
+    starter: p.starter,
   };
 }
 const ok = (value: unknown): CliResult => ({ kind: "ok", value });
@@ -86,6 +103,54 @@ function fixture() {
   return { context, source, refresh, editor, value: () => value };
 }
 
+describe("first car on a skip", () => {
+  it("previews again with the picked car and applies only with it", async () => {
+    const f = fixture();
+    f.source.preview.mockResolvedValueOnce(ok(skip(null)));
+    f.editor.select("after-intro");
+    await flush();
+    expect(f.editor.canApply).toBe(false);
+    f.source.preview.mockResolvedValueOnce(ok(skip(BRZ)));
+    f.editor.pickStarter(BRZ);
+    expect(f.value()).toMatchObject({ kind: "loading", starter: BRZ, last: skip(null) });
+    await flush();
+    expect(f.source.preview.mock.calls.at(-1)).toEqual([account, "after-intro", BRZ]);
+    expect(f.editor.canApply).toBe(true);
+    await f.editor.apply();
+    expect(f.source.apply).toHaveBeenCalledWith(skip(BRZ));
+    expect(f.value().kind).toBe("applied");
+  });
+  it("ignores a car the preview did not offer", async () => {
+    const f = fixture();
+    f.source.preview.mockResolvedValueOnce(ok(skip(null)));
+    f.editor.select("after-intro");
+    await flush();
+    f.editor.pickStarter("ff".repeat(16));
+    expect(f.source.preview).toHaveBeenCalledTimes(1);
+  });
+  it("refuses a preview bound to another car than the one picked", async () => {
+    const f = fixture();
+    f.source.preview.mockResolvedValueOnce(ok(skip(null)));
+    f.editor.select("after-intro");
+    await flush();
+    f.source.preview.mockResolvedValueOnce(ok(skip(CIVIC)));
+    f.editor.pickStarter(BRZ);
+    await flush();
+    expect(f.value().kind).toBe("error");
+    expect(f.editor.canApply).toBe(false);
+  });
+  it("does not confirm an apply that granted a different car", async () => {
+    const f = fixture();
+    f.source.preview.mockResolvedValueOnce(ok(skip(BRZ)));
+    f.editor.select("after-intro", BRZ);
+    await flush();
+    f.source.apply.mockResolvedValueOnce(ok({ ...applied(skip(BRZ)), starter: CIVIC }));
+    await f.editor.apply();
+    expect(f.value().kind).toBe("error");
+    expect(f.refresh).toHaveBeenCalled();
+  });
+});
+
 describe("story preview and apply", () => {
   it("keeps one preview running and replaces queued dragging with the latest target", async () => {
     const f = fixture();
@@ -96,11 +161,16 @@ describe("story preview and apply", () => {
     f.editor.select("3");
     f.editor.select("after-intro");
     expect(f.source.preview).toHaveBeenCalledTimes(1);
-    expect(f.value()).toEqual({ kind: "loading", target: "after-intro" });
+    expect(f.value()).toEqual({
+      kind: "loading",
+      target: "after-intro",
+      starter: null,
+      last: null,
+    });
     first.resolve(ok(preview("2")));
     await flush();
     expect(f.source.preview).toHaveBeenCalledTimes(2);
-    expect(f.source.preview.mock.calls[1]).toEqual([account, "after-intro"]);
+    expect(f.source.preview.mock.calls[1]).toEqual([account, "after-intro", null]);
     last.resolve(ok(preview()));
     await flush();
     expect(f.value()).toEqual({ kind: "ready", preview: preview() });

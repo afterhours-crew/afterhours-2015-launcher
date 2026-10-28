@@ -2,7 +2,8 @@ import type { CliResult, StoryApplied, StoryPreview, StoryReport } from "$lib/ap
 
 export type StoryEdit =
   | { kind: "idle" }
-  | { kind: "loading"; target: string }
+  /** `last`: the preview shown while a picked first car is checked again. */
+  | { kind: "loading"; target: string; starter: string | null; last: StoryPreview | null }
   | { kind: "ready"; preview: StoryPreview }
   | { kind: "applying"; preview: StoryPreview }
   | { kind: "applied"; result: StoryApplied }
@@ -21,9 +22,11 @@ interface Request {
   scope: string;
   ticket: number;
   sourceCheckpoint: string;
+  /** The first car picked from an earlier preview's `starters`. */
+  starter: string | null;
 }
 interface Source {
-  preview(account: string, target: string): Promise<CliResult>;
+  preview(account: string, target: string, starter: string | null): Promise<CliResult>;
   apply(preview: StoryPreview): Promise<CliResult>;
 }
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -63,7 +66,7 @@ export class StoryEditor {
       context.story.current_checkpoint === request.sourceCheckpoint
     );
   }
-  select(target: string): void {
+  select(target: string, starter: string | null = null, last: StoryPreview | null = null): void {
     this.cancel();
     const context = this.context();
     const story = context.story;
@@ -77,9 +80,21 @@ export class StoryEditor {
       scope: context.scope,
       ticket: this.ticket,
       sourceCheckpoint: story.current_checkpoint,
+      starter,
     };
-    this.set({ kind: "loading", target });
+    this.set({ kind: "loading", target, starter, last });
     void this.drain();
+  }
+  /**
+   * Pick the first car the shown preview offers. The server binds the car
+   * into the plan, so the same change is previewed again with it; Apply
+   * then sends that car.
+   */
+  pickStarter(id: string): void {
+    if (this.value.kind !== "ready" || this.writing) return;
+    const preview = this.value.preview;
+    if (preview.starter === id || !preview.starters.some((car) => car.id === id)) return;
+    this.select(preview.target_checkpoint, id, preview);
   }
   private async drain(): Promise<void> {
     if (this.reading || this.writing) return;
@@ -89,7 +104,11 @@ export class StoryEditor {
         const request = this.pending;
         this.pending = null;
         try {
-          const response = await this.source.preview(request.account, request.target);
+          const response = await this.source.preview(
+            request.account,
+            request.target,
+            request.starter,
+          );
           if (!this.current(request)) {
             if (request.ticket === this.ticket && !this.pending) this.set({ kind: "idle" });
             continue;
@@ -111,7 +130,11 @@ export class StoryEditor {
             !Array.isArray(preview.completes) ||
             !Array.isArray(preview.reopens) ||
             !Array.isArray(preview.reasons) ||
-            typeof preview.can_apply !== "boolean"
+            typeof preview.can_apply !== "boolean" ||
+            !Array.isArray(preview.starters ?? []) ||
+            (preview.starter ?? null) !== request.starter ||
+            (request.starter !== null &&
+              !(preview.starters ?? []).some((car) => car.id === request.starter))
           )
             throw new Error("The story preview changed. Refresh your story.");
           this.readyScope = request.scope;
@@ -139,6 +162,9 @@ export class StoryEditor {
       story.account_id === preview.account_id &&
       story.generation === preview.generation &&
       story.current_checkpoint === preview.source_checkpoint &&
+      // A skip past the car choice applies only with one of its cars picked.
+      ((preview.starters ?? []).length === 0 ||
+        (preview.starters ?? []).some((car) => car.id === preview.starter)) &&
       story.checkpoints.some((point) => point.id === preview.target_checkpoint && point.selectable)
     );
   }
@@ -152,6 +178,7 @@ export class StoryEditor {
       ticket: this.ticket,
       scope: this.context().scope,
       sourceCheckpoint: preview.source_checkpoint,
+      starter: preview.starter ?? null,
     };
     this.writing = true;
     this.set({ kind: "applying", preview });
@@ -167,7 +194,8 @@ export class StoryEditor {
         result.previous_generation !== request.generation ||
         result.target_checkpoint !== request.target ||
         typeof result.generation !== "string" ||
-        !result.backup?.id
+        !result.backup?.id ||
+        (request.starter !== null && result.starter !== request.starter)
       )
         throw new Error("Could not confirm the story change. Refresh your story.");
       this.set({ kind: "applied", result });

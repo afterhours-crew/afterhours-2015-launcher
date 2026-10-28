@@ -50,7 +50,7 @@ interface WorldChange {
 
 interface Source {
   story(): Promise<CliResult>;
-  storyPreview(account: string, target: string): Promise<CliResult>;
+  storyPreview(account: string, target: string, starter: string | null): Promise<CliResult>;
   storyApply(preview: StoryPreview): Promise<CliResult>;
   profile(accountId: string | null): Promise<CliResult>;
   profileList(): Promise<CliResult>;
@@ -80,11 +80,15 @@ async function sampleSource(): Promise<Source> {
       : sample.sampleStory(variant);
   return {
     story: async () => ok(story()),
-    storyPreview: async (account, target) => {
+    storyPreview: async (account, target, starter) => {
       const story = sample.sampleStory(variant);
       const at = story.checkpoints.findIndex((p) => p.id === target);
       if (account !== story.account_id || at < 0)
         return { kind: "error", exit: 1, message: "Unknown sample checkpoint." };
+      // `&story=fresh`: the save has no first car, so a skip past the car choice offers them.
+      const choice = variant === "fresh" && at > 1;
+      if (starter && !(choice && sample.SAMPLE_STARTERS.some((c) => c.id === starter)))
+        return { kind: "error", exit: 1, message: "That car is not one of the choices." };
       return ok({
         version: 1,
         account_id: account,
@@ -103,6 +107,8 @@ async function sampleSource(): Promise<Source> {
           .map(({ id, label }) => ({ id, label })),
         can_apply: false,
         reasons: ["Sample mode cannot change a save."],
+        starters: choice ? sample.SAMPLE_STARTERS : [],
+        starter: starter ?? null,
       } satisfies StoryPreview);
     },
     storyApply: async () => ({
@@ -185,8 +191,9 @@ async function sampleSource(): Promise<Source> {
 
 const live: Source = {
   story: () => api.story(),
-  storyPreview: (account, target) => api.storyPreview(account, target),
-  storyApply: (p) => api.storyApply(p.account_id, p.target_checkpoint, p.generation, p.plan_id),
+  storyPreview: (account, target, starter) => api.storyPreview(account, target, starter),
+  storyApply: (p) =>
+    api.storyApply(p.account_id, p.target_checkpoint, p.generation, p.plan_id, p.starter),
   profile: (accountId) => api.profile(accountId),
   profileList: () => api.profileList(),
   sessions: () => api.sessions(),
@@ -256,8 +263,8 @@ export class Records {
     const next = result.value as StoryReport;
     if (!sameProgress(current(this.story), next)) this.story = { kind: "ready", value: next };
   }
-  async previewStory(account: string, target: string): Promise<CliResult> {
-    return (await this.from()).storyPreview(account, target);
+  async previewStory(account: string, target: string, starter: string | null): Promise<CliResult> {
+    return (await this.from()).storyPreview(account, target, starter);
   }
   async applyStory(preview: StoryPreview): Promise<CliResult> {
     return (await this.from()).storyApply(preview);

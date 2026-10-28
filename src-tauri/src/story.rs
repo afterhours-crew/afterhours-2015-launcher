@@ -21,6 +21,7 @@ fn arguments(
     account: &str,
     target: &str,
     proof: Option<(&str, &str)>,
+    starter: Option<&str>,
 ) -> Result<Vec<String>, String> {
     if settings.server.is_some() {
         return Err("Change story checkpoints from the launcher on the server's own PC.".into());
@@ -30,6 +31,10 @@ fn arguments(
     }
     if target != "after-intro" && (!decimal(target) || target == "0") {
         return Err("Invalid story checkpoint.".into());
+    }
+    // An item definition GUID: the server checks it is one of the preview's starters.
+    if starter.is_some_and(|id| !hex(id, 32)) {
+        return Err("Invalid first car.".into());
     }
     let mut args = cli::global_args(settings);
     args.extend(["story".into(), "--account-id".into(), account.into()]);
@@ -49,6 +54,9 @@ fn arguments(
             ]);
         }
     }
+    if let Some(id) = starter {
+        args.extend(["--starter".into(), id.into()]);
+    }
     Ok(args)
 }
 async fn run(args: Vec<String>) -> Result<cli::CliResult, String> {
@@ -66,9 +74,17 @@ pub async fn story_preview(
     state: State<'_, crate::AppState>,
     account_id: String,
     target: String,
+    starter: Option<String>,
 ) -> Result<cli::CliResult, String> {
     let settings = crate::reads::settings_of(&state);
-    run(arguments(&settings, &account_id, &target, None)?).await
+    run(arguments(
+        &settings,
+        &account_id,
+        &target,
+        None,
+        starter.as_deref(),
+    )?)
+    .await
 }
 #[tauri::command]
 pub async fn story_apply(
@@ -77,6 +93,7 @@ pub async fn story_apply(
     target: String,
     expected_generation: String,
     plan_id: String,
+    starter: Option<String>,
 ) -> Result<cli::CliResult, String> {
     let settings = crate::reads::settings_of(&state);
     run(arguments(
@@ -84,6 +101,7 @@ pub async fn story_apply(
         &account_id,
         &target,
         Some((&expected_generation, &plan_id)),
+        starter.as_deref(),
     )?)
     .await
 }
@@ -101,13 +119,14 @@ mod tests {
             ..Settings::default()
         };
         let account = "01".repeat(16);
-        assert!(arguments(&settings, &account, "after-intro", None).is_err());
+        assert!(arguments(&settings, &account, "after-intro", None, None).is_err());
         assert!(
             arguments(
                 &settings,
                 &account,
                 "after-intro",
-                Some(("1", &"b".repeat(64)))
+                Some(("1", &"b".repeat(64))),
+                None
             )
             .is_err()
         );
@@ -122,6 +141,7 @@ mod tests {
             &id,
             "9007199254740993",
             Some(("9007199254740994", &plan)),
+            None,
         )
         .unwrap();
         assert_eq!(
@@ -136,15 +156,38 @@ mod tests {
             ]
         );
         for bad in ["0", "07", "--server", "../save", "18446744073709551616"] {
-            assert!(arguments(&settings, &id, bad, None).is_err());
+            assert!(arguments(&settings, &id, bad, None, None).is_err());
         }
-        assert!(arguments(&settings, "--data-dir", "after-intro", None).is_err());
-        assert!(arguments(&settings, &id, "after-intro", Some(("01", &plan))).is_err());
-        assert!(arguments(&settings, &id, "after-intro", Some(("1", "--help"))).is_err());
+        assert!(arguments(&settings, "--data-dir", "after-intro", None, None).is_err());
+        assert!(arguments(&settings, &id, "after-intro", Some(("01", &plan)), None).is_err());
+        assert!(arguments(&settings, &id, "after-intro", Some(("1", "--help")), None).is_err());
         assert!(
-            arguments(&settings, &id, "after-intro", None)
+            arguments(&settings, &id, "after-intro", None, None)
                 .unwrap()
                 .ends_with(&["--preview".into(), "after-intro".into()])
         );
+    }
+    #[test]
+    fn a_first_car_is_one_guid_passed_last_on_preview_and_apply() {
+        let id = "01".repeat(16);
+        let plan = "a".repeat(64);
+        let car = "592ac0f528a4f4a56d80ff6c290f2f54";
+        let settings = Settings::default();
+        assert!(
+            arguments(&settings, &id, "after-intro", None, Some(car))
+                .unwrap()
+                .ends_with(&["--starter".into(), car.into()])
+        );
+        let apply =
+            arguments(&settings, &id, "after-intro", Some(("1", &plan)), Some(car)).unwrap();
+        assert_eq!(&apply[apply.len() - 2..], ["--starter", car]);
+        for bad in [
+            "",
+            "--server",
+            "592AC0F528A4F4A56D80FF6C290F2F54",
+            &"0".repeat(31),
+        ] {
+            assert!(arguments(&settings, &id, "after-intro", None, Some(bad)).is_err());
+        }
     }
 }
