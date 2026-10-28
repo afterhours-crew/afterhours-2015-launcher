@@ -415,7 +415,12 @@
                             onchange={() => editor.pickStarter(starter.id)}
                           />
                           <CarImage
-                            picture={null}
+                            picture={carPicture(
+                              starter.image,
+                              "large",
+                              featureReady(session.info?.server, "car-images"),
+                              preview.car_images,
+                            )}
                             alt={starter.name ?? "First car"}
                             ratio="16 / 9"
                             icon={28}

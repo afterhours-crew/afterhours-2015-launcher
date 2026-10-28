@@ -41,6 +41,7 @@ function preview(target = "after-intro"): StoryPreview {
     can_apply: true,
     reasons: [],
     starters: [],
+    car_images: null,
     starter: null,
   };
 }
@@ -51,8 +52,8 @@ function skip(starter: string | null): StoryPreview {
   return {
     ...preview(),
     starters: [
-      { id: BRZ, name: "Subaru BRZ Premium" },
-      { id: CIVIC, name: "Honda Civic Type-R (2000)" },
+      { id: BRZ, name: "Subaru BRZ Premium", image: null },
+      { id: CIVIC, name: "Honda Civic Type-R (2000)", image: null },
     ],
     starter,
     can_apply: starter !== null,

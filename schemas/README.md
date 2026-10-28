@@ -21,10 +21,11 @@ capability and displays the usual coming note; a development `AFTERHOURS_EXE`
 build exercises the story view. Checkpoint apply remains disabled until the
 runtime supports starting from those boundaries. `story-preview.schema.json`,
 `story-apply.schema.json` and `version.schema.json` now come unchanged
-(formatted by Prettier) from `feature/story-starter` (commit 8c0e737, stacked
-on `codex/prologue-story`): the preview's `starters` and `starter`, the
-applied `starter` and the `story-starter` capability, for the first-car pick
-when a skip passes the car choice.
+(formatted by Prettier) from `feature/story-starter` (commits 8c0e737 and
+ca6eb2b, stacked on `codex/prologue-story`): the preview's `starters` and
+`starter`, the starters' pictures with `car_images`, the applied `starter`
+and the `story-starter` capability, for the first-car pick when a skip
+passes the car choice.
 
 **Ahead of the next release:** `map-images.schema.json` is new, copied unchanged
 from afterhours-2015 `feature/map-images` (pull request #158), which the Map screen

@@ -2,6 +2,62 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "definitions": {
+    "CarImage": {
+      "description": "One cached image for `profile`.",
+      "properties": {
+        "file": {
+          "description": "The file below the server's content folder,\n`car-images/<fingerprint>/<name>.png`, as the session API's\n`GET /v1/content/<file>` serves it to a client on any computer.",
+          "type": "string"
+        },
+        "height": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "Absolute path of the PNG file.",
+          "type": "string"
+        },
+        "source_format": {
+          "description": "The source texture's `RenderFormat` name, such as `BC1_UNORM`.",
+          "type": "string"
+        },
+        "width": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["path", "file", "width", "height", "source_format"],
+      "type": "object"
+    },
+    "CarImages": {
+      "description": "A car's cached images; a size is `null` when the car names none or it\ncould not be decoded.",
+      "properties": {
+        "large": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CarImage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "medium": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CarImage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["medium", "large"],
+      "type": "object"
+    },
     "Milestone": {
       "additionalProperties": false,
       "properties": {
@@ -17,26 +73,43 @@
     },
     "Starter": {
       "additionalProperties": false,
+      "description": "One first-car choice of a story preview, with what this computer knows of it.",
       "properties": {
         "id": {
-          "description": "Item definition GUID, 32 lowercase hexadecimal digits.",
+          "description": "Item definition GUID, 32 lowercase hexadecimal digits; pass it as\n`--starter`.",
           "type": "string"
         },
+        "image": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CarImages"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The car's decoded pictures, as on profile cars; `null` until\n`car-images` has run for the current content, or when the set has\nnone for this car."
+        },
         "name": {
-          "description": "The game's car name when the installation provides one.",
+          "description": "The game's long car name from the installation; `null` when it\ncannot be read.",
           "type": ["string", "null"]
         }
       },
-      "required": ["id", "name"],
+      "required": ["id", "name", "image"],
       "type": "object"
     }
   },
+  "description": "`story --preview --json`: the server's preview of a story edit, with\nnames and pictures for its first-car choices.",
   "properties": {
     "account_id": {
       "type": "string"
     },
     "can_apply": {
       "type": "boolean"
+    },
+    "car_images": {
+      "description": "The directory of the decoded car images; `null` until `car-images`\nhas run for the current content.",
+      "type": ["string", "null"]
     },
     "completes": {
       "items": {
@@ -51,7 +124,7 @@
       "type": "string"
     },
     "plan_id": {
-      "description": "Binds the exact save file, account, generation, target and prepared rules.",
+      "description": "Binds the exact save file, account, generation, target, first car and\nprepared rules.",
       "type": "string"
     },
     "reasons": {
@@ -70,12 +143,10 @@
       "type": "string"
     },
     "starter": {
-      "default": null,
       "description": "The choice this preview's `plan_id` binds, from `--starter`.",
       "type": ["string", "null"]
     },
     "starters": {
-      "default": [],
       "description": "First-car choices, listed only when this change completes the car\nchoice on a save without a starter. Apply then requires one of them.",
       "items": {
         "$ref": "#/definitions/Starter"
@@ -105,7 +176,8 @@
     "can_apply",
     "reasons",
     "starters",
-    "starter"
+    "starter",
+    "car_images"
   ],
   "title": "Preview",
   "type": "object"

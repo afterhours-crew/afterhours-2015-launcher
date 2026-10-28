@@ -87,7 +87,7 @@ async function sampleSource(): Promise<Source> {
         return { kind: "error", exit: 1, message: "Unknown sample checkpoint." };
       // `&story=fresh`: the save has no first car, so a skip past the car choice offers them.
       const choice = variant === "fresh" && at > 1;
-      if (starter && !(choice && sample.SAMPLE_STARTERS.some((c) => c.id === starter)))
+      if (starter && !(choice && sample.sampleStarters().some((c) => c.id === starter)))
         return { kind: "error", exit: 1, message: "That car is not one of the choices." };
       return ok({
         version: 1,
@@ -107,8 +107,9 @@ async function sampleSource(): Promise<Source> {
           .map(({ id, label }) => ({ id, label })),
         can_apply: false,
         reasons: ["Sample mode cannot change a save."],
-        starters: choice ? sample.SAMPLE_STARTERS : [],
+        starters: choice ? sample.sampleStarters() : [],
         starter: starter ?? null,
+        car_images: choice ? sample.SAMPLE_CAR_IMAGES : null,
       } satisfies StoryPreview);
     },
     storyApply: async () => ({
