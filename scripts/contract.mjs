@@ -32,6 +32,7 @@ import Ajv from "ajv";
 import Ajv2019 from "ajv/dist/2019.js";
 import Ajv2020 from "ajv/dist/2020.js";
 import { PIN_FILE, parsePin, sha256, sidecarPath } from "./lib/pin.mjs";
+import { storyCases } from "./lib/story-cases.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pin = parsePin(readFileSync(join(root, PIN_FILE), "utf8"));
@@ -78,6 +79,7 @@ const validators = new Map(
 
 const ID = "0123456789abcdef0123456789abcdef";
 const scratch = mkdtempSync(join(tmpdir(), "afterhours-contract-"));
+const exercised = new Set();
 
 function dataDir(name, seed) {
   const dir = join(scratch, name);
@@ -128,6 +130,7 @@ function runJson(args, schema) {
   const check = validators.get(schema);
   if (!check) throw new Error(`${schemaDir}/${schema}.schema.json is missing.`);
   if (!check(value)) throw new Error(`${schema} schema: ${JSON.stringify(check.errors)}`);
+  exercised.add(schema);
   return value;
 }
 
@@ -415,6 +418,8 @@ const cases = [
   },
 ];
 
+cases.push(...storyCases({ dataDir, runJson, refusal, sha256 }));
+
 // Vendored schemas may run ahead of the pinned server: the contract v1
 // schemas the screens are built against are vendored before a release
 // carries them. Then a server without `version --json` (v0.3.0) skips the
@@ -451,7 +456,6 @@ for (const testCase of cases) {
     console.log(`  FAIL  ${testCase.name}  ${error instanceof Error ? error.message : error}`);
   }
 }
-const exercised = new Set(cases.map((c) => c.schema).filter(Boolean));
 for (const schema of validators.keys()) {
   if (!exercised.has(schema)) {
     const why = schema.startsWith("status")

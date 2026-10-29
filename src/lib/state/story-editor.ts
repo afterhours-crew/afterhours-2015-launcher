@@ -30,6 +30,28 @@ interface Source {
   apply(preview: StoryPreview): Promise<CliResult>;
 }
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const guid = (value: unknown): value is string =>
+  typeof value === "string" && /^[a-f0-9]{32}$/.test(value) && value !== "0".repeat(32);
+const decimal = (value: unknown): value is string =>
+  typeof value === "string" &&
+  /^(0|[1-9][0-9]{0,19})$/.test(value) &&
+  BigInt(value) <= 18446744073709551615n;
+const milestones = (value: unknown): boolean =>
+  Array.isArray(value) &&
+  value.length <= 64 &&
+  value.every((item) => item && decimal(item.id) && typeof item.label === "string");
+const starters = (value: unknown): value is StoryPreview["starters"] =>
+  Array.isArray(value) &&
+  value.length <= 3 &&
+  value.every(
+    (car) =>
+      car &&
+      guid(car.id) &&
+      (car.name === null || typeof car.name === "string") &&
+      "image" in car &&
+      (car.image === null || typeof car.image === "object"),
+  ) &&
+  new Set(value.map((car) => car.id)).size === value.length;
 
 /** One command at a time, retaining only the newest slider request. */
 export class StoryEditor {
@@ -127,14 +149,17 @@ export class StoryEditor {
             preview.target_checkpoint !== request.target ||
             typeof preview.plan_id !== "string" ||
             !/^[a-f0-9]{64}$/.test(preview.plan_id) ||
-            !Array.isArray(preview.completes) ||
-            !Array.isArray(preview.reopens) ||
+            !decimal(preview.operation_id) ||
+            !milestones(preview.completes) ||
+            !milestones(preview.reopens) ||
             !Array.isArray(preview.reasons) ||
+            !preview.reasons.every((reason) => typeof reason === "string") ||
             typeof preview.can_apply !== "boolean" ||
-            !Array.isArray(preview.starters ?? []) ||
-            (preview.starter ?? null) !== request.starter ||
+            !starters(preview.starters) ||
+            !(preview.car_images === null || typeof preview.car_images === "string") ||
+            preview.starter !== request.starter ||
             (request.starter !== null &&
-              !(preview.starters ?? []).some((car) => car.id === request.starter))
+              !preview.starters.some((car) => car.id === request.starter))
           )
             throw new Error("The story preview changed. Refresh your story.");
           this.readyScope = request.scope;
@@ -193,9 +218,12 @@ export class StoryEditor {
         result.account_id !== request.account ||
         result.previous_generation !== request.generation ||
         result.target_checkpoint !== request.target ||
-        typeof result.generation !== "string" ||
-        !result.backup?.id ||
-        (request.starter !== null && result.starter !== request.starter)
+        !decimal(result.generation) ||
+        BigInt(result.generation) !== BigInt(request.generation) + 1n ||
+        !/^[a-f0-9]{64}$/.test(result.backup?.id ?? "") ||
+        !/^[a-f0-9]{64}$/.test(result.backup?.database_sha256 ?? "") ||
+        result.backup?.generation !== request.generation ||
+        result.starter !== request.starter
       )
         throw new Error("Could not confirm the story change. Refresh your story.");
       this.set({ kind: "applied", result });

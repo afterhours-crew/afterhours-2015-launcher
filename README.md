@@ -116,6 +116,17 @@ them from the launcher on that server's PC. Checkpoints remain unavailable for
 Apply until the server supports their native game restart path. The development
 sample previews changes but cannot write a save.
 
+When Skip needs a first car, the server supplies the authored choices; picking one
+requests a new proof before Apply becomes available. Missing or malformed choice
+fields are refused. A compatible server supports the opening and completed
+prologue endpoints; intermediate steps remain progress markers. Replay retains
+earned cars and parts, including through the first-car scene.
+
+The Story view also supports a standard gamepad: left/right previews a step,
+up/down moves between controls, A activates the focused control, and B cancels a
+preview. Connecting a controller or returning focus while a button is held never
+activates it; release it first. Keyboard and pointer controls remain available.
+
 ```text
 window (Svelte)  --invoke-->  src-tauri (Rust)  --spawn-->  Afterhours.exe  --spawn-->  Afterhours.exe supervise
                  <--events--                   <--stdout--  (bundled, pinned)          --> server role, NFS16.exe
@@ -343,6 +354,13 @@ real `--api` session and stops it through the API (see
 `src-tauri/src/connection.rs` for how to run it). See
 [CONTRIBUTING.md](CONTRIBUTING.md), [RELEASING.md](RELEASING.md) and
 [AGENTS.md](AGENTS.md).
+
+The CLI contract suite uses Node 24's SQLite support to construct disposable
+accounts from the public storage format. A server advertising story editing must
+pass successful read/preview/apply, first-car choice, backup, retry, rewind and
+stale-plan checks. The fixture builder is test tooling; the application does not
+edit databases. Use `AFTERHOURS_EXE` to check a candidate build without changing
+the release pin. These checks do not establish game or physical-controller acceptance.
 
 ## License
 

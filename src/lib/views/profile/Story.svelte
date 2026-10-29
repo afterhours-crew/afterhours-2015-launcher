@@ -29,6 +29,7 @@
   import { newlyDone, previewMarks, storyStops, storySummary } from "$lib/state/story";
   import { followStory } from "$lib/state/story-follow.svelte";
   import { StoryEditor, type StoryEdit } from "$lib/state/story-editor";
+  import { storyGamepad } from "$lib/state/story-gamepad";
   import { listText } from "$lib/state/upcoming";
   import type { StoryReport } from "$lib/api/types";
 
@@ -112,6 +113,7 @@
     if (stop) editor.select(stop.id);
   }
   function cancel() {
+    if (applying) return;
     editor.cancel();
     selected = saved;
   }
@@ -228,7 +230,7 @@
   }
 </script>
 
-<div class="story" use:staggerIn>
+<div class="story" use:staggerIn use:storyGamepad={cancel}>
   {#if !ready}
     <h1 class="t-view-title">Story</h1>
     <ViewNote>Your prologue progress and a timeline for replaying or skipping it.</ViewNote>
@@ -324,6 +326,10 @@
               onchange={() => choose(selected)}
               aria-valuetext={`${chosen?.label}${selected === saved ? ", your saved position" : ", preview only"}`}
             />
+            <p class="controller-help">
+              Controller: left/right previews a step; up/down selects a control; A activates it; B
+              cancels the preview.
+            </p>
             <ol class="stops" aria-hidden="true">
               {#each stops as stop, i (stop.id)}
                 {@const mark = marks[i] ?? null}
@@ -736,7 +742,13 @@
   .range:hover:not(:disabled) + .stops .name {
     color: var(--ink);
   }
-  .range:focus-visible + .stops .picked .marker {
+  .controller-help {
+    color: var(--ink-soft);
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 6px 0;
+  }
+  .range:focus-visible ~ .stops .picked .marker {
     outline: 2px solid var(--ink);
     outline-offset: 6px;
   }

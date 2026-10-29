@@ -201,6 +201,20 @@ describe("story preview and apply", () => {
       { target_checkpoint: "3" },
       { version: 2 },
       { plan_id: "--help" },
+      { starters: undefined },
+      { starters: [null] },
+      { starters: [{ id: BRZ, name: null }] },
+      {
+        starters: [
+          { id: BRZ, name: null, image: null },
+          { id: BRZ, name: null, image: null },
+        ],
+      },
+      { starter: undefined },
+      { car_images: undefined },
+      { operation_id: "9007199254740994oops" },
+      { completes: [null] },
+      { reopens: [{ id: 2, label: "Second" }] },
     ]) {
       const f = fixture();
       f.source.preview.mockResolvedValueOnce(ok({ ...preview(), ...patch }));
