@@ -147,6 +147,10 @@ them from the launcher on that server's PC. Checkpoints remain unavailable for
 Apply until the server supports their native game restart path. The development
 sample previews changes but cannot write a save.
 
+The timeline keeps checkpoint names, completion history and edit previews. It
+omits the current-position badge, repeated future-step labels and the inline
+controller hint; the range still announces its saved position to screen readers.
+
 When Skip needs a first car, the server supplies the authored choices; picking one
 requests a new proof before Apply becomes available. Missing or malformed choice
 fields are refused. A compatible server supports the opening and completed

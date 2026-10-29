@@ -199,13 +199,10 @@
   });
 
   function tag(index: number): { text: string; quiet: boolean } | null {
-    if (index === selected && previewing) return { text: "Preview", quiet: false };
+    if (!previewing) return null;
+    if (index === selected) return { text: "Preview", quiet: false };
     if (index !== saved) return null;
-    if (previewing) return { text: "Saved", quiet: true };
-    return {
-      text: summary?.started || summary?.complete ? "You are here" : "Start here",
-      quiet: false,
-    };
+    return { text: "Saved", quiet: true };
   }
 
   function stepLine(index: number): string {
@@ -326,10 +323,6 @@
               onchange={() => choose(selected)}
               aria-valuetext={`${chosen?.label}${selected === saved ? ", your saved position" : ", preview only"}`}
             />
-            <p class="controller-help">
-              Controller: left/right previews a step; up/down selects a control; A activates it; B
-              cancels the preview.
-            </p>
             <ol class="stops" aria-hidden="true">
               {#each stops as stop, i (stop.id)}
                 {@const mark = marks[i] ?? null}
@@ -365,13 +358,15 @@
                     {:else if !stop.saved}{i + 1}{/if}
                   </span>
                   <span class="name">{stop.label}</span>
-                  <span class="word"
-                    >{mark === "will-complete"
-                      ? "Will be done"
-                      : mark === "will-reopen"
-                        ? "Opens again"
-                        : stop.word}</span
-                  >
+                  {#if mark || stop.done}
+                    <span class="word"
+                      >{mark === "will-complete"
+                        ? "Will be done"
+                        : mark === "will-reopen"
+                          ? "Opens again"
+                          : stop.word}</span
+                    >
+                  {/if}
                 </li>
               {/each}
             </ol>
@@ -741,12 +736,6 @@
   }
   .range:hover:not(:disabled) + .stops .name {
     color: var(--ink);
-  }
-  .controller-help {
-    color: var(--ink-soft);
-    font-size: 12px;
-    line-height: 1.5;
-    margin: 6px 0;
   }
   .range:focus-visible ~ .stops .picked .marker {
     outline: 2px solid var(--ink);
