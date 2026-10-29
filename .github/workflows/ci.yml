@@ -188,6 +188,7 @@ jobs:
             .preview-server
             src-tauri
           key: prologue-preview
+          cache-on-failure: true
       - name: Build and package the canonical server
         working-directory: .preview-server
         shell: pwsh
@@ -218,7 +219,9 @@ jobs:
         run: node scripts/portable-zip.mjs --exe src-tauri/target/release/afterhours-launcher.exe --out "${{ runner.temp }}/preview-portable" --preview-input "${{ runner.temp }}/preview-input"
       - name: Install and check first-run startup on the disposable runner
         shell: powershell
-        run: ./scripts/Test-PreviewStartup.ps1 -InstallerDirectory src-tauri/target/release/bundle/nsis -PortableDirectory "${{ runner.temp }}/preview-portable" -PreviewInput "${{ runner.temp }}/preview-input" -OutputDirectory "${{ runner.temp }}/preview-startup"
+        run: |
+          ./scripts/Test-PreviewProcess.ps1
+          ./scripts/Test-PreviewStartup.ps1 -InstallerDirectory src-tauri/target/release/bundle/nsis -PortableDirectory "${{ runner.temp }}/preview-portable" -PreviewInput "${{ runner.temp }}/preview-input" -OutputDirectory "${{ runner.temp }}/preview-startup"
       # Preserve failed startup evidence too. A downloadable artifact alone
       # does not mean the startup check or the other CI gates passed.
       - uses: actions/upload-artifact@v4

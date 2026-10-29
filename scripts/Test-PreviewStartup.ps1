@@ -12,6 +12,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'lib/preview-process.ps1')
 if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted' -or $env:RUNNER_OS -cne 'Windows') {
     throw 'Startup smoke is restricted to disposable GitHub-hosted Windows runners.'
 }
@@ -44,8 +45,10 @@ function Test-Server([string]$Directory) {
 
 function Test-Window([string]$Executable, [string]$Name) {
     $child = $null
+    $observed = $null
     try {
-        $child = Start-Process -FilePath $Executable -WorkingDirectory (Split-Path -Parent $Executable) -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $output "$Name.stdout.log") -RedirectStandardError (Join-Path $output "$Name.stderr.log")
+        $observed = Start-PreviewChild -FilePath $Executable -WorkingDirectory (Split-Path -Parent $Executable)
+        $child = $observed.Process
         $deadline = [DateTime]::UtcNow.AddSeconds(60)
         $wizard = $false
         $names = @()
@@ -72,12 +75,20 @@ function Test-Window([string]$Executable, [string]$Name) {
         # embedded first-run UI, then closes normally without completing it.
         if (!$child.CloseMainWindow()) { throw "$Name refused a normal close." }
         if (!$child.WaitForExit(15000)) { throw "$Name did not close within 15 seconds." }
+        if ($null -eq $child.ExitCode) { throw "$Name exit status was unavailable." }
         if ($child.ExitCode -ne 0) { throw "$Name closed with $($child.ExitCode)." }
         $report.checks += [ordered]@{ distribution = $Name; first_run_heading = 'Find your game'; normal_exit = $child.ExitCode; executable_sha256 = (Get-FileHash -LiteralPath $Executable -Algorithm SHA256).Hash.ToLowerInvariant() }
     } finally {
         if ($null -ne $child -and !$child.HasExited) {
             # This PID belongs to this invocation on the disposable runner.
             Stop-Process -Id $child.Id -Force
+            $null = $child.WaitForExit(5000)
+        }
+        if ($null -ne $observed) {
+            if (!$observed.Stdout.Wait(5000) -or !$observed.Stderr.Wait(5000)) { throw "$Name diagnostic pipes did not close." }
+            $observed.Stdout.Result | Set-Content -LiteralPath (Join-Path $output "$Name.stdout.log") -Encoding UTF8
+            $observed.Stderr.Result | Set-Content -LiteralPath (Join-Path $output "$Name.stderr.log") -Encoding UTF8
+            $child.Dispose()
         }
     }
 }
