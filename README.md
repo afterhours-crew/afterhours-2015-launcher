@@ -21,6 +21,28 @@ brings both. Cops and driver edits wait for server work.
 Releases are published on this repository's Releases page. See
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
+## Isolated prologue installer preview
+
+`scripts/preview-package.mjs --server-package <folder> --out <new-folder>`
+checks a clean canonical terminal package's source/target/hash and runs the GUI
+contract against its executable. It produces an explicit Tauri config and
+allowlisted server inputs. The normal release pin and verified sidecar stay
+unchanged; About still reports the production pin separately from the candidate.
+Build with `pnpm tauri build --no-bundle --config <new-folder>/tauri-preview.json`,
+then `pnpm tauri bundle --bundles nsis --config <new-folder>/tauri-preview.json`.
+Use the same config for both commands. No updater signing or release publication
+is needed for this local preview.
+
+The installer is named **Afterhours Prologue Preview** and uses the distinct
+`crew.afterhours.launcher.prologue-preview` identifier. Its settings and server
+data (`server` under its local app data folder) are separate from the normal
+launcher, so a first install opens the first-run wizard. Missing/default data
+settings never fall back to the production save. Automatic updates are off and
+this preview has no release update endpoint. An explicitly chosen data folder
+survives a restart. Uninstalling the preview does not reset saved progress.
+Package only the matching executables, licenses, build identity and test
+instructions; never preseed an account or include extracted game content.
+
 ## Run it
 
 1. Install the [Tauri prerequisites](https://tauri.app/start/prerequisites/)
