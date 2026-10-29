@@ -44,6 +44,24 @@ const base = {
   canPlay: false,
 };
 
+it("uses local preparation hints only while preparing and leaves Play gated", () => {
+  const input = {
+    ...base,
+    running: true,
+    preparation: "Races loaded from cache · preparing prologue",
+    status: status("preparing"),
+  };
+  const model = launchBarModel(input);
+  expect(model.stateLine).toBe(input.preparation);
+  expect(model.play.disabled).toBe(true);
+  expect(launchBarModel({ ...input, status: status("starting") }).stateLine).not.toBe(
+    input.preparation,
+  );
+  expect(
+    launchBarModel({ ...input, server: { name: "Friend", address: "192.0.2.1" } }).stateLine,
+  ).toBe("Checking game files and your account");
+});
+
 /** Every string the bar and the pill show. */
 function shown(model: ReturnType<typeof launchBarModel>): string[] {
   return [

@@ -13,6 +13,7 @@
   import { hasCapability } from "$lib/state/capabilities";
   import { detectPlatform, isLive, launchBarModel, type PlayAction } from "$lib/state/launchbar";
   import { sampleMode } from "$lib/state/preview";
+  import { preparationLine } from "$lib/state/preparation";
   import { driverName, headerLine } from "$lib/state/profile";
   import { current, records } from "$lib/state/records.svelte";
   import { router } from "$lib/state/router.svelte";
@@ -78,6 +79,8 @@
       // Restart with game holds Play between stopping and starting again.
       running: session.running || session.restarting,
       canPlay: hasCapability(session.info?.server, "play"),
+      preparation:
+        session.running && !session.adopted && !inUse ? preparationLine(session.console) : null,
       server: inUse ? { name: inUse.name, address: entryAddress(inUse) } : null,
     }),
   );
