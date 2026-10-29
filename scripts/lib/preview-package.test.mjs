@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { sha256, SIDECAR_TARGET } from "./pin.mjs";
-import { previewBundleConfig, validatePreviewServer } from "./preview-package.mjs";
+import {
+  previewBundleConfig,
+  previewPortableLayout,
+  validatePreviewServer,
+} from "./preview-package.mjs";
 
 describe("explicit preview package", () => {
   const bytes = Buffer.from("constructed server package");
@@ -34,5 +38,32 @@ describe("explicit preview package", () => {
       "afterhours-server/build-info.json",
     );
     expect(Object.keys(config)).toEqual(["bundle"]);
+  });
+  it("ships the candidate in the portable ZIP and rejects replaced candidate bytes", () => {
+    const options = {
+      root: "/checkout",
+      exe: "/built/launcher.exe",
+      input: "/candidate/input",
+      info: good,
+      bytes,
+    };
+    const layout = previewPortableLayout(options);
+    expect(layout.map((file) => file.to)).toEqual([
+      "Afterhours Launcher.exe",
+      "Afterhours.exe",
+      "portable.txt",
+      "LICENSE",
+      "afterhours-server/LICENSE",
+      "afterhours-server/THIRD-PARTY-NOTICES.txt",
+      "afterhours-server/build-info.json",
+    ]);
+    expect(layout[1].from.replaceAll("\\", "/")).toBe(
+      "/candidate/input/Afterhours-x86_64-pc-windows-msvc.exe",
+    );
+    expect(layout[1].sha256).toBe(good.executable_sha256);
+    expect(layout[6].from.replaceAll("\\", "/")).toBe("/candidate/input/build-info.json");
+    expect(() =>
+      previewPortableLayout({ ...options, bytes: Buffer.from("wrong server") }),
+    ).toThrow();
   });
 });

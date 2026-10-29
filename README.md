@@ -371,6 +371,39 @@ left out everywhere. Nothing is gated on it.
 
 ## Checks
 
+### Prologue preview artifacts
+
+The existing CI workflow can build a paired preview entirely on GitHub. Dispatch
+it on the launcher branch with the exact canonical server commit:
+
+```sh
+gh workflow run ci.yml --ref <launcher-branch> -f preview_server_revision=<40-character-server-commit>
+```
+
+The `afterhours-prologue-preview` artifact contains an unsigned NSIS installer,
+a matching portable ZIP, source/build hashes and startup results. It builds the
+server from `afterhours-crew/afterhours-2015` with its locked toolchain and canonical
+packager, checks the actual CLI contract, and bundles the candidate using the
+isolated preview identity. The normal server release pin remains unchanged.
+No release, tag, signing key or owner machine is needed to produce these files.
+
+After building, the disposable Windows runner installs the package at its default
+per-user location, checks registration and candidate hashes, and reads the actual
+first-run `Find your game` heading through Windows accessibility. It closes that
+window normally and checks the extracted portable ZIP as well. It never completes
+setup or launches a game. `scripts/Test-PreviewStartup.ps1` refuses to run outside
+a GitHub-hosted Windows job. Failed reports are uploaded too: require a successful
+run and `startup-check.json` with `status: passed` before handing off the package.
+This tests installer/startup on the runner; the owner's Windows environment and
+full new-user gameplay remain separate acceptance checks.
+
+For a local build-only portable preview, use `scripts/portable-zip.mjs --exe
+<built-launcher.exe> --out <new-folder> --preview-input <preview-package-output>`
+after committing the launcher source. It rechecks the candidate bytes instead of
+silently substituting the release-pinned server. Building does not execute the
+installer or GUI. Unsigned-publisher prompts occur when Windows runs downloaded
+executables; the repository's existing Authenticode policy is unchanged.
+
 ```sh
 pnpm format:check && pnpm versions && pnpm check && pnpm test
 pnpm sidecar && pnpm contract

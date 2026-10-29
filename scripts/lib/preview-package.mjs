@@ -1,4 +1,6 @@
 import { sha256, SIDECAR_TARGET } from "./pin.mjs";
+import { join } from "node:path";
+import { LAUNCHER_NAME, MARKER_NAME } from "./portable.mjs";
 
 export function validatePreviewServer(info, bytes) {
   if (
@@ -34,4 +36,24 @@ export function previewBundleConfig(input) {
       },
     },
   };
+}
+
+// This uses the candidate input already checked by preview-package.mjs, never
+// the release-pinned sidecar. Revalidate the bytes at the final packaging edge.
+export function previewPortableLayout({ root, exe, input, info, bytes }) {
+  validatePreviewServer(info, bytes);
+  return [
+    { from: exe, to: LAUNCHER_NAME },
+    {
+      from: join(input, `Afterhours-${SIDECAR_TARGET}.exe`),
+      to: "Afterhours.exe",
+      sha256: info.executable_sha256,
+    },
+    { from: join(root, "packaging", MARKER_NAME), to: MARKER_NAME },
+    { from: join(root, "LICENSE"), to: "LICENSE" },
+    ...["LICENSE", "THIRD-PARTY-NOTICES.txt", "build-info.json"].map((name) => ({
+      from: join(input, name),
+      to: `afterhours-server/${name}`,
+    })),
+  ];
 }
