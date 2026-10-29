@@ -37,6 +37,7 @@ pub mod reads;
 pub mod server;
 pub mod servers;
 pub mod settings;
+mod startup;
 mod story;
 pub mod updates;
 
@@ -131,7 +132,20 @@ impl AppState {
 
 /// Build and run the application.
 pub fn run() {
-    tauri::Builder::default()
+    let context = tauri::generate_context!();
+    let startup = startup::Startup::new(
+        &context.config().identifier,
+        context
+            .config()
+            .app
+            .windows
+            .iter()
+            .filter_map(|window| window.data_directory.clone())
+            .collect(),
+    );
+    startup.install_hook();
+    let setup_startup = startup.clone();
+    let app = tauri::Builder::default()
         // Pictures and map tiles from the server's API (`GET /v1/content`).
         .register_asynchronous_uri_scheme_protocol("afterhours", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
@@ -148,12 +162,14 @@ pub fn run() {
                 .with_filename(WINDOW_STATE_FILE)
                 .build(),
         )
-        .setup(|app| {
+        .setup(move |app| {
+            setup_startup.stage("showing application window");
             // Created hidden and already restored by the window-state plugin.
             if let Some(window) = app.get_webview_window("main") {
                 window.show()?;
                 window.set_focus()?;
             }
+            setup_startup.stage("loading launcher settings");
             let settings = settings::load(app.handle())?;
             let servers = servers::load(app.handle(), &settings)?;
             app.manage(AppState {
@@ -167,6 +183,7 @@ pub fn run() {
             });
             let state = app.state::<AppState>();
             images::allow(app.handle(), &state.settings());
+            setup_startup.ready();
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -269,6 +286,12 @@ pub fn run() {
             reads::session_file,
             reads::open_session_folder,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running the Afterhours launcher");
+        .build(context)
+        .expect("error while building the Afterhours launcher");
+    startup.paths(
+        app.path().app_local_data_dir().map_err(|e| e.to_string()),
+        app.path().app_config_dir().map_err(|e| e.to_string()),
+    );
+    startup.stage("creating application window");
+    app.run(|_, _| {});
 }

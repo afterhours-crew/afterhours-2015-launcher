@@ -45,6 +45,15 @@ instructions; never preseed an account or include extracted game content.
 
 ## Run it
 
+If the Windows launcher fails before its main window opens, it shows a native
+startup error dialog and writes `startup-error.json` in its local app data folder.
+If that folder cannot be written, the dialog gives the temporary report path or
+reports both write failures. The report contains the initialization stage, error,
+version and resolved directories, without settings, command arguments, tokens or
+save contents. It stays local; review it before sharing because paths can include
+your Windows username. The native dialog uses the existing MIT-licensed `rfd`
+0.16.0 dependency and does not require a working webview.
+
 1. Install the [Tauri prerequisites](https://tauri.app/start/prerequisites/)
    for your platform, Rust 1.98.1 (selected by `rust-toolchain.toml`), Node 24
    and pnpm.

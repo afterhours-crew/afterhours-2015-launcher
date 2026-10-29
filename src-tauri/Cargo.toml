@@ -28,6 +28,11 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "=0.10.9"
 
+[target.'cfg(windows)'.dependencies]
+# MIT; already used by tauri-plugin-dialog. Native startup errors work even
+# when the webview cannot be created. No new runtime package/version.
+rfd = { version = "=0.16.0", default-features = false, features = ["common-controls-v6"] }
+
 [dependencies]
 # The token the launcher gives its own server's API (MIT or Apache-2.0).
 getrandom = "=0.2.17"
