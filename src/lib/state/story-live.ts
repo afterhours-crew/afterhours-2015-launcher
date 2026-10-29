@@ -26,6 +26,7 @@ export class StoryFollower {
   private complete = false;
   private handle: unknown = null;
   private reading = false;
+  private reread = false;
 
   constructor(
     private read: () => Promise<void>,
@@ -86,7 +87,10 @@ export class StoryFollower {
   }
 
   private async tick(): Promise<void> {
-    if (this.reading) return;
+    if (this.reading) {
+      this.reread = true;
+      return;
+    }
     this.reading = true;
     try {
       await this.read();
@@ -94,6 +98,26 @@ export class StoryFollower {
       // A missed read keeps what is shown; the next one tries again.
     } finally {
       this.reading = false;
+      if (this.reread) {
+        this.reread = false;
+        if (this.holders > 0) void this.tick();
+      }
     }
+  }
+}
+
+/** Terminal status can precede release of the supervisor's lock. Reads remain
+ * authoritative; a deadline never turns a still-held or unknown lock into idle. */
+export async function refreshStoppedStory(
+  read: () => Promise<boolean | null>,
+  current: () => boolean,
+  wait: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+  now: () => number = Date.now,
+): Promise<void> {
+  const deadline = now() + 6000;
+  for (let attempt = 0; attempt < 12 && current(); attempt += 1) {
+    const running = await read();
+    if (!current() || running === false || now() >= deadline) return;
+    if (attempt < 11) await wait(500);
   }
 }

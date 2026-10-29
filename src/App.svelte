@@ -48,7 +48,7 @@
   // A session that ends has changed the save and the session list.
   let wasRunning = false;
   $effect(() => {
-    const running = session.running;
+    const running = session.running || isLive(session.status?.state);
     if (wasRunning && !running) untrack(() => void records.refreshAfterSession());
     wasRunning = running;
   });

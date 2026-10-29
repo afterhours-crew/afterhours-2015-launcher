@@ -205,17 +205,27 @@ async fn run_read(args: Vec<String>) -> Result<cli::CliResult, String> {
 /// Never substitute this PC's save when that server cannot answer.
 #[tauri::command]
 pub async fn story(state: State<'_, crate::AppState>) -> Result<cli::CliResult, String> {
-    let settings = settings_of(&state);
+    match story_source(&settings_of(&state))? {
+        StorySource::Remote(endpoint) => api_read(endpoint, "/v1/story".into(), MAX_RECORD).await,
+        StorySource::Local(args) => run_read(args).await,
+    }
+}
+
+enum StorySource {
+    Local(Vec<String>),
+    Remote(crate::connection::Endpoint),
+}
+
+fn story_source(settings: &Settings) -> Result<StorySource, String> {
     if let Some(remote) = settings.server.as_ref() {
-        let endpoint = crate::connection::Endpoint::remote(remote)?;
-        return api_read(endpoint, "/v1/story".into(), MAX_RECORD).await;
+        return crate::connection::Endpoint::remote(remote).map(StorySource::Remote);
     }
-    if let Some(endpoint) = state.server_endpoint().or_else(|| state.endpoint()) {
-        return api_read(endpoint, "/v1/story".into(), MAX_RECORD).await;
-    }
-    let mut args = cli::global_args(&settings);
+    // The local command reads the selected save and actual writer/session locks,
+    // including while the server runs. A remembered API address is not evidence
+    // that its process still exists, and story edits must work after it exits.
+    let mut args = cli::global_args(settings);
     args.push("story".into());
-    run_read(args).await
+    Ok(StorySource::Local(args))
 }
 
 /// `profile --json`, for the active save or `account_id`. The active save
@@ -317,6 +327,40 @@ pub fn open_session_folder(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stopped_local_api_does_not_hide_the_selected_story_save() {
+        let settings = Settings {
+            data_dir: Some(PathBuf::from("D:/selected-save")),
+            local_api: Some(crate::settings::LocalApi {
+                port: 1,
+                token: "a".repeat(64),
+            }),
+            ..Settings::default()
+        };
+        let StorySource::Local(args) = story_source(&settings).unwrap() else {
+            panic!("a saved local API must not require a running server");
+        };
+        assert_eq!(args, ["--json", "--data-dir", "D:/selected-save", "story"]);
+    }
+
+    #[test]
+    fn remote_story_never_falls_back_to_the_local_save() {
+        let mut settings = Settings {
+            server: Some(crate::settings::RemoteServer {
+                url: "http://192.0.2.1:32123".into(),
+                token: "a".repeat(64),
+            }),
+            data_dir: Some(PathBuf::from("D:/unrelated-save")),
+            ..Settings::default()
+        };
+        assert!(matches!(
+            story_source(&settings),
+            Ok(StorySource::Remote(_))
+        ));
+        settings.server.as_mut().unwrap().url = "invalid".into();
+        assert!(story_source(&settings).is_err());
+    }
 
     const ID: &str = "0123456789abcdef0123456789abcdef";
 

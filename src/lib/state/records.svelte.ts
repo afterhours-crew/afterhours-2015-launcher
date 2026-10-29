@@ -26,7 +26,7 @@ import { applyChoice, saveArgs } from "./world";
 import { loadSample, sampleMode } from "./preview";
 import { session } from "./session.svelte";
 import { sameProgress } from "./story";
-import { StoryFollower } from "./story-live";
+import { refreshStoppedStory, StoryFollower } from "./story-live";
 
 export type Load<T> =
   | { kind: "idle" }
@@ -228,6 +228,7 @@ export class Records {
 
   private source: Promise<Source> | null = null;
   private storyRead = 0;
+  private storySource = 0;
   /** Reads the story again while a game runs and a screen shows it. */
   readonly storyLive = new StoryFollower(() => this.pollStory());
 
@@ -262,7 +263,8 @@ export class Records {
     const result = await (await this.from()).story();
     if (ticket !== this.storyRead || result.kind !== "ok") return;
     const next = result.value as StoryReport;
-    if (!sameProgress(current(this.story), next)) this.story = { kind: "ready", value: next };
+    if (this.story.kind !== "ready" || !sameProgress(current(this.story), next))
+      this.story = { kind: "ready", value: next };
   }
   async previewStory(account: string, target: string, starter: string | null): Promise<CliResult> {
     return (await this.from()).storyPreview(account, target, starter);
@@ -445,6 +447,7 @@ export class Records {
    * and the map is decoded again for the new server.
    */
   async switchServer(): Promise<void> {
+    ++this.storySource;
     ++this.storyRead;
     this.story = { kind: "idle" };
     this.imagesTried = null;
@@ -463,7 +466,18 @@ export class Records {
     // A session may have prepared new content: pictures can be tried again.
     this.imagesTried = null;
     void this.loadWorld();
-    await Promise.all([this.loadProfile(), this.loadSessions(), this.loadStory()]);
+    const source = this.storySource;
+    await Promise.all([
+      this.loadProfile(),
+      this.loadSessions(),
+      refreshStoppedStory(
+        async () => {
+          await this.loadStory();
+          return this.story.kind === "ready" ? this.story.value.session_running : null;
+        },
+        () => source === this.storySource && !session.running && !isLive(session.status?.state),
+      ),
+    ]);
   }
 }
 

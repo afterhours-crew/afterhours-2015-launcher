@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { StoryFollower, type Timers } from "./story-live";
+import { refreshStoppedStory, StoryFollower, type Timers } from "./story-live";
 
 /** Timers run only when the test says so. */
 function manualTimers() {
@@ -54,6 +54,24 @@ describe("StoryFollower", () => {
     expect(t.pending()).toBe(0);
     await Promise.resolve();
     expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the final save after an in-flight live read completes", async () => {
+    const t = manualTimers();
+    let finish!: () => void;
+    const read = vi.fn().mockImplementationOnce(() => new Promise<void>((r) => (finish = r)));
+    read.mockResolvedValue(undefined);
+    const f = new StoryFollower(read, t.timers);
+    f.retain();
+    f.setLive(true);
+    await t.fire();
+    f.setLive(false);
+    expect(read).toHaveBeenCalledTimes(1);
+    finish();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(t.pending()).toBe(0);
   });
 
   it("keeps following after a failed read", async () => {
@@ -125,5 +143,59 @@ describe("StoryFollower", () => {
     f.setLive(false, true);
     f.setLive(true, false);
     expect(f.following).toBe(true);
+  });
+});
+
+describe("refreshing a stopped session's story", () => {
+  it("waits through terminal status and API shutdown until the actual lease is released", async () => {
+    const states = [true, null, true, false];
+    const read = vi.fn(async () => states.shift()!);
+    const wait = vi.fn(async () => {});
+    await refreshStoppedStory(read, () => true, wait);
+    expect(read).toHaveBeenCalledTimes(4);
+    expect(wait).toHaveBeenCalledTimes(3);
+  });
+
+  it("bounds retries while another writer keeps its lease", async () => {
+    const read = vi.fn(async () => true);
+    const wait = vi.fn(async () => {});
+    await refreshStoppedStory(read, () => true, wait);
+    expect(read).toHaveBeenCalledTimes(12);
+    expect(wait).toHaveBeenCalledTimes(11);
+  });
+
+  it("stops if the user changes server or starts another session", async () => {
+    let current = true;
+    const read = vi.fn(async () => true);
+    await refreshStoppedStory(
+      read,
+      () => current,
+      async () => void (current = false),
+    );
+    expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not start a read for a replaced session, or keep retrying a slow unavailable read", async () => {
+    let time = 0;
+    const read = vi.fn(async () => {
+      time = 30_000;
+      return null;
+    });
+    const wait = vi.fn(async () => {});
+    await refreshStoppedStory(
+      read,
+      () => false,
+      wait,
+      () => time,
+    );
+    expect(read).not.toHaveBeenCalled();
+    await refreshStoppedStory(
+      read,
+      () => true,
+      wait,
+      () => time,
+    );
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(wait).not.toHaveBeenCalled();
   });
 });

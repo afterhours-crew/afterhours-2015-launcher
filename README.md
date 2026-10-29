@@ -147,6 +147,12 @@ them from the launcher on that server's PC. Checkpoints remain unavailable for
 Apply until the server supports their native game restart path. The development
 sample previews changes but cannot write a save.
 
+Local story reads use the bundled command and selected data folder even after
+the local API stops. The command checks the real session and save-writer locks;
+remembered API settings do not imply that a server is running. After an owned or
+adopted session ends, the view refreshes through a bounded shutdown grace period.
+An unavailable remote server never falls back to this PC's save.
+
 The timeline keeps checkpoint names, completion history and edit previews. It
 omits the current-position badge, repeated future-step labels and the inline
 controller hint; the range still announces its saved position to screen readers.
