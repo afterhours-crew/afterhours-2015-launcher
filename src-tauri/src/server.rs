@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! Which `Afterhours.exe` the launcher runs.
+//! Which bundled Afterhours server executable the launcher runs.
 //!
 //! Release builds always run the copy bundled next to the launcher, which
 //! `build.rs` checked against `server-pin.json`. Development builds may run
@@ -13,6 +13,10 @@
 //! here. Release builds ignore the variable, so a leftover development
 //! setting can never make an installed launcher run a different server
 //! against a tester's saves.
+//!
+//! Portable identity tests use `Afterhours2015Server.exe` to distinguish this
+//! process from unrelated games in desktop game detection. Existing packages
+//! with `Afterhours.exe` remain supported. Both names stay beside the launcher.
 
 use crate::pin;
 use serde::Serialize;
@@ -74,9 +78,17 @@ pub fn resolve(
             ))
         };
     }
-    let bundled = launcher_dir.map(|dir| dir.join(bundled_file_name()));
+    let bundled = launcher_dir.and_then(|dir| {
+        [
+            format!("Afterhours2015Server{}", std::env::consts::EXE_SUFFIX),
+            bundled_file_name(),
+        ]
+        .into_iter()
+        .map(|name| dir.join(name))
+        .find(|path| path.is_file())
+    });
     match bundled {
-        Some(path) if path.is_file() => Ok(Server {
+        Some(path) => Ok(Server {
             path,
             source: Source::Bundled,
         }),
@@ -289,6 +301,29 @@ mod tests {
         let missing = resolve(None, true, Some(&dir)).unwrap_err();
         assert!(missing.contains("bundled") || missing.contains(OVERRIDE_ENV));
         assert!(resolve(None, true, None).is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_distinct_package_uses_its_server_even_with_a_legacy_copy_present() {
+        let dir = temp("distinct-name");
+        let distinct = dir.join(format!(
+            "Afterhours2015Server{}",
+            std::env::consts::EXE_SUFFIX
+        ));
+        let legacy = dir.join(bundled_file_name());
+        std::fs::write(&distinct, b"new package").unwrap();
+        std::fs::write(&legacy, b"old package").unwrap();
+
+        // Installed/release behavior ignores a development override and uses
+        // the explicitly named copy, never the leftover legacy executable.
+        let selected = resolve(Some(legacy.clone().into()), false, Some(&dir)).unwrap();
+        assert_eq!(selected.path, distinct);
+        assert_eq!(selected.source, Source::Bundled);
+
+        // Existing installations with only the legacy name still work.
+        std::fs::remove_file(distinct).unwrap();
+        assert_eq!(resolve(None, false, Some(&dir)).unwrap().path, legacy);
         std::fs::remove_dir_all(dir).unwrap();
     }
 }
