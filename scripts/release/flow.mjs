@@ -79,8 +79,9 @@ function branchExists(deps, branch) {
 
 /**
  * Pull requests merged into the first-parent history after `since` up to
- * `head`, oldest first, with their changed files. Merge and squash subjects
- * name their pull request; other commits are looked up, direct ones skipped.
+ * `head`, oldest first, with their changed files. A subject is only a hint:
+ * GitHub must associate the commit with a merged pull request. Direct commits
+ * may end in an ordinary issue reference that looks like a squash subject.
  */
 export async function mergedPulls(deps, since, head = "HEAD") {
   const log = deps.git([
@@ -95,13 +96,12 @@ export async function mergedPulls(deps, since, head = "HEAD") {
   for (const line of log.stdout.split("\n")) {
     if (!line.trim()) continue;
     const [sha, subject = ""] = line.split("\t");
-    let number = pullRequestNumber(subject);
-    if (number === null) {
-      const found = await deps.api(`/repos/${deps.repository}/commits/${sha}/pulls`);
-      const merged = (found ?? []).find((p) => p.merged_at);
-      if (!merged) continue;
-      number = merged.number;
-    }
+    const hint = pullRequestNumber(subject);
+    const found = await deps.api(`/repos/${deps.repository}/commits/${sha}/pulls`);
+    const merged = (found ?? []).filter((p) => p.merged_at);
+    const associated = merged.find((p) => p.number === hint) ?? merged[0];
+    if (!associated) continue;
+    const number = associated.number;
     if (!numbers.includes(number)) numbers.push(number);
   }
   const pulls = [];

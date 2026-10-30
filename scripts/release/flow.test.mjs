@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { formatPin } from "../lib/pin.mjs";
 import { launcherVersions, versionProblems } from "../lib/release.mjs";
-import { findNotes, prepareRelease, selectTag } from "./flow.mjs";
+import { findNotes, mergedPulls, prepareRelease, selectTag } from "./flow.mjs";
 import { extractNotes, releaseBody } from "./plan.mjs";
 
 const REPO = "afterhours-crew/afterhours-2015-launcher";
@@ -54,7 +54,7 @@ function repository(change = {}) {
     describe: "v0.1.2",
     log: [`${sha("5")}\tMerge pull request #8 from afterhours-crew/feature/release-0.1.2`],
     pulls: [pull(8, "feature/release-0.1.2", ["package.json"])],
-    commitPulls: {},
+    commitPulls: { [sha("5")]: [{ number: 8, merged_at: "2026-10-21T00:00:00Z" }] },
     open: [],
     latest: { tag_name: "v0.1.2" },
     serverReleases: [
@@ -169,6 +169,71 @@ const withPulls = (...pulls) => ({
         .slice(0, 40)}\tMerge pull request #${p.number} from x/${p.head.ref}`,
   ),
   pulls,
+  commitPulls: Object.fromEntries(
+    pulls.map((p, i) => [
+      String(i + 6)
+        .repeat(40)
+        .slice(0, 40),
+      [{ number: p.number, merged_at: "2026-10-21T00:00:00Z" }],
+    ]),
+  ),
+});
+
+describe("commit association for release notes", () => {
+  it("skips direct issue references even when that number names an unrelated PR", async () => {
+    const { deps } = repository({
+      log: [
+        `${sha("7")}\tPreserve child exit status in preview startup checks (#25)`,
+        `${sha("8")}\tRefresh story editing (#26)`,
+      ],
+      pulls: [pull(26, "feature/unrelated", ["src/main.ts"])],
+      commitPulls: {},
+    });
+    await expect(mergedPulls(deps, "v0.1.2")).resolves.toEqual([]);
+  });
+
+  it("uses the associated merged PR instead of an issue-shaped subject hint", async () => {
+    const { deps } = repository({
+      log: [`${sha("7")}\tHandle startup failures (#25)`],
+      pulls: [pull(12, "feature/startup", ["src/main.ts"])],
+      commitPulls: {
+        [sha("7")]: [
+          { number: 25, merged_at: null },
+          { number: 12, merged_at: "2026-10-21T00:00:00Z" },
+        ],
+      },
+    });
+    const result = await mergedPulls(deps, "v0.1.2");
+    expect(result.map((p) => p.number)).toEqual([12]);
+  });
+
+  it.each(["Handle startup (#12)", "Merge pull request #12 from x/startup"])(
+    "accepts an associated merge or squash: %s",
+    async (subject) => {
+      const { deps } = repository({
+        log: [`${sha("7")}\t${subject}`],
+        pulls: [pull(12, "feature/startup", ["src/main.ts"])],
+        commitPulls: {
+          [sha("7")]: [{ number: 12, merged_at: "2026-10-21T00:00:00Z" }],
+        },
+      });
+      const result = await mergedPulls(deps, "v0.1.2");
+      expect(result.map((p) => p.number)).toEqual([12]);
+    },
+  );
+
+  it("does not treat an open associated PR as merged", async () => {
+    const { deps } = repository({
+      log: [`${sha("7")}\tHandle startup (#12)`],
+      commitPulls: { [sha("7")]: [{ number: 12, merged_at: null }] },
+    });
+    await expect(mergedPulls(deps, "v0.1.2")).resolves.toEqual([]);
+  });
+
+  it("reports an association API failure rather than dropping the commit", async () => {
+    const { deps } = repository({ failApi: /\/commits\/.*\/pulls$/ });
+    await expect(mergedPulls(deps, "v0.1.2")).rejects.toThrow(/HTTP 502/);
+  });
 });
 
 describe("preparing a pin bump", () => {
