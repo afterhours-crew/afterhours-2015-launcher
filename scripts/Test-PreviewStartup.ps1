@@ -30,7 +30,7 @@ $report = [ordered]@{ version = 1; started_utc = [DateTime]::UtcNow.ToString('o'
 $expected = Get-Content -Raw -LiteralPath (Join-Path $PreviewInput 'input/build-info.json') | ConvertFrom-Json
 
 function Test-Server([string]$Directory) {
-    $server = Join-Path $Directory 'Afterhours.exe'
+    $server = Join-Path $Directory 'Afterhours2015Server.exe'
     if ((Get-FileHash -LiteralPath $server -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected.executable_sha256) {
         throw 'The packaged server differs from the selected candidate.'
     }
@@ -115,7 +115,7 @@ try {
     Add-Type -AssemblyName UIAutomationClient
     Add-Type -AssemblyName UIAutomationTypes
     $report.stage = 'installed wizard'
-    Test-Window (Join-Path $install 'afterhours-launcher.exe') 'installed'
+    Test-Window (Join-Path $install 'Afterhours2015Launcher.exe') 'installed'
     $report.stage = 'portable extraction'
     $zips = @(Get-ChildItem -LiteralPath $PortableDirectory -Filter '*.zip' -File)
     if ($zips.Count -ne 1) { throw 'Expected exactly one portable ZIP.' }
@@ -124,7 +124,7 @@ try {
     Expand-Archive -LiteralPath $zips[0].FullName -DestinationPath $unpacked
     Test-Server $unpacked
     $report.stage = 'portable wizard'
-    Test-Window (Join-Path $unpacked 'Afterhours Launcher.exe') 'portable'
+    Test-Window (Join-Path $unpacked 'Afterhours2015Launcher.exe') 'portable'
     $report.status = 'passed'
     $report.stage = 'complete'
 } catch {

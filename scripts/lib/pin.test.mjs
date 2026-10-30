@@ -54,8 +54,8 @@ describe("the pin", () => {
   });
 
   it("names the sidecar the way Tauri's externalBin expects", () => {
-    expect(sidecarPath("/r", PIN).replace(/\\/g, "/")).toBe(
-      "/r/src-tauri/binaries/Afterhours-x86_64-pc-windows-msvc.exe",
+    expect(sidecarPath("/r").replace(/\\/g, "/")).toBe(
+      "/r/src-tauri/binaries/Afterhours2015Server-x86_64-pc-windows-msvc.exe",
     );
   });
 });

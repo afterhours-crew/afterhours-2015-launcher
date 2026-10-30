@@ -37,7 +37,7 @@ import { storyCases } from "./lib/story-cases.mjs";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pin = parsePin(readFileSync(join(root, PIN_FILE), "utf8"));
 const override = process.env.AFTERHOURS_EXE;
-const exe = override || sidecarPath(root, pin);
+const exe = override || sidecarPath(root);
 if (!override && sha256(readFileSync(exe)) !== pin.executable_sha256) {
   console.error(`${exe} does not match ${PIN_FILE}. Run pnpm sidecar.`);
   process.exit(1);

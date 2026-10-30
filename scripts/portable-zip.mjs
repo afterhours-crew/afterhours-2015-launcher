@@ -18,7 +18,7 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { PIN_FILE, parsePin, sha256, SIDECAR_TARGET } from "./lib/pin.mjs";
+import { BUNDLED_SERVER_STEM, PIN_FILE, parsePin, sha256, SIDECAR_TARGET } from "./lib/pin.mjs";
 import { portableLayout, zipName } from "./lib/portable.mjs";
 import { previewPortableLayout } from "./lib/preview-package.mjs";
 
@@ -44,7 +44,7 @@ try {
     const info = JSON.parse(
       readFileSync(join(input, "build-info.json"), "utf8").replace(/^\uFEFF/, ""),
     );
-    const bytes = readFileSync(join(input, `Afterhours-${SIDECAR_TARGET}.exe`));
+    const bytes = readFileSync(join(input, `${BUNDLED_SERVER_STEM}-${SIDECAR_TARGET}.exe`));
     layout = previewPortableLayout({ root, exe: resolve(exe), input, info, bytes });
     const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
     if (git("status", "--porcelain", "--untracked-files=normal")) {

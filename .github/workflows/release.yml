@@ -105,7 +105,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          zip=$(node scripts/portable-zip.mjs --exe src-tauri/target/release/afterhours-launcher.exe --out "$RUNNER_TEMP/portable" | tail -n 1)
+          zip=$(node scripts/portable-zip.mjs --exe src-tauri/target/release/Afterhours2015Launcher.exe --out "$RUNNER_TEMP/portable" | tail -n 1)
           gh release upload "$TAG" "$zip" --clobber
 
       - name: Name the bundled server in latest.json

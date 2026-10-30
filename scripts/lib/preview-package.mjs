@@ -1,4 +1,4 @@
-import { sha256, SIDECAR_TARGET } from "./pin.mjs";
+import { BUNDLED_SERVER_NAME, BUNDLED_SERVER_STEM, sha256, SIDECAR_TARGET } from "./pin.mjs";
 import { join } from "node:path";
 import { LAUNCHER_NAME, MARKER_NAME } from "./portable.mjs";
 
@@ -25,7 +25,7 @@ export function previewBundleConfig(input) {
   // verified sidecar remain intact; this explicit preview names its own files.
   return {
     bundle: {
-      externalBin: [`${input}/Afterhours`],
+      externalBin: [`${input}/${BUNDLED_SERVER_STEM}`],
       resources: {
         "binaries/afterhours-server/LICENSE": null,
         "binaries/afterhours-server/THIRD-PARTY-NOTICES.txt": null,
@@ -45,11 +45,11 @@ export function previewPortableLayout({ root, exe, input, info, bytes }) {
   return [
     { from: exe, to: LAUNCHER_NAME },
     {
-      from: join(input, `Afterhours-${SIDECAR_TARGET}.exe`),
-      to: "Afterhours.exe",
+      from: join(input, `${BUNDLED_SERVER_STEM}-${SIDECAR_TARGET}.exe`),
+      to: BUNDLED_SERVER_NAME,
       sha256: info.executable_sha256,
     },
-    { from: join(root, "packaging", MARKER_NAME), to: MARKER_NAME },
+    { from: join(root, "packaging", "preview-portable.txt"), to: MARKER_NAME },
     { from: join(root, "LICENSE"), to: "LICENSE" },
     ...["LICENSE", "THIRD-PARTY-NOTICES.txt", "build-info.json"].map((name) => ({
       from: join(input, name),

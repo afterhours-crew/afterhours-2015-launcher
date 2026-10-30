@@ -241,11 +241,21 @@ contain `scripts/release/`.
 
 ## Validate and publish
 
+Windows installer CI also runs `scripts/Test-InstallerMigration.ps1` on a fresh
+GitHub-hosted runner. It verifies the published v0.5.0 installer digest, installs
+that legacy format, then runs the candidate with `/S /UPDATE`. The check requires
+the new executable and pinned server hashes, migrated desktop/Start-menu
+shortcuts, removal of the old GUI, and unchanged synthetic settings/save bytes.
+It does not launch the GUI/game or test the signed download end to end. Keep the
+manual update check below. Portable copies continue to use manual file replacement;
+an old `Afterhours.exe` can remain, but the new launcher prefers its bundled
+`Afterhours2015Server.exe`.
+
 1. Validate the draft. At least:
    - Install it as an ordinary user on Windows; it installs per user without
      administrator rights. Note any SmartScreen warning.
    - Unzip the no-install ZIP into an empty folder and run
-     `Afterhours Launcher.exe`. Settings → Updates says the copy runs without
+     `Afterhours2015Launcher.exe`. Settings → Updates says the copy runs without
      installing and offers Ask me and Off only.
    - Settings → About shows the new launcher version, the pinned server and
      "Matches the pin".

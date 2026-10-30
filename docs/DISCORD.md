@@ -76,27 +76,38 @@ the launcher; and run two copies to inspect Discord's own conflict behavior.
 Confirm absent/offline Discord leaves normal launch and shutdown working. Windows
 automated results do not establish Linux/macOS desktop behavior.
 
-## Recent activity identity investigation
+## Recent activity identity
 
 A correct live card does not establish correct recent activity history. Discord
 documents Rich Presence and automatic game detection as independent systems:
 [Game claiming requirements](https://docs.discord.com/developers/platform/claim-your-game).
-A reported history entry for the unrelated **AfterHours** game is being
-investigated. Executable-name detection is a hypothesis, not a confirmed cause.
+A reported history entry pointed to the unrelated **AfterHours** game.
+Executable-name detection is a hypothesis, not a confirmed cause.
 
-For a controlled portable test, package the release GUI as
-`Afterhours2015Launcher.exe` and the same verified server bytes as
+Windows installers and portable ZIPs package the GUI as
+`Afterhours2015Launcher.exe` and the verified server bytes as
 `Afterhours2015Server.exe`. Server resolution prefers that exact name beside the
 launcher and falls back to the existing `Afterhours.exe` name for old packages.
 The presence helper follows the current launcher executable automatically.
 No application ID, server pin, version, Discord setting or save location changes.
 Keep both binaries together in a new folder, with the portable marker and notices.
-The normal installer/release packaging still uses the existing names.
+The upstream archive still supplies `Afterhours.exe`; its hashes and provenance
+remain intact when staging it under the distribution name. The installer keeps
+the existing product name and application identifier. Tauri's NSIS migration
+handles the main executable rename and shortcut targets. The Windows installer
+CI checks migration from the published v0.5.0 format with synthetic settings and
+save bytes; see [RELEASING.md](../RELEASING.md). This does not establish that an
+upgrade has been exercised on every existing installation.
 
 Check the live title/artwork and subsequent activity history after a new session.
 Existing history is historical: an old incorrect tile remaining is not evidence
 that the new session was also misidentified. Record whether the unrelated entry's
-last-played time advances and whether the correct application gains a new entry.
-No tester should need to disable another game's detection for this test. A clear
-result is required before adopting a permanent packaging change; this experiment
-does not guarantee that a custom application will be retained in Discord history.
+last-played time advances. No tester should need to disable another game's
+detection for this check.
+
+On 2026-10-30 the owner tested portable GUI ef2b55f with these names and reported
+that NFS updated while the unrelated AfterHours entry stayed old (30 seconds
+versus 17 minutes in the supplied screenshot). The owner accepted correct live
+presence with no fresh wrong history entry; a separate Afterhours 2015 history
+entry is not required. This is one owner observation, not a guarantee about
+Discord's matching algorithm, other clients or future history retention.

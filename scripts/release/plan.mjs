@@ -255,7 +255,7 @@ export function launcherNotes({
     "There are two downloads with the same launcher inside. They differ only in how it gets onto your PC and how it updates:",
     "",
     `- **Afterhours_${version}_x64-setup.exe: the installer.** Choose this if you want the launcher to keep itself up to date. It installs for your Windows user only, needs no administrator rights, and installs new versions for you. It isn't code-signed yet, so Windows SmartScreen may warn; choose **More info → Run anyway**.`,
-    `- **Afterhours_${version}_x64-portable.zip: no installation.** Choose this if you'd rather not install anything. Extract it anywhere and run **Afterhours Launcher.exe**. Extracted into the game folder, beside NFS16.exe, it uses that game. It tells you when a new version is out and opens its download page, but you replace the files yourself.`,
+    `- **Afterhours_${version}_x64-portable.zip: no installation.** Choose this if you'd rather not install anything. Extract it anywhere and run **Afterhours2015Launcher.exe**. Extracted into the game folder, beside NFS16.exe, it uses that game. It tells you when a new version is out and opens its download page, but you replace the files yourself.`,
     "",
     "The other two files, `.sig` and `latest.json`, are for the launcher's updater. You don't need to download them.",
   ];

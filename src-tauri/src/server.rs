@@ -14,7 +14,7 @@
 //! setting can never make an installed launcher run a different server
 //! against a tester's saves.
 //!
-//! Portable identity tests use `Afterhours2015Server.exe` to distinguish this
+//! Distributions use `Afterhours2015Server.exe` to distinguish this
 //! process from unrelated games in desktop game detection. Existing packages
 //! with `Afterhours.exe` remain supported. Both names stay beside the launcher.
 
@@ -54,7 +54,11 @@ pub struct Server {
 /// The bundled executable's file name next to the launcher. Tauri strips
 /// the target triple from `externalBin` names when it installs them.
 pub fn bundled_file_name() -> String {
-    format!("Afterhours{}", std::env::consts::EXE_SUFFIX)
+    format!(
+        "{}{}",
+        pin::BUNDLED_SERVER_STEM,
+        std::env::consts::EXE_SUFFIX
+    )
 }
 
 /// Decide which executable to run. Pure apart from checking that the
@@ -80,8 +84,8 @@ pub fn resolve(
     }
     let bundled = launcher_dir.and_then(|dir| {
         [
-            format!("Afterhours2015Server{}", std::env::consts::EXE_SUFFIX),
             bundled_file_name(),
+            format!("Afterhours{}", std::env::consts::EXE_SUFFIX),
         ]
         .into_iter()
         .map(|name| dir.join(name))
@@ -311,7 +315,7 @@ mod tests {
             "Afterhours2015Server{}",
             std::env::consts::EXE_SUFFIX
         ));
-        let legacy = dir.join(bundled_file_name());
+        let legacy = dir.join(format!("Afterhours{}", std::env::consts::EXE_SUFFIX));
         std::fs::write(&distinct, b"new package").unwrap();
         std::fs::write(&legacy, b"old package").unwrap();
 

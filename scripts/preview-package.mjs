@@ -4,7 +4,7 @@ import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { sha256, SIDECAR_TARGET } from "./lib/pin.mjs";
+import { BUNDLED_SERVER_STEM, sha256, SIDECAR_TARGET } from "./lib/pin.mjs";
 import { previewBundleConfig, validatePreviewServer } from "./lib/preview-package.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -34,7 +34,7 @@ try {
   mkdirSync(out); // Existing evidence is never overwritten.
   const input = join(out, "input");
   mkdirSync(input);
-  writeFileSync(join(input, `Afterhours-${SIDECAR_TARGET}.exe`), bytes);
+  writeFileSync(join(input, `${BUNDLED_SERVER_STEM}-${SIDECAR_TARGET}.exe`), bytes);
   for (const name of ["LICENSE", "THIRD-PARTY-NOTICES.txt", "build-info.json"]) {
     copyFileSync(join(server, name), join(input, name));
   }

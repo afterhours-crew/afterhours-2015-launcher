@@ -3,7 +3,8 @@
 The graphical launcher for [Afterhours 2015](https://github.com/afterhours-crew/afterhours-2015),
 the community server for Need for Speed (2015). It is a Tauri 2 desktop app
 with a Svelte frontend. It installs with its own copy of the server, the
-single `Afterhours.exe` from an exact afterhours-2015 release, and updates
+single `Afterhours.exe` from an exact afterhours-2015 release, packaged as
+`Afterhours2015Server.exe` without changing its bytes. The launcher updates
 itself from this repository's GitHub releases. Nothing about the game, the
 server or the safety rules lives here; this app is the Play button in front of
 them.
@@ -76,7 +77,8 @@ your Windows username. The native dialog uses the existing MIT-licensed `rfd`
    map four times a second; `&nomapfeed` is a server without `map-feed`.
 
    `pnpm sidecar` downloads the server release pinned in `server-pin.json`,
-   checks its SHA-256 and places `Afterhours.exe` in `src-tauri/binaries/`.
+   checks its SHA-256 and stages `Afterhours2015Server-<target>.exe` in
+   `src-tauri/binaries/`.
    Windows builds refuse to compile without it. To run another server build
    while developing, set `AFTERHOURS_EXE` to it; release builds ignore that
    variable. On Linux and macOS there is no bundled server, so development
@@ -111,7 +113,7 @@ your Windows username. The native dialog uses the existing MIT-licensed `rfd`
 ### Without installing
 
 Each release also has `Afterhours_<version>_x64-portable.zip`:
-`Afterhours Launcher.exe`, the pinned `Afterhours.exe` beside it, the
+`Afterhours2015Launcher.exe`, the pinned `Afterhours2015Server.exe` beside it, the
 licences and `portable.txt`. Its marker tells the launcher it was not
 installed (`src-tauri/src/updates.rs`). That copy still checks for updates,
 but cannot install them: it offers Ask me and Off, and **Download** opens the
@@ -122,7 +124,7 @@ preview shows that copy with `?sample&noinstall`.
 
 ### A copy in the game folder
 
-The launcher executable and its bundled `Afterhours.exe` can also be copied
+The launcher executable and its bundled `Afterhours2015Server.exe` can also be copied
 into the game folder, next to `NFS16.exe`, the way the terminal
 `Afterhours.exe` is placed; the no-install ZIP can be unzipped there. That copy uses the game it sits in: the first
 run skips "Find your game" and goes straight to the file check, and
@@ -201,7 +203,7 @@ preview. Connecting a controller or returning focus while a button is held never
 activates it; release it first. Keyboard and pointer controls remain available.
 
 ```text
-window (Svelte)  --invoke-->  src-tauri (Rust)  --spawn-->  Afterhours.exe  --spawn-->  Afterhours.exe supervise
+window (Svelte)  --invoke-->  src-tauri (Rust)  --spawn-->  Afterhours2015Server.exe  --spawn-->  Afterhours2015Server.exe supervise
                  <--events--                   <--stdout--  (bundled, pinned)          --> server role, NFS16.exe
 ```
 
