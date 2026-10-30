@@ -42,6 +42,22 @@ function Invoke-Installer([string]$Path, [string]$Arguments) {
     }
 }
 
+function Get-ExpectedInstalledHash([string]$Path) {
+    # Tauri patches the bundle marker before NSIS packaging, then restores the
+    # loose binary. Match the entire installed file, allowing exactly that edit.
+    # tauri-cli-v2.12.3/crates/tauri-bundler/src/bundle.rs: patch_binary
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    $token = '__TAURI_BUNDLE_TYPE_VAR_UNK'
+    $text = [Text.Encoding]::Latin1.GetString($bytes)
+    $at = $text.IndexOf($token, [StringComparison]::Ordinal)
+    if ($at -lt 0 -or $text.IndexOf($token, $at + 1, [StringComparison]::Ordinal) -ge 0) {
+        throw 'Expected exactly one unpatched Tauri bundle marker.'
+    }
+    $replacement = [Text.Encoding]::ASCII.GetBytes('__TAURI_BUNDLE_TYPE_VAR_NSS')
+    [Array]::Copy($replacement, 0, $bytes, $at, $replacement.Length)
+    return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes))
+}
+
 try {
     # Immutable published baseline; digest from its GitHub release asset metadata.
     $legacy = Join-Path $output 'legacy-setup.exe'
@@ -76,7 +92,7 @@ try {
     if (Test-Path -LiteralPath (Join-Path $install $oldName)) { throw 'Old main executable remains.' }
     $installedGui = Join-Path $install 'Afterhours2015Launcher.exe'
     $builtGui = Join-Path $root 'src-tauri/target/release/Afterhours2015Launcher.exe'
-    if ((Get-FileHash -LiteralPath $installedGui).Hash -cne (Get-FileHash -LiteralPath $builtGui).Hash) { throw 'Installed GUI differs from this build.' }
+    if ((Get-FileHash -LiteralPath $installedGui).Hash -cne (Get-ExpectedInstalledHash $builtGui)) { throw 'Installed GUI differs from the expected NSIS-marked build.' }
     $pin = Get-Content -Raw -LiteralPath (Join-Path $root 'server-pin.json') | ConvertFrom-Json
     $server = Join-Path $install 'Afterhours2015Server.exe'
     if ((Get-FileHash -LiteralPath $server).Hash.ToLowerInvariant() -cne $pin.executable_sha256) { throw 'Installed server differs from the pin.' }
@@ -86,7 +102,7 @@ try {
     if ((Get-FileHash -LiteralPath $settings).Hash -cne $settingsHash -or (Get-FileHash -LiteralPath $save).Hash -cne $saveHash) { throw 'Settings or save bytes changed during update.' }
     if (Test-Path -LiteralPath (Join-Path $install 'portable.txt')) { throw 'Installer incorrectly carries the portable marker.' }
     $report.status = 'passed'
-    $report.checks = @('legacy v0.5.0 installed', 'updater-mode install succeeded', 'old GUI removed', 'new GUI and pinned server hashes match', 'desktop and start-menu shortcuts migrated', 'settings and save bytes preserved', 'installed update mode retained')
+    $report.checks = @('legacy v0.5.0 installed', 'updater-mode install succeeded', 'old GUI removed', 'NSIS-marked GUI and pinned server hashes match', 'desktop and start-menu shortcuts migrated', 'settings and save bytes preserved', 'installed update mode retained')
     $report.candidate_sha256 = (Get-FileHash -LiteralPath $candidates[0].FullName).Hash.ToLowerInvariant()
 } finally {
     $report.finished_utc = [DateTime]::UtcNow.ToString('o')
