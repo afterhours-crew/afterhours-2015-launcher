@@ -18,7 +18,7 @@ fn runtime() -> tokio::runtime::Runtime {
 
 // A child process really uses the same pipes, deadlines, kill and reap path.
 // These fixtures never connect to Discord, the server, or the game.
-fn fixture(mode: &str) -> tokio::process::Command {
+fn fixture(mode: &str, signal_ready: bool) -> tokio::process::Command {
     #[cfg(windows)]
     {
         let script = match mode {
@@ -31,12 +31,17 @@ fn fixture(mode: &str) -> tokio::process::Command {
             }
         };
         let mut command = tokio::process::Command::new("powershell.exe");
+        let ready = if signal_ready {
+            "[Console]::WriteLine('ready'); "
+        } else {
+            ""
+        };
         command.args([
             "-NoLogo",
             "-NoProfile",
             "-NonInteractive",
             "-Command",
-            script,
+            &format!("{ready}{script}"),
         ]);
         command
     }
@@ -50,15 +55,30 @@ fn fixture(mode: &str) -> tokio::process::Command {
             }
         };
         let mut command = tokio::process::Command::new("/bin/sh");
-        command.args(["-c", script]);
+        let ready = if signal_ready { "echo ready; " } else { "" };
+        command.args(["-c", &format!("{ready}{script}")]);
         command
     }
+}
+
+async fn ready_fixture(mode: &str) -> Helper {
+    let mut helper = Helper::spawn(fixture(mode, true)).unwrap();
+    // A loaded CI runner may take longer than the protocol deadline to start
+    // PowerShell. Wait separately for the fixture, then exercise the unchanged
+    // production response/cleanup deadlines against a running child.
+    let mut ready = String::new();
+    timeout(Duration::from_secs(30), helper.output.read_line(&mut ready))
+        .await
+        .expect("fixture startup deadline")
+        .unwrap();
+    assert_eq!(ready.trim_end(), "ready");
+    helper
 }
 
 #[test]
 fn actual_child_pipe_ack_and_graceful_shutdown() {
     runtime().block_on(async {
-        let mut helper = Helper::spawn(fixture("ok")).unwrap();
+        let mut helper = ready_fixture("ok").await;
         assert!(
             timeout(
                 REPLY_TIMEOUT,
@@ -75,7 +95,7 @@ fn actual_child_pipe_ack_and_graceful_shutdown() {
 #[test]
 fn silent_child_is_timed_out_then_killed_and_reaped() {
     runtime().block_on(async {
-        let mut helper = Helper::spawn(fixture("silent")).unwrap();
+        let mut helper = ready_fixture("silent").await;
         assert!(
             timeout(
                 REPLY_TIMEOUT,
@@ -93,7 +113,7 @@ fn silent_child_is_timed_out_then_killed_and_reaped() {
 #[test]
 fn malformed_child_response_is_rejected() {
     runtime().block_on(async {
-        let mut helper = Helper::spawn(fixture("invalid")).unwrap();
+        let mut helper = ready_fixture("invalid").await;
         assert!(
             timeout(
                 REPLY_TIMEOUT,
@@ -146,7 +166,7 @@ fn shutdown_cancels_a_pending_reply_without_waiting_for_its_deadline() {
             if let Some(started) = started.take() {
                 let _ = started.send(());
             }
-            Ok(fixture("silent"))
+            Ok(fixture("silent", false))
         }));
         seen.await.unwrap();
         sender.send_replace(Desired::Shutdown);

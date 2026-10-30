@@ -1,6 +1,6 @@
 This copy of the Afterhours launcher runs without installing.
 
-Keep this file next to "Afterhours Launcher.exe": it is how the launcher
+Keep this file next to "Afterhours2015Launcher.exe": it is how the launcher
 knows it was not installed.
 
 Updates: the launcher still checks for new versions. When one is out, it
@@ -13,8 +13,8 @@ Your saves and logs are in %LOCALAPPDATA%\Afterhours2015, not in this
 folder, so replacing these files keeps them.
 
 If you place these files in the game folder, beside NFS16.exe, the launcher
-uses that game. Its Afterhours.exe is the server it bundles; it replaces an
-Afterhours.exe already there.
+uses that game. Keep its bundled Afterhours2015Server.exe beside it. A legacy
+Afterhours.exe can remain there; this launcher prefers Afterhours2015Server.exe.
 
 To install the launcher instead, so that it updates itself, use the
 -setup.exe from the same release page.

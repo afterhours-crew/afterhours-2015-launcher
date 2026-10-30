@@ -7,6 +7,9 @@ import { join } from "node:path";
 export const PIN_FILE = "server-pin.json";
 /** The only target the server repository publishes a bundle for. */
 export const SIDECAR_TARGET = "x86_64-pc-windows-msvc";
+/** Distribution name; the upstream archive and pin still name Afterhours.exe. */
+export const BUNDLED_SERVER_STEM = "Afterhours2015Server";
+export const BUNDLED_SERVER_NAME = `${BUNDLED_SERVER_STEM}.exe`;
 /** Files from the server ZIP that ship with the launcher besides the executable. */
 export const SERVER_NOTICES = ["LICENSE", "THIRD-PARTY-NOTICES.txt", "build-info.json"];
 
@@ -93,9 +96,8 @@ export function sha256(bytes) {
 }
 
 /** Where Tauri's externalBin expects the executable. */
-export function sidecarPath(root, pin) {
-  const stem = pin.executable.replace(/\.exe$/, "");
-  return join(root, "src-tauri", "binaries", `${stem}-${SIDECAR_TARGET}.exe`);
+export function sidecarPath(root) {
+  return join(root, "src-tauri", "binaries", `${BUNDLED_SERVER_STEM}-${SIDECAR_TARGET}.exe`);
 }
 
 /** Where the server's license files are kept for the installer. */

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 //! Reads `server-pin.json`, hands the pinned server tag and hash to the app,
-//! and refuses to build a Windows app whose bundled `Afterhours.exe` is not
+//! and refuses to build a Windows app whose bundled `Afterhours2015Server.exe` is not
 //! the pinned one. `pnpm sidecar` puts the verified executable in place.
 
 #[allow(dead_code)]
@@ -43,7 +43,7 @@ fn main() {
         }
         let sidecar = manifest
             .join("binaries")
-            .join(pin::sidecar_file_name(pin.executable_stem(), &target));
+            .join(pin::sidecar_file_name(pin::BUNDLED_SERVER_STEM, &target));
         println!("cargo:rerun-if-changed={}", sidecar.display());
         let check = pin::check_file(&sidecar, &pin.executable_sha256)
             .unwrap_or_else(|e| panic!("cannot read {}: {e}", sidecar.display()));

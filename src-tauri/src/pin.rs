@@ -32,6 +32,9 @@ pub const MAX_PIN_BYTES: usize = 4096;
 /// The only target the server repository publishes a bundle for.
 pub const BUNDLED_TARGET: &str = "x86_64-pc-windows-msvc";
 
+/// Distribution name, independent of the upstream archive's executable name.
+pub const BUNDLED_SERVER_STEM: &str = "Afterhours2015Server";
+
 /// One pinned server release.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -104,13 +107,6 @@ impl Pin {
             ));
         }
         Ok(())
-    }
-
-    /// The executable's name without `.exe`, which is the `externalBin` stem.
-    pub fn executable_stem(&self) -> &str {
-        self.executable
-            .strip_suffix(".exe")
-            .unwrap_or(&self.executable)
     }
 }
 
@@ -239,7 +235,7 @@ mod tests {
         let pin = Pin::parse(text).unwrap();
         assert_eq!(pin.repository, "afterhours-crew/afterhours-2015");
         assert!(is_release_tag(&pin.tag));
-        assert_eq!(pin.executable_stem(), "Afterhours");
+        assert_eq!(pin.executable, "Afterhours.exe");
     }
 
     #[test]
@@ -248,8 +244,8 @@ mod tests {
         assert_eq!(pin.tag, "v0.3.0");
         assert_eq!(pin.schemas, SchemaSource::Vendored);
         assert_eq!(
-            sidecar_file_name(pin.executable_stem(), BUNDLED_TARGET),
-            "Afterhours-x86_64-pc-windows-msvc.exe"
+            sidecar_file_name(BUNDLED_SERVER_STEM, BUNDLED_TARGET),
+            "Afterhours2015Server-x86_64-pc-windows-msvc.exe"
         );
         assert_eq!(
             sidecar_file_name("Afterhours", "x86_64-unknown-linux-gnu"),

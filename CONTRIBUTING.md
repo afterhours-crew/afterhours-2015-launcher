@@ -1,7 +1,7 @@
 # Contributing
 
 The launcher is a Tauri 2 desktop app: Rust in `src-tauri/`, Svelte 5 with
-Vite and TypeScript in `src/`. It runs sessions through the `Afterhours.exe`
+Vite and TypeScript in `src/`. It runs sessions through the bundled `Afterhours2015Server.exe`
 published by the [afterhours-2015](https://github.com/afterhours-crew/afterhours-2015)
 repository, bundled at the release pinned in `server-pin.json`, and never
 touches the game or server itself.
@@ -43,7 +43,7 @@ unsigned Windows installer.
 | --------------------------- | --------------------------------------------------------------------- |
 | `server-pin.json`           | the one server release the launcher bundles                           |
 | `src-tauri/src/pin.rs`      | reading the pin and hashing; also compiled into `build.rs`            |
-| `src-tauri/src/server.rs`   | which `Afterhours.exe` runs (bundled, or `AFTERHOURS_EXE` in dev)     |
+| `src-tauri/src/server.rs`   | which server executable runs (bundled, or `AFTERHOURS_EXE` in dev)    |
 | `src-tauri/src/cli.rs`      | running it within deadlines, event streaming                          |
 | `src-tauri/src/data.rs`     | reading the data folder's session records, copying saves aside        |
 | `src-tauri/src/updates.rs`  | what the updater asks of the Rust side                                |

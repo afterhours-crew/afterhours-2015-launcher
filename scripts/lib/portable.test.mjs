@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parsePin, PIN_FILE } from "./pin.mjs";
+import { BUNDLED_SERVER_STEM, parsePin, PIN_FILE } from "./pin.mjs";
 import { LAUNCHER_NAME, MARKER_NAME, portableLayout, zipName } from "./portable.mjs";
 
 const root = resolve(import.meta.dirname, "..", "..");
@@ -17,7 +17,7 @@ describe("the no-install ZIP", () => {
     const layout = portableLayout({ root, exe: "built.exe", pin });
     expect(layout.map((f) => f.to)).toEqual([
       LAUNCHER_NAME,
-      "Afterhours.exe",
+      "Afterhours2015Server.exe",
       MARKER_NAME,
       "LICENSE",
       "afterhours-server/LICENSE",
@@ -26,7 +26,7 @@ describe("the no-install ZIP", () => {
     ]);
     expect(layout[0].from).toBe("built.exe");
     // The server is the verified sidecar, checked against the pin.
-    expect(layout[1].from).toMatch(/Afterhours-x86_64-pc-windows-msvc\.exe$/);
+    expect(layout[1].from).toMatch(/Afterhours2015Server-x86_64-pc-windows-msvc\.exe$/);
     expect(layout[1].sha256).toBe(pin.executable_sha256);
   });
 
@@ -36,5 +36,13 @@ describe("the no-install ZIP", () => {
     const marker = readFileSync(join(root, "packaging", MARKER_NAME), "utf8");
     expect(marker).toContain(LAUNCHER_NAME);
     expect(marker).toContain("without installing");
+  });
+
+  it("uses the same executable identities in the installer and portable ZIP", () => {
+    const windows = JSON.parse(readFileSync(join(root, "src-tauri/tauri.windows.conf.json")));
+    expect(`${windows.mainBinaryName}.exe`).toBe(LAUNCHER_NAME);
+    expect(windows.bundle.externalBin).toEqual([`binaries/${BUNDLED_SERVER_STEM}`]);
+    // The upstream download remains unchanged; only its distribution name changes.
+    expect(pin.executable).toBe("Afterhours.exe");
   });
 });

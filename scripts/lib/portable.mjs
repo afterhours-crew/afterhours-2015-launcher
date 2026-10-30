@@ -7,10 +7,10 @@
 // installed (src-tauri/src/updates.rs): it then offers each update's
 // download page instead of installing it.
 import { join } from "node:path";
-import { noticesDir, sidecarPath } from "./pin.mjs";
+import { BUNDLED_SERVER_NAME, noticesDir, sidecarPath } from "./pin.mjs";
 
 /** The launcher's name inside the ZIP. */
-export const LAUNCHER_NAME = "Afterhours Launcher.exe";
+export const LAUNCHER_NAME = "Afterhours2015Launcher.exe";
 /** Tells the launcher it was not installed; must match updates.rs. */
 export const MARKER_NAME = "portable.txt";
 
@@ -30,7 +30,7 @@ export function portableLayout({ root, exe, pin }) {
   const notices = noticesDir(root);
   return [
     { from: exe, to: LAUNCHER_NAME },
-    { from: sidecarPath(root, pin), to: pin.executable, sha256: pin.executable_sha256 },
+    { from: sidecarPath(root), to: BUNDLED_SERVER_NAME, sha256: pin.executable_sha256 },
     { from: join(root, "packaging", MARKER_NAME), to: MARKER_NAME },
     { from: join(root, "LICENSE"), to: "LICENSE" },
     { from: join(notices, "LICENSE"), to: "afterhours-server/LICENSE" },

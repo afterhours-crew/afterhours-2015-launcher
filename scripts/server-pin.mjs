@@ -72,12 +72,12 @@ function unpackServer(zip, pin) {
 }
 
 function placeServer(files, pin) {
-  writeAtomically(sidecarPath(root, pin), files[pin.executable]);
+  writeAtomically(sidecarPath(root), files[pin.executable]);
   for (const name of SERVER_NOTICES) writeAtomically(join(noticesDir(root), name), files[name]);
 }
 
 function placedMatches(pin) {
-  const target = sidecarPath(root, pin);
+  const target = sidecarPath(root);
   if (!existsSync(target)) return false;
   if (!SERVER_NOTICES.every((name) => existsSync(join(noticesDir(root), name)))) return false;
   return sha256(readFileSync(target)) === pin.executable_sha256;
@@ -97,17 +97,13 @@ async function fetchPinned() {
   }
   const { files, info } = unpackServer(zip, pin);
   placeServer(files, pin);
-  console.log(
-    `Placed ${pin.executable} ${pin.tag} (${info.revision}) at ${sidecarPath(root, pin)}.`,
-  );
+  console.log(`Placed ${pin.executable} ${pin.tag} (${info.revision}) at ${sidecarPath(root)}.`);
 }
 
 function verifyPlaced() {
   const pin = readPin();
   if (!placedMatches(pin)) {
-    throw new Error(
-      `${sidecarPath(root, pin)} is missing or differs from the pin. Run pnpm sidecar.`,
-    );
+    throw new Error(`${sidecarPath(root)} is missing or differs from the pin. Run pnpm sidecar.`);
   }
   console.log(`${pin.executable} ${pin.tag} matches the pin.`);
 }

@@ -1,0 +1,14 @@
+This preview of the Afterhours launcher runs without installing.
+
+Run Afterhours2015Launcher.exe. Keep Afterhours2015Server.exe and portable.txt
+beside it. The launcher prefers this server over any legacy Afterhours.exe.
+
+This preview has automatic updates disabled and no release update endpoint.
+Close it before replacing its files with a newer preview package.
+
+Settings are separate from the normal launcher. By default saves and logs are
+in %LOCALAPPDATA%\crew.afterhours.launcher.prologue-preview\server, outside
+this folder. An explicitly chosen data folder is preserved when reopening.
+
+If placed beside NFS16.exe, the launcher uses that game. Otherwise select the
+game folder on first run. Replacing this package does not reset saved progress.

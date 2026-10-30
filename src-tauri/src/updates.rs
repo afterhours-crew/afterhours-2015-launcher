@@ -239,7 +239,7 @@ mod tests {
         assert!(!windows.to_string().contains(super::PORTABLE_MARKER));
         assert!(!CONFIG.contains(super::PORTABLE_MARKER));
         let marker = include_str!("../../packaging/portable.txt");
-        assert!(marker.contains("Afterhours Launcher.exe"));
+        assert!(marker.contains("Afterhours2015Launcher.exe"));
     }
 
     #[test]
@@ -307,12 +307,20 @@ mod tests {
         assert_eq!(windows["bundle"]["targets"], serde_json::json!(["nsis"]));
         assert_eq!(
             windows["bundle"]["externalBin"],
-            serde_json::json!(["binaries/Afterhours"])
+            serde_json::json!(["binaries/Afterhours2015Server"])
         );
-        let pin = crate::pin::Pin::parse(include_str!("../../server-pin.json")).unwrap();
         assert_eq!(
-            format!("binaries/{}", pin.executable_stem()),
+            format!("binaries/{}", crate::pin::BUNDLED_SERVER_STEM),
             windows["bundle"]["externalBin"][0]
         );
+        assert_eq!(
+            crate::server::bundled_file_name(),
+            format!(
+                "{}{}",
+                crate::pin::BUNDLED_SERVER_STEM,
+                std::env::consts::EXE_SUFFIX
+            )
+        );
+        assert_eq!(windows["mainBinaryName"], "Afterhours2015Launcher");
     }
 }
