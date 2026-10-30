@@ -136,6 +136,23 @@ the game and keeps the usual first run. The decision is
 
 ## How it works
 
+Settings → General → **Show activity on Discord** is off by default. Turning it
+on shares basic launcher, preparation, local game and local hosting status with
+the running Discord desktop client, using the Afterhours logo. Discord's own
+activity-sharing setting must also allow it. Driver names, save data, server
+addresses and story details are never included. Gameplay works without Discord.
+Turning the setting off or exiting the launcher disconnects its activity.
+
+Presence is implemented entirely in this launcher using the cross-platform
+`discord-presence` Rust package. A supervised helper mode of the same executable
+isolates its synchronous calls; there is no separate installation or server
+integration. It reads the bundled server's existing local `status --json` command
+every five seconds while enabled, including local relay sessions. Selected remote
+server reports are never used. Discord updates coalesce over fifteen seconds;
+reconnects resend the latest state. Elapsed time, garage/race details and invitations
+are not part of this version. See [Discord presence](docs/DISCORD.md) for validation
+and implementation boundaries.
+
 Profile → Story shows the saved prologue position and previews another checkpoint
 without changing the save. Restart story and Skip prologue select its endpoints;
 Cancel returns to the saved marker. With a server that reports `story-preview`,

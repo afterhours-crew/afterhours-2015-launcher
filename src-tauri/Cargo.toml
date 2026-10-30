@@ -34,6 +34,10 @@ sha2 = "=0.10.9"
 rfd = { version = "=0.16.0", default-features = false, features = ["common-controls-v6"] }
 
 [dependencies]
+# MIT; cross-platform Discord presence. Calls run in this executable's helper mode.
+discord-presence = "=3.2.0"
+# MIT; bounded helper supervision. Reuses the locked Tokio version.
+tokio = { version = "=1.53.3", features = ["io-util", "process", "sync", "time", "rt", "macros"] }
 # The token the launcher gives its own server's API (MIT or Apache-2.0).
 getrandom = "=0.2.17"
 tauri = { version = "=2.12.4", features = ["protocol-asset"] }

@@ -5,6 +5,7 @@
   import Note from "$lib/components/Note.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
   import Segmented from "$lib/components/Segmented.svelte";
+  import Toggle from "$lib/components/Toggle.svelte";
   import { sampleMode } from "$lib/state/preview";
   import { router } from "$lib/state/router.svelte";
   import { servers } from "$lib/state/servers.svelte";
@@ -18,6 +19,20 @@
   let dataDir = $derived(session.settings.data_dir ?? session.info?.data_dir ?? null);
   let note = $state<{ kind: "ready" | "warn"; text: string } | null>(null);
   let checking = $state(false);
+  let savingDiscord = $state(false);
+  let discordError = $state<string | null>(null);
+
+  async function setDiscord(enabled: boolean) {
+    savingDiscord = true;
+    discordError = null;
+    try {
+      await session.save({ discord_presence: enabled });
+    } catch (e) {
+      discordError = failure(e);
+    } finally {
+      savingDiscord = false;
+    }
+  }
 
   function failure(e: unknown): string {
     return String(e instanceof Error ? e.message : e);
@@ -76,6 +91,27 @@
 </script>
 
 <div class="panels">
+  <Glass radius="panel" label="Discord" class="panel rows-panel">
+    <div class="list-row tall">
+      <span class="grow text">
+        <span class="name" id="discord-presence-label">
+          Show activity on Discord
+          <InfoButton
+            label="About Discord activity"
+            text="Shares whether you are in the launcher, starting the game, playing or hosting on this PC. Discord must be open and activity sharing enabled there. Your driver name, save and server address are never shared. Turning this off or closing the launcher clears its activity."
+          />
+        </span>
+      </span>
+      <Toggle
+        checked={session.settings.discord_presence}
+        labelledby="discord-presence-label"
+        disabled={savingDiscord}
+        onchange={(value) => void setDiscord(value)}
+      />
+    </div>
+    {#if discordError}<div class="note"><Note kind="warn">{discordError}</Note></div>{/if}
+  </Glass>
+
   <Glass radius="panel" label="Game and data" class="panel rows-panel">
     <div class="list-row tall">
       <span class="grow text">

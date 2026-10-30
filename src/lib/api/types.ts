@@ -63,6 +63,8 @@ export interface Settings {
   avatar: string | null;
   first_run_done: boolean;
   updates: UpdateSettings;
+  /** Share basic local activity with the desktop Discord client. Default off. */
+  discord_presence: boolean;
   last_server_tag: string | null;
   /** Your server on another PC on your network; `null` is this PC's own. */
   server: RemoteServer | null;
@@ -233,6 +235,7 @@ export function emptySettings(): Settings {
     avatar: null,
     first_run_done: false,
     updates: { mode: "ask", skipped_version: null },
+    discord_presence: false,
     last_server_tag: null,
     server: null,
     local_api: null,

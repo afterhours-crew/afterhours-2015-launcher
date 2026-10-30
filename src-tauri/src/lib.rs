@@ -31,6 +31,7 @@ pub mod connection;
 pub mod connlog;
 pub mod data;
 pub mod detect;
+mod discord;
 pub mod images;
 pub mod pin;
 pub mod reads;
@@ -58,6 +59,7 @@ pub const WINDOW_STATE_FILE: &str = "window.json";
 
 /// State shared by every command: settings and the running session, if any.
 pub struct AppState {
+    discord: discord::Presence,
     /// As saved. Read through [`AppState::settings`], which applies the
     /// game folder decision.
     pub settings: Mutex<settings::Settings>,
@@ -132,6 +134,9 @@ impl AppState {
 
 /// Build and run the application.
 pub fn run() {
+    if discord::entry() {
+        return;
+    }
     let context = tauri::generate_context!();
     let startup = startup::Startup::new(
         &context.config().identifier,
@@ -172,7 +177,9 @@ pub fn run() {
             setup_startup.stage("loading launcher settings");
             let settings = settings::load(app.handle())?;
             let servers = servers::load(app.handle(), &settings)?;
+            let discord = discord::Presence::start(&settings);
             app.manage(AppState {
+                discord,
                 settings: Mutex::new(settings),
                 session: Mutex::new(None),
                 connection: Mutex::new(None),
@@ -293,5 +300,11 @@ pub fn run() {
         app.path().app_config_dir().map_err(|e| e.to_string()),
     );
     startup.stage("creating application window");
-    app.run(|_, _| {});
+    app.run(|app, event| {
+        if matches!(event, tauri::RunEvent::Exit)
+            && let Some(state) = app.try_state::<AppState>()
+        {
+            state.discord.shutdown();
+        }
+    });
 }
