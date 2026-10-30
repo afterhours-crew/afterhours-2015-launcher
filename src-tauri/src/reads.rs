@@ -228,52 +228,49 @@ fn story_source(settings: &Settings) -> Result<StorySource, String> {
     Ok(StorySource::Local(args))
 }
 
-/// `profile --json`, for the active save or `account_id`. The active save
-/// comes through the session API when the window follows one.
+/// Saved profiles on this PC are read from the selected data folder, even
+/// when a previously used local API address remains in settings. A remote
+/// selection always remains remote and never falls back to this PC's save.
+fn profile_source(
+    settings: &Settings,
+    account_id: Option<&str>,
+    list: bool,
+) -> Result<StorySource, String> {
+    let args = if list {
+        profile_list_args(settings)
+    } else {
+        profile_args(settings, account_id)?
+    };
+    if let Some(remote) = &settings.server {
+        return crate::connection::Endpoint::remote(remote).map(StorySource::Remote);
+    }
+    Ok(StorySource::Local(args))
+}
+
 #[tauri::command]
 pub async fn profile(
     state: State<'_, crate::AppState>,
     account_id: Option<String>,
 ) -> Result<cli::CliResult, String> {
-    let settings = settings_of(&state);
-    let args = profile_args(&settings, account_id.as_deref())?;
-    if let Some(remote) = settings.server.clone() {
-        // Another PC's server shows the save it selects.
-        let endpoint = crate::connection::Endpoint::remote(&remote)?;
-        return tauri::async_runtime::spawn_blocking(move || {
-            endpoint
-                .profile(READ_TIMEOUT)
-                .ok_or_else(|| format!("Your server at {} does not answer.", remote.url))
-        })
-        .await
-        .map_err(|e| e.to_string())?;
+    match profile_source(&settings_of(&state), account_id.as_deref(), false)? {
+        StorySource::Local(args) => run_read(args).await,
+        StorySource::Remote(endpoint) => {
+            let path =
+                account_id.map_or_else(|| "/v1/profile".into(), |id| format!("/v1/profiles/{id}"));
+            api_read(endpoint, path, MAX_RECORD).await
+        }
     }
-    if let Some(endpoint) = state.server_endpoint() {
-        let path = match &account_id {
-            Some(id) => format!("/v1/profiles/{id}"),
-            None => "/v1/profile".to_owned(),
-        };
-        return api_read(endpoint, path, MAX_RECORD).await;
-    }
-    let Some(endpoint) = state.endpoint().filter(|_| account_id.is_none()) else {
-        return run_read(args).await;
-    };
-    let server = server::current()?;
-    tauri::async_runtime::spawn_blocking(move || match endpoint.profile(READ_TIMEOUT) {
-        Some(result) => Ok(result),
-        None => cli::run_json(&server.path, &args, READ_TIMEOUT),
-    })
-    .await
-    .map_err(|e| e.to_string())?
 }
 
-/// `profile --list --json`.
+/// `profile --list --json` follows the same selected-save boundary.
 #[tauri::command]
 pub async fn profile_list(state: State<'_, crate::AppState>) -> Result<cli::CliResult, String> {
-    if let Some(endpoint) = state.server_endpoint() {
-        return api_read(endpoint, "/v1/profiles".into(), MAX_RECORD).await;
+    match profile_source(&settings_of(&state), None, true)? {
+        StorySource::Local(args) => run_read(args).await,
+        StorySource::Remote(endpoint) => {
+            api_read(endpoint, "/v1/profiles".into(), MAX_RECORD).await
+        }
     }
-    run_read(profile_list_args(&settings_of(&state))).await
 }
 
 /// `sessions --json`.
@@ -360,6 +357,48 @@ mod tests {
         ));
         settings.server.as_mut().unwrap().url = "invalid".into();
         assert!(story_source(&settings).is_err());
+    }
+
+    #[test]
+    fn remembered_local_api_cannot_intercept_profile_or_save_list_refresh() {
+        let settings = Settings {
+            data_dir: Some(PathBuf::from("D:/selected-save")),
+            local_api: Some(crate::settings::LocalApi {
+                port: 1,
+                token: "a".repeat(64),
+            }),
+            ..Settings::default()
+        };
+        for (account, list, expected) in [
+            (None, false, profile_args(&settings, None).unwrap()),
+            (Some(ID), false, profile_args(&settings, Some(ID)).unwrap()),
+            (None, true, profile_list_args(&settings)),
+        ] {
+            let StorySource::Local(args) = profile_source(&settings, account, list).unwrap() else {
+                panic!("saved profiles must remain readable when the local server has stopped");
+            };
+            assert_eq!(args, expected);
+        }
+    }
+
+    #[test]
+    fn remote_profiles_and_save_list_never_substitute_local_data() {
+        let mut settings = Settings {
+            server: Some(crate::settings::RemoteServer {
+                url: "http://192.0.2.1:32123".into(),
+                token: "a".repeat(64),
+            }),
+            ..Settings::default()
+        };
+        for list in [false, true] {
+            assert!(matches!(
+                profile_source(&settings, None, list),
+                Ok(StorySource::Remote(_))
+            ));
+        }
+        settings.server.as_mut().unwrap().url = "invalid".into();
+        assert!(profile_source(&settings, None, false).is_err());
+        assert!(profile_source(&settings, None, true).is_err());
     }
 
     const ID: &str = "0123456789abcdef0123456789abcdef";

@@ -174,6 +174,9 @@ and save list. Old profile reads cannot overwrite a newer refresh or server
 selection. A failed refresh clears the old car and exposes a retry instead of
 continuing to display unconfirmed inventory. This also refreshes a starter car
 selected when skipping the prologue.
+Local profile and save-list reads use the selected data folder even when a saved
+local API address remains after shutdown. Local car/map pictures use their scoped
+cache files and local preparation commands; remote selections stay on their API.
 
 The Story view also supports a standard gamepad: left/right previews a step,
 up/down moves between controls, A activates the focused control, and B cancels a

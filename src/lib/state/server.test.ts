@@ -48,11 +48,11 @@ describe("a server on another PC", () => {
   });
 });
 
-describe("reaching the server through its API", () => {
-  it("is so for another PC's server and for this PC's once it has an API", () => {
+describe("reading pictures through the server API", () => {
+  it("uses remote APIs but keeps local pictures readable after a local server stops", () => {
     expect(viaApi(emptySettings())).toBe(false);
     expect(viaApi({ ...emptySettings(), local_api: { port: 61234, token: "a".repeat(64) } })).toBe(
-      true,
+      false,
     );
     expect(
       viaApi({

@@ -31,12 +31,11 @@ export function isToken(input: string): boolean {
 }
 
 /**
- * Whether the window reaches its server through the server's API: another
- * PC's, or this PC's own once the launcher has started it with the API.
- * Then pictures come from the server too, never from files here.
+ * Pictures from another PC use its API. Local pictures use scoped files,
+ * so a remembered API port cannot make them disappear after the server stops.
  */
 export function viaApi(settings: Settings): boolean {
-  return settings.server !== null || settings.local_api !== null;
+  return settings.server !== null;
 }
 
 /**
