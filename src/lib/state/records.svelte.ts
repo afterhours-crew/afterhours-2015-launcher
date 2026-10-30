@@ -138,7 +138,16 @@ async function sampleSource(): Promise<Source> {
     },
     profile: async (accountId) => {
       const entry = sample.SAMPLE_PROFILE_LIST.accounts.find((a) => a.account_id === accountId);
-      if (!accountId || entry?.active) return ok(sample.SAMPLE_PROFILE);
+      // `&profilewarn`: the active save comes with a warning, for the note above Profile.
+      if (!accountId || entry?.active)
+        return ok(
+          query.has("profilewarn")
+            ? {
+                ...sample.SAMPLE_PROFILE,
+                warnings: ["One table in this sample save could not be read."],
+              }
+            : sample.SAMPLE_PROFILE,
+        );
       if (!entry || entry.error) {
         return { kind: "error", exit: 5, message: entry?.error ?? "No such save." };
       }

@@ -1,17 +1,21 @@
 <script lang="ts">
   import IconFlag3 from "@tabler/icons-svelte/icons/flag-3";
+  import { isLive } from "$lib/state/launchbar";
   import { staggerDelay } from "$lib/state/motion";
   import { current, records } from "$lib/state/records.svelte";
   import { router } from "$lib/state/router.svelte";
+  import { session } from "$lib/state/session.svelte";
   import { storySummary } from "$lib/state/story";
   import { followStory } from "$lib/state/story-follow.svelte";
 
   // Garage (canvas K5): while the prologue is under way, how far along it
   // is and what comes next. Nothing shows once it is complete, or for a
-  // server without the story record.
+  // server without the story record. In a running game the done segments
+  // are striped: the prologue keeps nothing until it is complete.
   followStory();
   let story = $derived(current(records.story));
   let summary = $derived(story ? storySummary(story) : null);
+  let pending = $derived(isLive(session.status?.state) && session.status?.game_running === true);
 </script>
 
 {#if summary && !summary.complete}
@@ -23,6 +27,7 @@
     </div>
     <div
       class="segments"
+      class:pending
       role="progressbar"
       aria-label="Prologue progress"
       aria-valuemin="0"
@@ -100,6 +105,13 @@
   }
   .fill.on {
     transform: scaleX(1);
+  }
+  .pending .fill {
+    background: repeating-linear-gradient(
+      135deg,
+      var(--crew) 0 4px,
+      rgba(61, 214, 140, 0.45) 4px 8px
+    );
   }
   .fill:not(.on) {
     animation: none;

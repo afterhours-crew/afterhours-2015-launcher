@@ -78,11 +78,20 @@
         {/if}
       </div>
     {:else}
-      {#if load.kind === "error"}
-        <div class="note"><Note kind="warn">Showing the last read. {load.message}</Note></div>
-      {/if}
-      {#if profile.warnings.length > 0}
-        <div class="note"><Note>{profile.warnings.join(" ")}</Note></div>
+      {#if load.kind === "error" || profile.warnings.length > 0}
+        <!-- The notes line up with the main column below: the same wrapping
+             row, with an empty stand-in for the side panel. -->
+        <div class="notes" class:cars={section === "cars"}>
+          <div class="note-column">
+            {#if load.kind === "error"}
+              <Note kind="warn">Showing the last read. {load.message}</Note>
+            {/if}
+            {#if profile.warnings.length > 0}
+              <Note>{profile.warnings.join(" ")}</Note>
+            {/if}
+          </div>
+          <span class="note-side" aria-hidden="true"></span>
+        </div>
       {/if}
       {#if section === "cars"}
         <Cars {profile} />
@@ -146,7 +155,34 @@
   .column h1 {
     margin: 0;
   }
-  .note {
+  /* Mirrors the Overview and Cars layouts (main column, then side panel). */
+  .notes {
+    width: 100%;
+    max-width: var(--page-wide);
+    margin-inline: auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    column-gap: var(--space-5);
+  }
+  .note-column {
+    flex: 999 1 560px;
+    min-width: 0;
     max-width: 820px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .note-side {
+    flex: 1 1 320px;
+    max-width: 380px;
+  }
+  .cars .note-column {
+    flex-basis: 600px;
+    max-width: 840px;
+  }
+  .cars .note-side {
+    flex-basis: 300px;
+    max-width: 360px;
   }
 </style>

@@ -46,13 +46,17 @@ export const SAMPLE_VERSION: VersionReport = {
   ],
 };
 
-/** Made-up story state for the development preview; never a gameplay claim. */
+/**
+ * Made-up story state for the development preview; never a gameplay claim.
+ * IDs are decimal strings like the server's objective IDs, so previews pass
+ * the editor's checks.
+ */
 const STORY_STEPS = [
-  ["intro-drive", "Drive to the club"],
-  ["intro-car", "Choose your first car"],
-  ["intro-race", "House Calls"],
-  ["intro-diner", "Diner Dash"],
-  ["intro-garage", "Back to the garage"],
+  ["101", "Drive to the club"],
+  ["102", "Choose your first car"],
+  ["103", "House Calls"],
+  ["104", "Diner Dash"],
+  ["105", "Back to the garage"],
   ["after-intro", "Prologue complete"],
 ] as const;
 

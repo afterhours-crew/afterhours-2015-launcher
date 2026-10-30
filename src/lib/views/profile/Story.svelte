@@ -2,7 +2,9 @@
   import { onDestroy, untrack } from "svelte";
   import { fade } from "svelte/transition";
   import IconArchive from "@tabler/icons-svelte/icons/archive";
+  import IconCar from "@tabler/icons-svelte/icons/car";
   import IconCheck from "@tabler/icons-svelte/icons/check";
+  import IconDeviceFloppy from "@tabler/icons-svelte/icons/device-floppy";
   import IconEye from "@tabler/icons-svelte/icons/eye";
   import IconFlag3 from "@tabler/icons-svelte/icons/flag-3";
   import IconListCheck from "@tabler/icons-svelte/icons/list-check";
@@ -12,6 +14,7 @@
   import CarImage from "$lib/components/CarImage.svelte";
   import EmptyLine from "$lib/components/EmptyLine.svelte";
   import Glass from "$lib/components/Glass.svelte";
+  import InfoButton from "$lib/components/InfoButton.svelte";
   import Note from "$lib/components/Note.svelte";
   import PanelHeading from "$lib/components/PanelHeading.svelte";
   import PillButton from "$lib/components/PillButton.svelte";
@@ -34,12 +37,15 @@
   import type { StoryReport } from "$lib/api/types";
 
   // Profile › Story (canvas row K). One stop per intro objective, then
-  // Prologue complete. Green is played, dashed peach is set in the launcher,
-  // the archive mark is complete in an older save; the white ring is where
-  // the save is. Picking a stop only previews: the server answers with the
-  // exact change, Apply asks it to make that change, Cancel goes back.
+  // Prologue complete, the square save mark. Green is played, dashed peach is
+  // set in the launcher, the archive mark is complete in an older save; your
+  // car in blue is where the save is. No words under the dots: the marks say
+  // it. Picking a stop only previews: the server answers with the exact
+  // change, Apply asks it to make that change, Cancel goes back.
   // While a game runs, the window reads the story again every few seconds
-  // (src/lib/state/story-live.ts) and newly finished steps fill in.
+  // (src/lib/state/story-live.ts) and newly finished steps fill in. The
+  // prologue keeps nothing until it is complete, so while it is under way in
+  // a running game the line between finished steps is striped (canvas L5).
 
   let ready = $derived(featureReady(session.info?.server, "story"));
   let load = $derived(records.story);
@@ -86,6 +92,8 @@
   let noCar = $derived(profile?.cars != null && car === null);
 
   let live = $derived(isLive(session.status?.state) && session.status?.game_running === true);
+  // Finished this sitting but not kept yet: the prologue saves only at its end.
+  let pending = $derived(live && summary !== null && summary.started && !summary.complete);
 
   const scope = () =>
     JSON.stringify([session.settings.data_dir, session.settings.server?.url ?? null]);
@@ -192,7 +200,7 @@
       };
     return {
       tone: "var(--status-ready)",
-      eyebrow: `Prologue · ${summary.done} of ${summary.total} done`,
+      eyebrow: `${live ? "In game · prologue" : "Prologue"} · ${summary.done} of ${summary.total} done`,
       title: `Next: ${summary.next}`,
       line: carLine,
     };
@@ -208,8 +216,9 @@
   function stepLine(index: number): string {
     const stop = stops[index];
     if (!stop || !summary) return "";
-    if (stop.terminal) return "Your saved position";
-    return `Step ${index + 1} of ${summary.total} · your saved position`;
+    const where = pending ? "where the game is now" : "your saved position";
+    if (stop.terminal) return where[0]!.toUpperCase() + where.slice(1);
+    return `Step ${index + 1} of ${summary.total} · ${where}`;
   }
 
   function savedText(): string {
@@ -223,7 +232,7 @@
     }
     if (!summary.started)
       return "Press Play to start with the game's opening scene. You choose your first car along the way.";
-    return "Play carries on from here. Pick another stop to preview a change; nothing is saved until you apply it.";
+    return "";
   }
 </script>
 
@@ -273,11 +282,11 @@
             {#snippet aside()}
               <span class="heading-aside">
                 {#if live}
-                  <span
-                    class="live"
-                    title="Your story is read again every few seconds while the game runs."
-                    ><span class="dot" aria-hidden="true"></span>Live</span
-                  >
+                  <span class="live"><span class="dot" aria-hidden="true"></span>Live</span>
+                  <InfoButton
+                    label="About live progress"
+                    text="Steps fill in here within seconds as you finish them in the game."
+                  />
                 {/if}
                 {#if summary}
                   <span class="chip"
@@ -309,7 +318,7 @@
             {/snippet}
           </PanelHeading>
 
-          <div class="track" style="--count: {stops.length}">
+          <div class="track" class:pending style="--count: {stops.length}">
             <input
               class="range"
               type="range"
@@ -329,6 +338,7 @@
                 {@const label = tag(i)}
                 <li
                   class="stop {stop.kind}"
+                  class:end={stop.terminal}
                   class:picked={i === selected}
                   class:fresh={justDone.includes(stop.id)}
                   class:will={mark === "will-complete"}
@@ -349,23 +359,18 @@
                     {/key}
                   {/if}
                   <span class="marker">
-                    {#if stop.done}
+                    {#if stop.terminal}<IconDeviceFloppy size={16} stroke={2} />
+                    {:else if stop.done}
                       {#if stop.kind === "kept"}<IconArchive
                           size={14}
                           stroke={2}
                         />{:else}<IconCheck size={14} stroke={3} />{/if}
-                    {:else if stop.terminal}<IconFlag3 size={14} stroke={2} />
-                    {:else if !stop.saved}{i + 1}{/if}
+                    {:else if stop.saved}<IconCar size={20} stroke={2} />
+                    {:else}{i + 1}{/if}
                   </span>
                   <span class="name">{stop.label}</span>
-                  {#if mark || stop.done}
-                    <span class="word"
-                      >{mark === "will-complete"
-                        ? "Will be done"
-                        : mark === "will-reopen"
-                          ? "Opens again"
-                          : stop.word}</span
-                    >
+                  {#if !mark && (stop.kind === "set" || stop.kind === "kept")}
+                    <span class="word">{stop.word}</span>
                   {/if}
                 </li>
               {/each}
@@ -481,7 +486,7 @@
             {:else if chosen}
               <span class="t-caption">{stepLine(selected)}</span>
               <h2 class="detail-title">{chosen.label}</h2>
-              <span class="soft">{savedText()}</span>
+              {#if savedText()}<span class="soft">{savedText()}</span>{/if}
               {#if edit.kind === "applied"}
                 <span class="t-caption eyebrow-line" in:toastIn
                   ><IconArchive size={16} stroke={1.6} aria-hidden="true" />Story progress updated.
@@ -491,16 +496,21 @@
             {/if}
           </div>
 
-          <div class="actions">
-            {#if summary?.started || summary?.complete}
-              <PillButton disabled={applying} onclick={() => choose(0)}>Replay prologue</PillButton>
-            {/if}
-            {#if !summary?.complete}
-              <PillButton disabled={applying} onclick={() => choose(stops.length - 1)}
-                >Skip prologue</PillButton
-              >
-            {/if}
-          </div>
+          <!-- Replay and skip change the save, which needs the game closed. -->
+          {#if !live}
+            <div class="actions">
+              {#if summary?.started || summary?.complete}
+                <PillButton disabled={applying} onclick={() => choose(0)}
+                  >Replay prologue</PillButton
+                >
+              {/if}
+              {#if !summary?.complete}
+                <PillButton disabled={applying} onclick={() => choose(stops.length - 1)}
+                  >Skip prologue</PillButton
+                >
+              {/if}
+            </div>
+          {/if}
         </Glass>
 
         {#if summary?.complete}
@@ -549,7 +559,7 @@
           </div>
           <span class="t-caption foot"
             >{live
-              ? "Following your game: finished steps show here within seconds."
+              ? "Following your game live. Replay and skip come back once the game is closed."
               : "Read from your save. It updates when a session ends."}</span
           >
         </Glass>
@@ -827,15 +837,22 @@
     border-color: var(--ink-soft);
     color: var(--ink);
   }
+  /* Where the save is: your car, a blue pill on the track (canvas M3). */
   .here .marker {
-    border: 3px solid var(--ink);
+    width: 44px;
+    height: 30px;
+    margin-top: -1px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--speed);
+    color: #08182b;
   }
-  .here .marker::before {
-    content: "";
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--ink);
+  /* Prologue complete: the square mark where the prologue is kept. */
+  .end .marker {
+    width: 34px;
+    height: 34px;
+    margin-top: -3px;
+    border-radius: 10px;
   }
   .reopen .marker {
     opacity: 0.55;
@@ -844,6 +861,21 @@
     box-shadow:
       0 0 0 4px var(--graphite),
       0 0 0 6px var(--ink);
+  }
+  .picked.here .marker {
+    box-shadow: 0 0 0 4px var(--graphite);
+  }
+  /* Finished in this sitting, not kept yet (canvas L5). */
+  .pending .played .fill {
+    background: repeating-linear-gradient(
+      90deg,
+      var(--crew) 0 6px,
+      rgba(61, 214, 140, 0.35) 6px 10px
+    );
+  }
+  .pending .end .marker {
+    border-color: var(--crew);
+    color: var(--crew);
   }
   .fresh .marker {
     animation: arrive var(--motion-slow) var(--ease-out) both;
@@ -871,11 +903,7 @@
     line-height: 1.3;
     color: var(--ink-soft);
   }
-  .played .word {
-    color: var(--crew);
-  }
-  .set .word,
-  .will .word {
+  .set .word {
     color: var(--peach);
   }
   .tag {
