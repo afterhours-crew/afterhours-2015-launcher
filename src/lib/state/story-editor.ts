@@ -1,0 +1,274 @@
+import type { CliResult, StoryApplied, StoryPreview, StoryReport } from "$lib/api/types";
+
+export type StoryEdit =
+  | { kind: "idle" }
+  /** `last`: the preview shown while a picked first car is checked again. */
+  | { kind: "loading"; target: string; starter: string | null; last: StoryPreview | null }
+  | { kind: "ready"; preview: StoryPreview }
+  | { kind: "applying"; preview: StoryPreview }
+  | { kind: "applied"; result: StoryApplied }
+  | { kind: "error"; message: string };
+export interface StoryContext {
+  /** Selected server/data folder. Never contains an API token. */
+  scope: string;
+  story: StoryReport | null;
+  fresh: boolean;
+  canPreview: boolean;
+  canRestart?: boolean;
+}
+interface Request {
+  target: string;
+  account: string;
+  generation: string;
+  scope: string;
+  ticket: number;
+  sourceCheckpoint: string;
+  restart: boolean;
+  /** The first car picked from an earlier preview's `starters`. */
+  starter: string | null;
+}
+interface Source {
+  preview(
+    account: string,
+    target: string,
+    starter: string | null,
+    restart: boolean,
+  ): Promise<CliResult>;
+  apply(preview: StoryPreview): Promise<CliResult>;
+}
+const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const guid = (value: unknown): value is string =>
+  typeof value === "string" && /^[a-f0-9]{32}$/.test(value) && value !== "0".repeat(32);
+const decimal = (value: unknown): value is string =>
+  typeof value === "string" &&
+  /^(0|[1-9][0-9]{0,19})$/.test(value) &&
+  BigInt(value) <= 18446744073709551615n;
+const milestones = (value: unknown): boolean =>
+  Array.isArray(value) &&
+  value.length <= 64 &&
+  value.every((item) => item && decimal(item.id) && typeof item.label === "string");
+const starters = (value: unknown): value is StoryPreview["starters"] =>
+  Array.isArray(value) &&
+  value.length <= 3 &&
+  value.every(
+    (car) =>
+      car &&
+      guid(car.id) &&
+      (car.name === null || typeof car.name === "string") &&
+      "image" in car &&
+      (car.image === null || typeof car.image === "object"),
+  ) &&
+  new Set(value.map((car) => car.id)).size === value.length;
+
+/** One command at a time, retaining only the newest slider request. */
+export class StoryEditor {
+  private value: StoryEdit = { kind: "idle" };
+  private ticket = 0;
+  private pending: Request | null = null;
+  private reading = false;
+  private writing = false;
+  private readyScope: string | null = null;
+  constructor(
+    private source: Source,
+    private context: () => StoryContext,
+    private update: (value: StoryEdit) => void,
+    private refresh: (account: string) => Promise<void>,
+  ) {}
+  private set(value: StoryEdit): void {
+    this.value = value;
+    this.update(value);
+  }
+  cancel(): void {
+    ++this.ticket;
+    this.pending = null;
+    this.readyScope = null;
+    this.set({ kind: "idle" });
+  }
+  private current(request: Request, fresh = true): boolean {
+    const context = this.context();
+    return (
+      request.ticket === this.ticket &&
+      context.scope === request.scope &&
+      (!fresh || context.fresh) &&
+      context.story?.account_id === request.account &&
+      context.story.generation === request.generation &&
+      context.story.current_checkpoint === request.sourceCheckpoint
+    );
+  }
+  select(
+    target: string,
+    starter: string | null = null,
+    last: StoryPreview | null = null,
+    restart = false,
+  ): void {
+    this.cancel();
+    const context = this.context();
+    const story = context.story;
+    if (
+      !context.canPreview ||
+      !context.fresh ||
+      !story ||
+      (!restart && target === story.current_checkpoint)
+    )
+      return;
+    if (!story.checkpoints.some((point) => point.id === target)) return;
+    if (restart && (!context.canRestart || starter !== null || target !== story.checkpoints[0]?.id))
+      return;
+    this.pending = {
+      target,
+      account: story.account_id,
+      generation: story.generation,
+      scope: context.scope,
+      ticket: this.ticket,
+      sourceCheckpoint: story.current_checkpoint,
+      restart,
+      starter,
+    };
+    this.set({ kind: "loading", target, starter, last });
+    void this.drain();
+  }
+  /**
+   * Pick the first car the shown preview offers. The server binds the car
+   * into the plan, so the same change is previewed again with it; Apply
+   * then sends that car.
+   */
+  pickStarter(id: string): void {
+    if (this.value.kind !== "ready" || this.writing) return;
+    const preview = this.value.preview;
+    if (preview.starter === id || !preview.starters.some((car) => car.id === id)) return;
+    this.select(preview.target_checkpoint, id, preview);
+  }
+  private async drain(): Promise<void> {
+    if (this.reading || this.writing) return;
+    this.reading = true;
+    try {
+      while (this.pending) {
+        const request = this.pending;
+        this.pending = null;
+        try {
+          const response = await this.source.preview(
+            request.account,
+            request.target,
+            request.starter,
+            request.restart,
+          );
+          if (!this.current(request)) {
+            if (request.ticket === this.ticket && !this.pending) this.set({ kind: "idle" });
+            continue;
+          }
+          if (response.kind === "error") {
+            this.set({ kind: "error", message: response.message });
+            continue;
+          }
+          const preview = response.value as StoryPreview;
+          if (
+            !preview ||
+            preview.version !== 1 ||
+            preview.account_id !== request.account ||
+            preview.generation !== request.generation ||
+            preview.source_checkpoint !== request.sourceCheckpoint ||
+            preview.target_checkpoint !== request.target ||
+            (preview.restart ?? false) !== request.restart ||
+            typeof preview.plan_id !== "string" ||
+            !/^[a-f0-9]{64}$/.test(preview.plan_id) ||
+            !decimal(preview.operation_id) ||
+            !milestones(preview.completes) ||
+            !milestones(preview.reopens) ||
+            !Array.isArray(preview.reasons) ||
+            !preview.reasons.every((reason) => typeof reason === "string") ||
+            typeof preview.can_apply !== "boolean" ||
+            !starters(preview.starters) ||
+            !(preview.car_images === null || typeof preview.car_images === "string") ||
+            preview.starter !== request.starter ||
+            (request.starter !== null &&
+              !preview.starters.some((car) => car.id === request.starter))
+          )
+            throw new Error("The story preview changed. Refresh your story.");
+          this.readyScope = request.scope;
+          this.set({ kind: "ready", preview });
+        } catch (error) {
+          if (this.current(request)) this.set({ kind: "error", message: message(error) });
+        }
+      }
+    } finally {
+      this.reading = false;
+    }
+  }
+  get canApply(): boolean {
+    if (this.value.kind !== "ready" || this.writing || this.pending) return false;
+    const context = this.context();
+    const story = context.story;
+    const preview = this.value.preview;
+    return !!(
+      context.fresh &&
+      context.canPreview &&
+      context.scope === this.readyScope &&
+      story?.can_edit &&
+      !story.session_running &&
+      preview.can_apply &&
+      (!preview.restart || context.canRestart) &&
+      story.account_id === preview.account_id &&
+      story.generation === preview.generation &&
+      story.current_checkpoint === preview.source_checkpoint &&
+      // A skip past the car choice applies only with one of its cars picked.
+      ((preview.starters ?? []).length === 0 ||
+        (preview.starters ?? []).some((car) => car.id === preview.starter)) &&
+      story.checkpoints.some((point) => point.id === preview.target_checkpoint && point.selectable)
+    );
+  }
+  async apply(): Promise<void> {
+    if (!this.canApply || this.value.kind !== "ready") return;
+    const preview = this.value.preview;
+    const request: Request = {
+      account: preview.account_id,
+      generation: preview.generation,
+      target: preview.target_checkpoint,
+      ticket: this.ticket,
+      scope: this.context().scope,
+      sourceCheckpoint: preview.source_checkpoint,
+      starter: preview.starter ?? null,
+      restart: preview.restart ?? false,
+    };
+    this.writing = true;
+    this.set({ kind: "applying", preview });
+    try {
+      const response = await this.source.apply(preview);
+      if (!this.current(request, false)) return;
+      if (response.kind === "error") throw new Error(response.message);
+      const result = response.value as StoryApplied;
+      if (
+        !result ||
+        result.version !== 1 ||
+        result.account_id !== request.account ||
+        result.previous_generation !== request.generation ||
+        result.target_checkpoint !== request.target ||
+        (result.restart ?? false) !== request.restart ||
+        !decimal(result.generation) ||
+        BigInt(result.generation) !== BigInt(request.generation) + 1n ||
+        !/^[a-f0-9]{64}$/.test(result.backup?.id ?? "") ||
+        !/^[a-f0-9]{64}$/.test(result.backup?.database_sha256 ?? "") ||
+        result.backup?.generation !== request.generation ||
+        result.starter !== request.starter
+      )
+        throw new Error("Could not confirm the story change. Refresh your story.");
+      this.set({ kind: "applied", result });
+    } catch (error) {
+      if (this.current(request, false)) this.set({ kind: "error", message: message(error) });
+    } finally {
+      this.writing = false;
+      // A timeout may follow a committed write. Read actual progress; never
+      // guess a rollback, update the marker optimistically or retry a write.
+      if (request.ticket === this.ticket && !this.current(request, false))
+        this.set({ kind: "idle" });
+      if (request.scope === this.context().scope) {
+        try {
+          await this.refresh(request.account);
+        } catch (error) {
+          if (request.scope === this.context().scope && request.ticket === this.ticket)
+            this.set({ kind: "error", message: message(error) });
+        }
+      }
+      void this.drain();
+    }
+  }
+}

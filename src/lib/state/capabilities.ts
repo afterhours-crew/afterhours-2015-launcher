@@ -17,6 +17,9 @@ import type { ServerInfo } from "$lib/api/types";
  */
 export type Capability =
   | "profile"
+  | "story"
+  | "story-preview"
+  | "story-restart"
   | "sessions"
   | "events"
   | "play"
@@ -40,6 +43,7 @@ export function hasCapability(
  */
 export const FEATURES = {
   profile: "profile",
+  story: "story",
   cars: "profile",
   "save-data": "profile",
   /** Each car's in-game picture on Cars and Profile. */

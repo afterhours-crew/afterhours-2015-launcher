@@ -21,7 +21,38 @@ brings both. Cops and driver edits wait for server work.
 Releases are published on this repository's Releases page. See
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
+## Isolated prologue installer preview
+
+`scripts/preview-package.mjs --server-package <folder> --out <new-folder>`
+checks a clean canonical terminal package's source/target/hash and runs the GUI
+contract against its executable. It produces an explicit Tauri config and
+allowlisted server inputs. The normal release pin and verified sidecar stay
+unchanged; About still reports the production pin separately from the candidate.
+Build with `pnpm tauri build --no-bundle --config <new-folder>/tauri-preview.json`,
+then `pnpm tauri bundle --bundles nsis --config <new-folder>/tauri-preview.json`.
+Use the same config for both commands. No updater signing or release publication
+is needed for this local preview.
+
+The installer is named **Afterhours Prologue Preview** and uses the distinct
+`crew.afterhours.launcher.prologue-preview` identifier. Its settings and server
+data (`server` under its local app data folder) are separate from the normal
+launcher, so a first install opens the first-run wizard. Missing/default data
+settings never fall back to the production save. Automatic updates are off and
+this preview has no release update endpoint. An explicitly chosen data folder
+survives a restart. Uninstalling the preview does not reset saved progress.
+Package only the matching executables, licenses, build identity and test
+instructions; never preseed an account or include extracted game content.
+
 ## Run it
+
+If the Windows launcher fails before its main window opens, it shows a native
+startup error dialog and writes `startup-error.json` in its local app data folder.
+If that folder cannot be written, the dialog gives the temporary report path or
+reports both write failures. The report contains the initialization stage, error,
+version and resolved directories, without settings, command arguments, tokens or
+save contents. It stays local; review it before sharing because paths can include
+your Windows username. The native dialog uses the existing MIT-licensed `rfd`
+0.16.0 dependency and does not require a working webview.
 
 1. Install the [Tauri prerequisites](https://tauri.app/start/prerequisites/)
    for your platform, Rust 1.98.1 (selected by `rust-toolchain.toml`), Node 24
@@ -104,6 +135,53 @@ the game and keeps the usual first run. The decision is
 `src-tauri/src/detect.rs` (`game_folder`).
 
 ## How it works
+
+Profile → Story shows the saved prologue position and previews another checkpoint
+without changing the save. Restart story and Skip prologue select its endpoints;
+Cancel returns to the saved marker. With a server that reports `story-preview`,
+the selection requests an exact server preview of objectives to complete or reopen.
+Apply sends that same preview proof back to the server, which owns process checks,
+the save backup and the transaction. A timed-out reply causes a fresh read rather
+than an automatic retry. Remote saves are read from their selected server; edit
+them from the launcher on that server's PC. Checkpoints remain unavailable for
+Apply until the server supports their native game restart path. The development
+sample previews changes but cannot write a save.
+
+Local story reads use the bundled command and selected data folder even after
+the local API stops. The command checks the real session and save-writer locks;
+remembered API settings do not imply that a server is running. After an owned or
+adopted session ends, the view refreshes through a bounded shutdown grace period.
+An unavailable remote server never falls back to this PC's save.
+
+The timeline keeps checkpoint names, completion history and edit previews. It
+omits the current-position badge, repeated future-step labels and the inline
+controller hint; the range still announces its saved position to screen readers.
+
+When Skip needs a first car, the server supplies the authored choices; picking one
+requests a new proof before Apply becomes available. Missing or malformed choice
+fields are refused. A compatible server supports the opening and completed
+prologue endpoints; intermediate steps remain progress markers. Restart story
+requires `story-restart` and explicitly previews a whole-career reset, including
+later story progress, cars, parts, money, REP, unlocks and race records. It is
+available even at the opening checkpoint. The final button says “Back up and
+restart story”; the server verifies a full backup before its atomic transaction.
+Identity, settings and saved designs remain. An older server without the
+capability does not offer this action. Ordinary CLI checkpoint changes retain
+their previous reward-preserving behavior.
+
+After a story write, the launcher reloads the authoritative story, active profile
+and save list. Old profile reads cannot overwrite a newer refresh or server
+selection. A failed refresh clears the old car and exposes a retry instead of
+continuing to display unconfirmed inventory. This also refreshes a starter car
+selected when skipping the prologue.
+Local profile and save-list reads use the selected data folder even when a saved
+local API address remains after shutdown. Local car/map pictures use their scoped
+cache files and local preparation commands; remote selections stay on their API.
+
+The Story view also supports a standard gamepad: left/right previews a step,
+up/down moves between controls, A activates the focused control, and B cancels a
+preview. Connecting a controller or returning focus while a button is held never
+activates it; release it first. Keyboard and pointer controls remain available.
 
 ```text
 window (Svelte)  --invoke-->  src-tauri (Rust)  --spawn-->  Afterhours.exe  --spawn-->  Afterhours.exe supervise
@@ -318,6 +396,39 @@ left out everywhere. Nothing is gated on it.
 
 ## Checks
 
+### Prologue preview artifacts
+
+The existing CI workflow can build a paired preview entirely on GitHub. Dispatch
+it on the launcher branch with the exact canonical server commit:
+
+```sh
+gh workflow run ci.yml --ref <launcher-branch> -f preview_server_revision=<40-character-server-commit>
+```
+
+The `afterhours-prologue-preview` artifact contains an unsigned NSIS installer,
+a matching portable ZIP, source/build hashes and startup results. It builds the
+server from `afterhours-crew/afterhours-2015` with its locked toolchain and canonical
+packager, checks the actual CLI contract, and bundles the candidate using the
+isolated preview identity. The normal server release pin remains unchanged.
+No release, tag, signing key or owner machine is needed to produce these files.
+
+After building, the disposable Windows runner installs the package at its default
+per-user location, checks registration and candidate hashes, and reads the actual
+first-run `Find your game` heading through Windows accessibility. It closes that
+window normally and checks the extracted portable ZIP as well. It never completes
+setup or launches a game. `scripts/Test-PreviewStartup.ps1` refuses to run outside
+a GitHub-hosted Windows job. Failed reports are uploaded too: require a successful
+run and `startup-check.json` with `status: passed` before handing off the package.
+This tests installer/startup on the runner; the owner's Windows environment and
+full new-user gameplay remain separate acceptance checks.
+
+For a local build-only portable preview, use `scripts/portable-zip.mjs --exe
+<built-launcher.exe> --out <new-folder> --preview-input <preview-package-output>`
+after committing the launcher source. It rechecks the candidate bytes instead of
+silently substituting the release-pinned server. Building does not execute the
+installer or GUI. Unsigned-publisher prompts occur when Windows runs downloaded
+executables; the repository's existing Authenticode policy is unchanged.
+
 ```sh
 pnpm format:check && pnpm versions && pnpm check && pnpm test
 pnpm sidecar && pnpm contract
@@ -332,6 +443,13 @@ real `--api` session and stops it through the API (see
 `src-tauri/src/connection.rs` for how to run it). See
 [CONTRIBUTING.md](CONTRIBUTING.md), [RELEASING.md](RELEASING.md) and
 [AGENTS.md](AGENTS.md).
+
+The CLI contract suite uses Node 24's SQLite support to construct disposable
+accounts from the public storage format. A server advertising story editing must
+pass successful read/preview/apply, first-car choice, backup, retry, rewind and
+stale-plan checks. The fixture builder is test tooling; the application does not
+edit databases. Use `AFTERHOURS_EXE` to check a candidate build without changing
+the release pin. These checks do not establish game or physical-controller acceptance.
 
 ## License
 

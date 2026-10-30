@@ -17,6 +17,7 @@ import type {
   SessionList,
   SettingsReport,
   Status,
+  StoryReport,
   VersionReport,
 } from "$lib/api/types";
 
@@ -32,6 +33,8 @@ export const SAMPLE_VERSION: VersionReport = {
   records: { profile: 1, "profile-list": 1, sessions: 1, status: 1, version: 1 },
   capabilities: [
     "profile",
+    "story",
+    "story-preview",
     "sessions",
     "events",
     "play",
@@ -42,6 +45,74 @@ export const SAMPLE_VERSION: VersionReport = {
     "api",
   ],
 };
+
+/**
+ * Made-up story state for the development preview; never a gameplay claim.
+ * IDs are decimal strings like the server's objective IDs, so previews pass
+ * the editor's checks.
+ */
+const STORY_STEPS = [
+  ["101", "Drive to the club"],
+  ["102", "Choose your first car"],
+  ["103", "House Calls"],
+  ["104", "Diner Dash"],
+  ["105", "Back to the garage"],
+  ["after-intro", "Prologue complete"],
+] as const;
+
+/**
+ * `story --json` at one saved position. `progress` has three objectives
+ * played (or `done` of them, for the live preview, where 6 completes the
+ * prologue); `fresh` none; `done` all played; `skipped` the first three
+ * played and the rest set in the launcher; `older` all complete in a save
+ * without gameplay receipts. Labels are the proposed player-facing names.
+ */
+export function sampleStory(variant: string | null, done?: number): StoryReport {
+  const kind = variant ?? "progress";
+  const count =
+    kind === "fresh"
+      ? 0
+      : kind === "progress"
+        ? Math.min(STORY_STEPS.length, done ?? 3)
+        : STORY_STEPS.length;
+  const current = Math.min(count, STORY_STEPS.length - 1);
+  const complete = count === STORY_STEPS.length;
+  return {
+    version: 1,
+    account_id: "0123456789abcdef0123456789abcdef",
+    generation: String(42 + count),
+    current_checkpoint: STORY_STEPS[current]![0],
+    intro_completed: complete,
+    session_running: done !== undefined && !complete,
+    can_edit: false,
+    warnings: ["Story checkpoint editing awaits playable prologue integration."],
+    checkpoints: STORY_STEPS.map(([id, label], i) => {
+      const completed = i < count;
+      return {
+        id,
+        label,
+        active: i === current,
+        completed,
+        played: completed && kind !== "older" && !(kind === "skipped" && i >= 3),
+        edited: completed && kind === "skipped" && i >= 3,
+        existing: completed && kind === "older",
+        reward_claimed: completed && i === 1,
+        selectable: false,
+      };
+    }),
+  };
+}
+
+export const SAMPLE_STORY: StoryReport = sampleStory("progress");
+
+/** The first cars a skip past the car choice offers (`story-preview` `starters`). */
+export function sampleStarters() {
+  return [
+    ["592ac0f528a4f4a56d80ff6c290f2f54", "Subaru BRZ Premium"],
+    ["cdb48f852999625a8cfe5bab8332df47", "Ford Mustang Foxbody (1990)"],
+    ["0b18c9413a0f38f4815a80342a62dc4e", "Honda Civic Type-R (2000)"],
+  ].map(([id, name]) => ({ id: id!, name: name!, image: images(id!, ["large"]) }));
+}
 
 /** Where `map-images` writes the decoded world map, for the current content. */
 export const SAMPLE_MAP_DIR =

@@ -28,6 +28,8 @@ export interface LaunchBarInput {
   running: boolean;
   /** The server reports `play`: it can start the game in a serve session. */
   canPlay: boolean;
+  /** Current local session's preparation hint; never a readiness signal. */
+  preparation?: string | null;
   /** The server in use when it is one on another PC; `null` is this PC's own. */
   server?: { name: string; address: string } | null;
 }
@@ -156,7 +158,13 @@ export function launchBarModel(input: LaunchBarInput): LaunchBarModel {
     });
     switch (phase) {
       case "preparing":
-        return live("Preparing", "Preparing", "Checking game files and your account", "info", null);
+        return live(
+          "Preparing",
+          "Preparing",
+          (!input.server && input.preparation) || "Checking game files and your account",
+          "info",
+          null,
+        );
       case "starting":
         return live(
           "Starting",

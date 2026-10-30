@@ -231,10 +231,10 @@ pub async fn car_images(
     app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<CliResult, String> {
-    if let Some(endpoint) = state.server_endpoint() {
+    let settings = state.settings();
+    if let Some(endpoint) = image_endpoint(&settings)? {
         return through_api(endpoint, "/v1/car-images", CAR_IMAGES_TIMEOUT).await;
     }
-    let settings = state.settings();
     let args = car_images_args(&settings);
     decode(app, settings, args, CAR_IMAGES_TIMEOUT).await
 }
@@ -247,12 +247,22 @@ pub async fn map_images(
     app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<CliResult, String> {
-    if let Some(endpoint) = state.server_endpoint() {
+    let settings = state.settings();
+    if let Some(endpoint) = image_endpoint(&settings)? {
         return through_api(endpoint, "/v1/map-images", MAP_IMAGES_TIMEOUT).await;
     }
-    let settings = state.settings();
     let args = map_images_args(&settings);
     decode(app, settings, args, MAP_IMAGES_TIMEOUT).await
+}
+
+/// Local content is independent of a remembered session API address. Invalid
+/// remote selections fail rather than decoding unrelated content on this PC.
+fn image_endpoint(settings: &Settings) -> Result<Option<crate::connection::Endpoint>, String> {
+    settings
+        .server
+        .as_ref()
+        .map(crate::connection::Endpoint::remote)
+        .transpose()
 }
 
 /// Decode through the server's API: its record, or why not.
@@ -288,6 +298,25 @@ async fn decode(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cached_local_api_does_not_block_image_preparation_after_shutdown() {
+        let mut settings = Settings {
+            local_api: Some(crate::settings::LocalApi {
+                port: 1,
+                token: "a".repeat(64),
+            }),
+            ..Settings::default()
+        };
+        assert!(image_endpoint(&settings).unwrap().is_none());
+        settings.server = Some(crate::settings::RemoteServer {
+            url: "http://192.0.2.1:32123".into(),
+            token: "a".repeat(64),
+        });
+        assert!(image_endpoint(&settings).unwrap().is_some());
+        settings.server.as_mut().unwrap().url = "invalid".into();
+        assert!(image_endpoint(&settings).is_err());
+    }
 
     #[test]
     fn picture_fetches_queue_a_few_at_a_time() {

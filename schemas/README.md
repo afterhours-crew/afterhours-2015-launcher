@@ -1,5 +1,12 @@
 # Schemas
 
+The story preview/apply and version schemas include the additive `restart`
+intent and `story-restart` capability from canonical `codex/story-restart`
+(issue #214). They are copied from the server's generated schemas and formatted
+with Prettier; the release pin stays unchanged. The paired preview build tests
+that revision explicitly. The CLI contract includes a real helper reset at an
+already-current opening, backup verification and a different starter afterward.
+
 JSON Schemas for what the bundled `Afterhours.exe` prints with `--json`.
 `pnpm types` turns each `<name>.schema.json` into
 `src/lib/api/generated/<name>.ts`, and `pnpm contract` validates the pinned
@@ -12,6 +19,20 @@ took every `schema/*.schema.json` from that release's
 replaced this folder with them. Each later pin bump does the same
 (RELEASING.md). Do not edit these files by hand; fix a schema in the server
 repository, where it is generated from the Rust types, and bump the pin.
+
+The story timeline is being developed against the server branch
+`codex/prologue-story`: `story.schema.json` and `version.schema.json` come
+from that branch's generated schemas, formatted by Prettier. The release pin
+stays unchanged until this contract ships. The pinned server has no `story`
+capability and displays the usual coming note; a development `AFTERHOURS_EXE`
+build exercises the story view. Checkpoint apply remains disabled until the
+runtime supports starting from those boundaries. `story-preview.schema.json`,
+`story-apply.schema.json` and `version.schema.json` now come unchanged
+(formatted by Prettier) from `feature/story-starter` (commits 8c0e737 and
+ca6eb2b, stacked on `codex/prologue-story`): the preview's `starters` and
+`starter`, the starters' pictures with `car_images`, the applied `starter`
+and the `story-starter` capability, for the first-car pick when a skip
+passes the car choice.
 
 **Ahead of the next release:** `map-images.schema.json` is new, copied unchanged
 from afterhours-2015 `feature/map-images` (pull request #158), which the Map screen

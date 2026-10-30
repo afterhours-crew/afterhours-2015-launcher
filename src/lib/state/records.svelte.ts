@@ -16,6 +16,8 @@ import type {
   SessionFileText,
   SessionList,
   SettingsReport,
+  StoryReport,
+  StoryPreview,
 } from "$lib/api/types";
 import { hasCapability } from "./capabilities";
 import { needsCarImages } from "./carimages";
@@ -23,6 +25,8 @@ import { isLive } from "./launchbar";
 import { applyChoice, saveArgs } from "./world";
 import { loadSample, sampleMode } from "./preview";
 import { session } from "./session.svelte";
+import { sameProgress } from "./story";
+import { refreshStoppedStory, StoryFollower } from "./story-live";
 
 export type Load<T> =
   | { kind: "idle" }
@@ -45,6 +49,14 @@ interface WorldChange {
 }
 
 interface Source {
+  story(): Promise<CliResult>;
+  storyPreview(
+    account: string,
+    target: string,
+    starter: string | null,
+    restart: boolean,
+  ): Promise<CliResult>;
+  storyApply(preview: StoryPreview): Promise<CliResult>;
   profile(accountId: string | null): Promise<CliResult>;
   profileList(): Promise<CliResult>;
   sessions(): Promise<CliResult>;
@@ -63,7 +75,54 @@ async function sampleSource(): Promise<Source> {
   let world: SettingsReport = query.has("offscale")
     ? { ...sample.SAMPLE_SETTINGS, traffic_percent: 150, rival_limit: 2 }
     : sample.SAMPLE_SETTINGS;
+  // `&story=fresh|done|skipped|older`: other saved positions. `&storylive`
+  // with `&hosting=game`: the game finishes one more objective every few reads.
+  const variant = query.get("story");
+  let reads = 0;
+  const story = () =>
+    query.has("storylive")
+      ? sample.sampleStory("progress", 1 + Math.floor(reads++ / 3))
+      : sample.sampleStory(variant);
   return {
+    story: async () => ok(story()),
+    storyPreview: async (account, target, starter, restart) => {
+      const story = sample.sampleStory(variant);
+      const at = story.checkpoints.findIndex((p) => p.id === target);
+      if (account !== story.account_id || at < 0)
+        return { kind: "error", exit: 1, message: "Unknown sample checkpoint." };
+      // `&story=fresh`: the save has no first car, so a skip past the car choice offers them.
+      const choice = variant === "fresh" && at > 1;
+      if (starter && !(choice && sample.sampleStarters().some((c) => c.id === starter)))
+        return { kind: "error", exit: 1, message: "That car is not one of the choices." };
+      return ok({
+        version: 1,
+        account_id: account,
+        generation: story.generation,
+        source_checkpoint: story.current_checkpoint,
+        restart,
+        target_checkpoint: target,
+        operation_id: "43",
+        plan_id: "a".repeat(64),
+        completes: story.checkpoints
+          .slice(0, at)
+          .filter((p) => !p.completed)
+          .map(({ id, label }) => ({ id, label })),
+        reopens: story.checkpoints
+          .slice(at)
+          .filter((p) => p.completed)
+          .map(({ id, label }) => ({ id, label })),
+        can_apply: false,
+        reasons: ["Sample mode cannot change a save."],
+        starters: choice ? sample.sampleStarters() : [],
+        starter: starter ?? null,
+        car_images: choice ? sample.SAMPLE_CAR_IMAGES : null,
+      } satisfies StoryPreview);
+    },
+    storyApply: async () => ({
+      kind: "error",
+      exit: 1,
+      message: "Sample mode cannot change a save.",
+    }),
     settings: async (change) => {
       if (change.traffic === undefined && change.rivals === undefined) return ok(world);
       if (query.has("savefail") || isLive(session.status?.state)) {
@@ -85,7 +144,16 @@ async function sampleSource(): Promise<Source> {
     },
     profile: async (accountId) => {
       const entry = sample.SAMPLE_PROFILE_LIST.accounts.find((a) => a.account_id === accountId);
-      if (!accountId || entry?.active) return ok(sample.SAMPLE_PROFILE);
+      // `&profilewarn`: the active save comes with a warning, for the note above Profile.
+      if (!accountId || entry?.active)
+        return ok(
+          query.has("profilewarn")
+            ? {
+                ...sample.SAMPLE_PROFILE,
+                warnings: ["One table in this sample save could not be read."],
+              }
+            : sample.SAMPLE_PROFILE,
+        );
       if (!entry || entry.error) {
         return { kind: "error", exit: 5, message: entry?.error ?? "No such save." };
       }
@@ -138,6 +206,18 @@ async function sampleSource(): Promise<Source> {
 }
 
 const live: Source = {
+  story: () => api.story(),
+  storyPreview: (account, target, starter, restart) =>
+    api.storyPreview(account, target, starter, restart),
+  storyApply: (p) =>
+    api.storyApply(
+      p.account_id,
+      p.target_checkpoint,
+      p.generation,
+      p.plan_id,
+      p.starter,
+      p.restart ?? false,
+    ),
   profile: (accountId) => api.profile(accountId),
   profileList: () => api.profileList(),
   sessions: () => api.sessions(),
@@ -151,6 +231,7 @@ function message(e: unknown): string {
 }
 
 export class Records {
+  story = $state<Load<StoryReport>>({ kind: "idle" });
   /** The active save, for the header, Garage and Profile. */
   profile = $state<Load<Profile>>({ kind: "idle" });
   /** Every save in the data folder, for Save data. */
@@ -169,6 +250,17 @@ export class Records {
   private imagesTried: string | null = null;
 
   private source: Promise<Source> | null = null;
+  private storyRead = 0;
+  private storySource = 0;
+  private profileRead = 0;
+  private profilesRead = 0;
+  private pickedRead = 0;
+
+  private profileScope(): string {
+    return JSON.stringify([session.settings.data_dir, session.settings.server]);
+  }
+  /** Reads the story again while a game runs and a screen shows it. */
+  readonly storyLive = new StoryFollower(() => this.pollStory());
 
   private async from(): Promise<Source> {
     this.source ??= sampleMode ? sampleSource() : Promise.resolve(live);
@@ -177,6 +269,43 @@ export class Records {
 
   get canProfile(): boolean {
     return hasCapability(session.info?.server, "profile");
+  }
+
+  async loadStory(): Promise<void> {
+    const ticket = ++this.storyRead;
+    await this.read<StoryReport>(
+      hasCapability(session.info?.server, "story"),
+      (s) => s.story(),
+      (l) => {
+        if (ticket === this.storyRead) this.story = l;
+      },
+      current(this.story),
+    );
+  }
+  /**
+   * A live read while the game runs: quiet, unlike `loadStory`. What is shown
+   * stays until a read brings different progress; a failed read changes
+   * nothing, and a newer read or a server switch wins over this one.
+   */
+  async pollStory(): Promise<void> {
+    if (!hasCapability(session.info?.server, "story")) return;
+    const ticket = ++this.storyRead;
+    const result = await (await this.from()).story();
+    if (ticket !== this.storyRead || result.kind !== "ok") return;
+    const next = result.value as StoryReport;
+    if (this.story.kind !== "ready" || !sameProgress(current(this.story), next))
+      this.story = { kind: "ready", value: next };
+  }
+  async previewStory(
+    account: string,
+    target: string,
+    starter: string | null,
+    restart = false,
+  ): Promise<CliResult> {
+    return (await this.from()).storyPreview(account, target, starter, restart);
+  }
+  async applyStory(preview: StoryPreview): Promise<CliResult> {
+    return (await this.from()).storyApply(preview);
   }
 
   get canSessions(): boolean {
@@ -211,14 +340,39 @@ export class Records {
     }
   }
 
-  async loadProfile(): Promise<void> {
+  async loadProfile(expectedAccount?: string): Promise<void> {
+    const ticket = ++this.profileRead;
+    const scope = this.profileScope();
+    const active = () => ticket === this.profileRead && scope === this.profileScope();
     await this.read<Profile>(
       this.canProfile,
-      (s) => s.profile(null),
-      (l) => (this.profile = l),
+      async (s) => {
+        const result = await s.profile(null);
+        if (
+          result.kind === "ok" &&
+          expectedAccount &&
+          (result.value as Profile).account_id !== expectedAccount
+        )
+          throw new Error("The selected driver changed. Refresh your profile.");
+        return result;
+      },
+      (l) => {
+        if (active()) this.profile = l;
+      },
       current(this.profile),
     );
-    void this.ensureCarImages();
+    if (active()) void this.ensureCarImages();
+  }
+
+  /** A story write can change the whole career. Read committed state, never the preview. */
+  async refreshAfterStory(account: string): Promise<void> {
+    this.profile = { kind: "idle" };
+    this.profiles = { kind: "idle" };
+    this.pickedProfile = { kind: "idle" };
+    ++this.pickedRead;
+    this.picked = null;
+    this.imagesTried = null;
+    await Promise.all([this.loadStory(), this.loadProfile(account), this.loadProfiles()]);
   }
 
   /**
@@ -236,9 +390,10 @@ export class Records {
     if (this.imagesTried === folder) return;
     this.imagesTried = folder;
     this.imagesRunning = true;
+    const scope = this.profileScope();
     try {
       const result = await api.carImages();
-      if (result.kind === "ok") {
+      if (result.kind === "ok" && scope === this.profileScope()) {
         this.imagesRunning = false;
         await this.loadProfile();
       }
@@ -266,10 +421,14 @@ export class Records {
   }
 
   async loadProfiles(): Promise<void> {
+    const ticket = ++this.profilesRead;
+    const scope = this.profileScope();
     await this.read<ProfileList>(
       this.canProfile,
       (s) => s.profileList(),
-      (l) => (this.profiles = l),
+      (l) => {
+        if (ticket === this.profilesRead && scope === this.profileScope()) this.profiles = l;
+      },
       current(this.profiles),
     );
   }
@@ -312,13 +471,17 @@ export class Records {
 
   /** Show one save on Save data; `null` or the active one is the profile. */
   async pick(accountId: string | null): Promise<void> {
+    const ticket = ++this.pickedRead;
+    const scope = this.profileScope();
     const active = current(this.profile);
     this.picked = accountId === active?.account_id ? null : accountId;
     if (this.picked === null) return;
     await this.read<Profile>(
       this.canProfile,
       (s) => s.profile(accountId),
-      (l) => (this.pickedProfile = l),
+      (l) => {
+        if (ticket === this.pickedRead && scope === this.profileScope()) this.pickedProfile = l;
+      },
       null,
     );
   }
@@ -353,6 +516,12 @@ export class Records {
    * and the map is decoded again for the new server.
    */
   async switchServer(): Promise<void> {
+    ++this.profileRead;
+    ++this.profilesRead;
+    ++this.pickedRead;
+    ++this.storySource;
+    ++this.storyRead;
+    this.story = { kind: "idle" };
     this.imagesTried = null;
     this.profile = { kind: "idle" };
     this.profiles = { kind: "idle" };
@@ -369,7 +538,18 @@ export class Records {
     // A session may have prepared new content: pictures can be tried again.
     this.imagesTried = null;
     void this.loadWorld();
-    await Promise.all([this.loadProfile(), this.loadSessions()]);
+    const source = this.storySource;
+    await Promise.all([
+      this.loadProfile(),
+      this.loadSessions(),
+      refreshStoppedStory(
+        async () => {
+          await this.loadStory();
+          return this.story.kind === "ready" ? this.story.value.session_running : null;
+        },
+        () => source === this.storySource && !session.running && !isLive(session.status?.state),
+      ),
+    ]);
   }
 }
 

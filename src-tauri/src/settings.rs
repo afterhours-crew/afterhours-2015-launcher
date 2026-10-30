@@ -175,7 +175,23 @@ fn file(app: &AppHandle) -> Result<PathBuf, String> {
 /// Read settings from disk; a missing or unreadable file yields defaults.
 pub fn load(app: &AppHandle) -> Result<Settings, Box<dyn std::error::Error>> {
     let path = file(app)?;
-    Ok(read(&path))
+    Ok(for_distribution(
+        read(&path),
+        &app.config().identifier,
+        &app.path().app_local_data_dir()?,
+    ))
+}
+
+/// A preview installation has its own Tauri identifier and server data. Never
+/// fall back to the production server directory when its settings are absent.
+fn for_distribution(mut settings: Settings, identifier: &str, local_data: &Path) -> Settings {
+    if identifier == "crew.afterhours.launcher.prologue-preview" {
+        settings
+            .data_dir
+            .get_or_insert_with(|| local_data.join("server"));
+        settings.updates.mode = UpdateMode::Off;
+    }
+    settings
 }
 
 pub(crate) fn read(path: &Path) -> Settings {
@@ -239,7 +255,11 @@ pub fn save_settings(
         local_api: current.local_api.clone(),
         ..settings
     };
-    let stored = to_store(settings, &current, &state.game_folder(&current));
+    let stored = for_distribution(
+        to_store(settings, &current, &state.game_folder(&current)),
+        &app.config().identifier,
+        &app.path().app_local_data_dir().map_err(|e| e.to_string())?,
+    );
     write(&file(&app)?, &stored)?;
     *current = stored;
     let saved = effective(&current, &state.game_folder(&current));
@@ -303,6 +323,38 @@ pub fn write_server(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preview_is_fresh_and_isolated_while_normal_defaults_and_choices_survive() {
+        let base = Path::new("preview-local-data");
+        let preview = for_distribution(
+            Settings::default(),
+            "crew.afterhours.launcher.prologue-preview",
+            base,
+        );
+        assert_eq!(preview.data_dir, Some(base.join("server")));
+        assert_eq!(preview.updates.mode, UpdateMode::Off);
+        assert!(!preview.first_run_done);
+        assert!(
+            preview.game_dir.is_none() && preview.local_api.is_none() && preview.server.is_none()
+        );
+        assert_eq!(
+            for_distribution(Settings::default(), "crew.afterhours.launcher", base),
+            Settings::default()
+        );
+        let chosen = Settings {
+            data_dir: Some(PathBuf::from("chosen-preview-save")),
+            first_run_done: true,
+            ..Settings::default()
+        };
+        let reopened = for_distribution(
+            chosen.clone(),
+            "crew.afterhours.launcher.prologue-preview",
+            base,
+        );
+        assert_eq!(reopened.data_dir, chosen.data_dir);
+        assert!(reopened.first_run_done);
+    }
 
     #[test]
     fn settings_round_trip_and_tolerate_missing_or_broken_files() {

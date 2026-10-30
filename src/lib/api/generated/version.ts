@@ -12,6 +12,9 @@ export type Capability =
   | "car-images"
   | "map-images"
   | "world-settings"
+  | "story"
+  | "story-preview"
+  | "story-restart"
   | "map-feed"
   | "api";
 

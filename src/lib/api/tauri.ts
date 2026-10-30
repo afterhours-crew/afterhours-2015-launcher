@@ -102,6 +102,30 @@ export const api = {
    * `/v1/profile`), or the account named.
    */
   profile: (accountId: string | null = null) => invoke<CliResult>("profile", { accountId }),
+  story: () => invoke<CliResult>("story"),
+  /** `starter`: the first car picked from an earlier preview's `starters`. */
+  storyPreview: (
+    accountId: string,
+    target: string,
+    starter: string | null = null,
+    restart = false,
+  ) => invoke<CliResult>("story_preview", { accountId, target, starter, restart }),
+  storyApply: (
+    accountId: string,
+    target: string,
+    expectedGeneration: string,
+    planId: string,
+    starter: string | null = null,
+    restart = false,
+  ) =>
+    invoke<CliResult>("story_apply", {
+      accountId,
+      target,
+      expectedGeneration,
+      planId,
+      starter,
+      restart,
+    }),
   profileList: () => invoke<CliResult>("profile_list"),
   sessions: () => invoke<CliResult>("sessions"),
   sessionFile: (id: string, name: string) => invoke<SessionFileText>("session_file", { id, name }),
