@@ -66,3 +66,9 @@ fontsource (SIL OFL 1.1), and for tooling only `json-schema-to-typescript`,
 `ajv` and `fflate` (MIT). The bundled server is MPL-2.0 and ships with
 its own `LICENSE` and `THIRD-PARTY-NOTICES.txt`. Review a new dependency's
 license before adding it.
+
+Discord presence uses `discord-presence` 3.2.0 and Tokio 1.53.3 (MIT).
+The added dependency graph includes `tokio-macros`, `cfg_aliases`, `nix`, and
+`quork-proc` (MIT), plus `num-derive`, `paste`, `proc-macro-error2`,
+`proc-macro-error-attr2`, `quork`, and `windows-sys` (MIT or Apache-2.0).
+Their versions are recorded in `Cargo.lock`; no Discord SDK binary is bundled.

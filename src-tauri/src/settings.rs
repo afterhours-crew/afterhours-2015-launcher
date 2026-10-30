@@ -27,6 +27,8 @@ pub struct Settings {
     /// The first-run wizard has been completed once.
     pub first_run_done: bool,
     pub updates: UpdateSettings,
+    /// Explicit opt-in to sharing basic local activity with the Discord client.
+    pub discord_presence: bool,
     /// Server tag of the last session this launcher started. A different
     /// bundled tag means an update arrived since, and the first start may
     /// rebuild the content cache.
@@ -263,6 +265,7 @@ pub fn save_settings(
     write(&file(&app)?, &stored)?;
     *current = stored;
     let saved = effective(&current, &state.game_folder(&current));
+    state.discord.configure(&saved);
     // A new data folder brings its own pictures folder.
     crate::images::allow(&app, &saved);
     Ok(saved)
@@ -368,6 +371,7 @@ mod tests {
             player_name: Some("Driver_01".into()),
             avatar: Some("style".into()),
             first_run_done: true,
+            discord_presence: true,
             updates: UpdateSettings {
                 mode: UpdateMode::Auto,
                 skipped_version: Some("0.2.0".into()),
@@ -387,6 +391,7 @@ mod tests {
         // Files from before this setting use this PC's own server.
         std::fs::write(&path, br#"{"first_run_done": true}"#).unwrap();
         assert_eq!(read(&path).server, None);
+        assert!(!read(&path).discord_presence);
         assert_eq!(read(&path).local_api, None);
         assert_eq!(read(&path).share_address, None);
         let a = LocalApi::new().unwrap();
