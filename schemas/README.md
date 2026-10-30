@@ -1,5 +1,12 @@
 # Schemas
 
+The story preview/apply and version schemas include the additive `restart`
+intent and `story-restart` capability from canonical `codex/story-restart`
+(issue #214). They are copied from the server's generated schemas and formatted
+with Prettier; the release pin stays unchanged. The paired preview build tests
+that revision explicitly. The CLI contract includes a real helper reset at an
+already-current opening, backup verification and a different starter afterward.
+
 JSON Schemas for what the bundled `Afterhours.exe` prints with `--json`.
 `pnpm types` turns each `<name>.schema.json` into
 `src/lib/api/generated/<name>.ts`, and `pnpm contract` validates the pinned

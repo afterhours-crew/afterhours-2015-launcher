@@ -50,7 +50,12 @@ interface WorldChange {
 
 interface Source {
   story(): Promise<CliResult>;
-  storyPreview(account: string, target: string, starter: string | null): Promise<CliResult>;
+  storyPreview(
+    account: string,
+    target: string,
+    starter: string | null,
+    restart: boolean,
+  ): Promise<CliResult>;
   storyApply(preview: StoryPreview): Promise<CliResult>;
   profile(accountId: string | null): Promise<CliResult>;
   profileList(): Promise<CliResult>;
@@ -80,7 +85,7 @@ async function sampleSource(): Promise<Source> {
       : sample.sampleStory(variant);
   return {
     story: async () => ok(story()),
-    storyPreview: async (account, target, starter) => {
+    storyPreview: async (account, target, starter, restart) => {
       const story = sample.sampleStory(variant);
       const at = story.checkpoints.findIndex((p) => p.id === target);
       if (account !== story.account_id || at < 0)
@@ -94,6 +99,7 @@ async function sampleSource(): Promise<Source> {
         account_id: account,
         generation: story.generation,
         source_checkpoint: story.current_checkpoint,
+        restart,
         target_checkpoint: target,
         operation_id: "43",
         plan_id: "a".repeat(64),
@@ -201,9 +207,17 @@ async function sampleSource(): Promise<Source> {
 
 const live: Source = {
   story: () => api.story(),
-  storyPreview: (account, target, starter) => api.storyPreview(account, target, starter),
+  storyPreview: (account, target, starter, restart) =>
+    api.storyPreview(account, target, starter, restart),
   storyApply: (p) =>
-    api.storyApply(p.account_id, p.target_checkpoint, p.generation, p.plan_id, p.starter),
+    api.storyApply(
+      p.account_id,
+      p.target_checkpoint,
+      p.generation,
+      p.plan_id,
+      p.starter,
+      p.restart ?? false,
+    ),
   profile: (accountId) => api.profile(accountId),
   profileList: () => api.profileList(),
   sessions: () => api.sessions(),
@@ -238,6 +252,13 @@ export class Records {
   private source: Promise<Source> | null = null;
   private storyRead = 0;
   private storySource = 0;
+  private profileRead = 0;
+  private profilesRead = 0;
+  private pickedRead = 0;
+
+  private profileScope(): string {
+    return JSON.stringify([session.settings.data_dir, session.settings.server]);
+  }
   /** Reads the story again while a game runs and a screen shows it. */
   readonly storyLive = new StoryFollower(() => this.pollStory());
 
@@ -275,8 +296,13 @@ export class Records {
     if (this.story.kind !== "ready" || !sameProgress(current(this.story), next))
       this.story = { kind: "ready", value: next };
   }
-  async previewStory(account: string, target: string, starter: string | null): Promise<CliResult> {
-    return (await this.from()).storyPreview(account, target, starter);
+  async previewStory(
+    account: string,
+    target: string,
+    starter: string | null,
+    restart = false,
+  ): Promise<CliResult> {
+    return (await this.from()).storyPreview(account, target, starter, restart);
   }
   async applyStory(preview: StoryPreview): Promise<CliResult> {
     return (await this.from()).storyApply(preview);
@@ -314,14 +340,39 @@ export class Records {
     }
   }
 
-  async loadProfile(): Promise<void> {
+  async loadProfile(expectedAccount?: string): Promise<void> {
+    const ticket = ++this.profileRead;
+    const scope = this.profileScope();
+    const active = () => ticket === this.profileRead && scope === this.profileScope();
     await this.read<Profile>(
       this.canProfile,
-      (s) => s.profile(null),
-      (l) => (this.profile = l),
+      async (s) => {
+        const result = await s.profile(null);
+        if (
+          result.kind === "ok" &&
+          expectedAccount &&
+          (result.value as Profile).account_id !== expectedAccount
+        )
+          throw new Error("The selected driver changed. Refresh your profile.");
+        return result;
+      },
+      (l) => {
+        if (active()) this.profile = l;
+      },
       current(this.profile),
     );
-    void this.ensureCarImages();
+    if (active()) void this.ensureCarImages();
+  }
+
+  /** A story write can change the whole career. Read committed state, never the preview. */
+  async refreshAfterStory(account: string): Promise<void> {
+    this.profile = { kind: "idle" };
+    this.profiles = { kind: "idle" };
+    this.pickedProfile = { kind: "idle" };
+    ++this.pickedRead;
+    this.picked = null;
+    this.imagesTried = null;
+    await Promise.all([this.loadStory(), this.loadProfile(account), this.loadProfiles()]);
   }
 
   /**
@@ -339,9 +390,10 @@ export class Records {
     if (this.imagesTried === folder) return;
     this.imagesTried = folder;
     this.imagesRunning = true;
+    const scope = this.profileScope();
     try {
       const result = await api.carImages();
-      if (result.kind === "ok") {
+      if (result.kind === "ok" && scope === this.profileScope()) {
         this.imagesRunning = false;
         await this.loadProfile();
       }
@@ -369,10 +421,14 @@ export class Records {
   }
 
   async loadProfiles(): Promise<void> {
+    const ticket = ++this.profilesRead;
+    const scope = this.profileScope();
     await this.read<ProfileList>(
       this.canProfile,
       (s) => s.profileList(),
-      (l) => (this.profiles = l),
+      (l) => {
+        if (ticket === this.profilesRead && scope === this.profileScope()) this.profiles = l;
+      },
       current(this.profiles),
     );
   }
@@ -415,13 +471,17 @@ export class Records {
 
   /** Show one save on Save data; `null` or the active one is the profile. */
   async pick(accountId: string | null): Promise<void> {
+    const ticket = ++this.pickedRead;
+    const scope = this.profileScope();
     const active = current(this.profile);
     this.picked = accountId === active?.account_id ? null : accountId;
     if (this.picked === null) return;
     await this.read<Profile>(
       this.canProfile,
       (s) => s.profile(accountId),
-      (l) => (this.pickedProfile = l),
+      (l) => {
+        if (ticket === this.pickedRead && scope === this.profileScope()) this.pickedProfile = l;
+      },
       null,
     );
   }
@@ -456,6 +516,9 @@ export class Records {
    * and the map is decoded again for the new server.
    */
   async switchServer(): Promise<void> {
+    ++this.profileRead;
+    ++this.profilesRead;
+    ++this.pickedRead;
     ++this.storySource;
     ++this.storyRead;
     this.story = { kind: "idle" };

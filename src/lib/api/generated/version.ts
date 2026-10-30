@@ -14,7 +14,7 @@ export type Capability =
   | "world-settings"
   | "story"
   | "story-preview"
-  | "story-starter"
+  | "story-restart"
   | "map-feed"
   | "api";
 

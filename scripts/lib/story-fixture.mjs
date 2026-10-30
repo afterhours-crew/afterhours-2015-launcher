@@ -123,6 +123,53 @@ export function storyFixture(data) {
       })),
     }),
   );
+  const tables = [
+    ["ProgressionObjective", "ObjectiveID", 2],
+    ["PersistentDataTable", "ValueId", 3],
+    ["CollectiblesTable", "CollectibleID", 1],
+    ["RepValuesTable", null, 7],
+    ["DynamicMessage", "Index", 3],
+    ["StaticMessage", "Index", 2],
+    ["GameplayStatsTable", null, 9],
+    ["UgStaticMessages", "Index", 2],
+    ["PoiIdTable", "PoiId", 1],
+    ["GarageItemsTable", "GarageVehicles", 5],
+    ["TutorialTable", "ValueId", 1],
+    ["TicketTable", "Ticketd", 1],
+    ["ProgressionStats", null, 1],
+    ["ActivitiesTable", "ActivityID", 1],
+    ["SpeedListStatsTable", null, 10],
+    ["PrestigeMedalTable", null, 6],
+  ].map(([name, secondary_key, count]) => ({
+    name,
+    key: key(name),
+    secondary_key,
+    using_stores: secondary_key === null,
+    write_whole_rows: false,
+    columns: Array.from({ length: count }, (_, i) => {
+      const column =
+        name === "GarageItemsTable"
+          ? ["PrimaryVehicleItem", "Vehicle1", "Vehicle2", "Vehicle3", "Vehicle4"][i]
+          : name === "ProgressionObjective"
+            ? ["Active", "Completed"][i]
+            : `Column${i}`;
+      return {
+        name: column,
+        key: key(column),
+        value_type: name === "GarageItemsTable" ? "string" : "int",
+        default: "0",
+      };
+    }),
+  }));
+  writeFileSync(
+    join(content, "persistent-content.json"),
+    JSON.stringify({
+      version: 1,
+      build_sha256: build,
+      source: { path: "constructed", sha256: "00".repeat(32) },
+      tables,
+    }),
+  );
   return { database, content };
 }
 

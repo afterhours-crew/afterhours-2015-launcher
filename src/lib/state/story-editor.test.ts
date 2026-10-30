@@ -104,6 +104,52 @@ function fixture() {
   return { context, source, refresh, editor, value: () => value };
 }
 
+describe("explicit fresh-career restart", () => {
+  it("allows the opening to restart itself and sends the exact destructive intent", async () => {
+    const f = fixture();
+    f.context.canRestart = true;
+    const reset = { ...preview("1"), restart: true };
+    f.source.preview.mockResolvedValueOnce(ok(reset));
+    f.source.apply.mockResolvedValueOnce(ok({ ...applied(reset), restart: true }));
+    f.editor.select("1", null, null, true);
+    await flush();
+    expect(f.source.preview).toHaveBeenCalledWith(account, "1", null, true);
+    expect(f.editor.canApply).toBe(true);
+    await f.editor.apply();
+    expect(f.source.apply).toHaveBeenCalledWith(reset);
+    expect(f.value().kind).toBe("applied");
+    expect(f.refresh).toHaveBeenCalledWith(account);
+  });
+  it("never falls back to an ordinary replay when the server ignores restart", async () => {
+    const f = fixture();
+    f.context.canRestart = true;
+    f.editor.select("1", null, null, true);
+    await flush();
+    expect(f.value().kind).toBe("error");
+    expect(f.editor.canApply).toBe(false);
+    await f.editor.apply();
+    expect(f.source.apply).not.toHaveBeenCalled();
+  });
+  it("requires the capability, opening target and no starter choice", () => {
+    const f = fixture();
+    f.editor.select("1", null, null, true);
+    f.context.canRestart = true;
+    f.editor.select("after-intro", null, null, true);
+    f.editor.select("1", BRZ, null, true);
+    expect(f.source.preview).not.toHaveBeenCalled();
+  });
+  it("does not report success if apply omits the restart intent, but refreshes actual state", async () => {
+    const f = fixture();
+    f.context.canRestart = true;
+    f.source.preview.mockResolvedValueOnce(ok({ ...preview("1"), restart: true }));
+    f.editor.select("1", null, null, true);
+    await flush();
+    await f.editor.apply();
+    expect(f.value().kind).toBe("error");
+    expect(f.refresh).toHaveBeenCalledWith(account);
+  });
+});
+
 describe("first car on a skip", () => {
   it("previews again with the picked car and applies only with it", async () => {
     const f = fixture();
@@ -115,7 +161,7 @@ describe("first car on a skip", () => {
     f.editor.pickStarter(BRZ);
     expect(f.value()).toMatchObject({ kind: "loading", starter: BRZ, last: skip(null) });
     await flush();
-    expect(f.source.preview.mock.calls.at(-1)).toEqual([account, "after-intro", BRZ]);
+    expect(f.source.preview.mock.calls.at(-1)).toEqual([account, "after-intro", BRZ, false]);
     expect(f.editor.canApply).toBe(true);
     await f.editor.apply();
     expect(f.source.apply).toHaveBeenCalledWith(skip(BRZ));
@@ -171,7 +217,7 @@ describe("story preview and apply", () => {
     first.resolve(ok(preview("2")));
     await flush();
     expect(f.source.preview).toHaveBeenCalledTimes(2);
-    expect(f.source.preview.mock.calls[1]).toEqual([account, "after-intro", null]);
+    expect(f.source.preview.mock.calls[1]).toEqual([account, "after-intro", null, false]);
     last.resolve(ok(preview()));
     await flush();
     expect(f.value()).toEqual({ kind: "ready", preview: preview() });

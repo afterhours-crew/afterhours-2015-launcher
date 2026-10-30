@@ -137,7 +137,7 @@ the game and keeps the usual first run. The decision is
 ## How it works
 
 Profile → Story shows the saved prologue position and previews another checkpoint
-without changing the save. Replay prologue and Skip prologue select its endpoints;
+without changing the save. Restart story and Skip prologue select its endpoints;
 Cancel returns to the saved marker. With a server that reports `story-preview`,
 the selection requests an exact server preview of objectives to complete or reopen.
 Apply sends that same preview proof back to the server, which owns process checks,
@@ -160,8 +160,20 @@ controller hint; the range still announces its saved position to screen readers.
 When Skip needs a first car, the server supplies the authored choices; picking one
 requests a new proof before Apply becomes available. Missing or malformed choice
 fields are refused. A compatible server supports the opening and completed
-prologue endpoints; intermediate steps remain progress markers. Replay retains
-earned cars and parts, including through the first-car scene.
+prologue endpoints; intermediate steps remain progress markers. Restart story
+requires `story-restart` and explicitly previews a whole-career reset, including
+later story progress, cars, parts, money, REP, unlocks and race records. It is
+available even at the opening checkpoint. The final button says “Back up and
+restart story”; the server verifies a full backup before its atomic transaction.
+Identity, settings and saved designs remain. An older server without the
+capability does not offer this action. Ordinary CLI checkpoint changes retain
+their previous reward-preserving behavior.
+
+After a story write, the launcher reloads the authoritative story, active profile
+and save list. Old profile reads cannot overwrite a newer refresh or server
+selection. A failed refresh clears the old car and exposes a retry instead of
+continuing to display unconfirmed inventory. This also refreshes a starter car
+selected when skipping the prologue.
 
 The Story view also supports a standard gamepad: left/right previews a step,
 up/down moves between controls, A activates the focused control, and B cancels a

@@ -1,6 +1,5 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "additionalProperties": false,
   "definitions": {
     "CarImage": {
       "description": "One cached image for `profile`.",
@@ -72,11 +71,8 @@
       "type": "object"
     },
     "Starter": {
-      "additionalProperties": false,
-      "description": "One first-car choice of a story preview, with what this computer knows of it.",
       "properties": {
         "id": {
-          "description": "Item definition GUID, 32 lowercase hexadecimal digits; pass it as\n`--starter`.",
           "type": "string"
         },
         "image": {
@@ -87,11 +83,9 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The car's decoded pictures, as on profile cars; `null` until\n`car-images` has run for the current content, or when the set has\nnone for this car."
+          ]
         },
         "name": {
-          "description": "The game's long car name from the installation; `null` when it\ncannot be read.",
           "type": ["string", "null"]
         }
       },
@@ -99,7 +93,7 @@
       "type": "object"
     }
   },
-  "description": "`story --preview --json`: the server's preview of a story edit, with\nnames and pictures for its first-car choices.",
+  "description": "The server owns the plan; the launcher adds installed names and cached images.",
   "properties": {
     "account_id": {
       "type": "string"
@@ -108,7 +102,6 @@
       "type": "boolean"
     },
     "car_images": {
-      "description": "The directory of the decoded car images; `null` until `car-images`\nhas run for the current content.",
       "type": ["string", "null"]
     },
     "completes": {
@@ -124,7 +117,6 @@
       "type": "string"
     },
     "plan_id": {
-      "description": "Binds the exact save file, account, generation, target, first car and\nprepared rules.",
       "type": "string"
     },
     "reasons": {
@@ -139,15 +131,16 @@
       },
       "type": "array"
     },
+    "restart": {
+      "type": "boolean"
+    },
     "source_checkpoint": {
       "type": "string"
     },
     "starter": {
-      "description": "The choice this preview's `plan_id` binds, from `--starter`.",
       "type": ["string", "null"]
     },
     "starters": {
-      "description": "First-car choices, listed only when this change completes the car\nchoice on a save without a starter. Apply then requires one of them.",
       "items": {
         "$ref": "#/definitions/Starter"
       },

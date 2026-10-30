@@ -60,7 +60,8 @@
   );
   let selected = $state(0);
   let chosen = $derived(stops[selected]);
-  let previewing = $derived(stops.length > 0 && selected !== saved);
+  let restarting = $state(false);
+  let previewing = $derived(stops.length > 0 && (restarting || selected !== saved));
   let edit = $state<StoryEdit>({ kind: "idle" });
   // While a picked first car is checked again, the last preview stays in view.
   let preview = $derived(
@@ -99,7 +100,8 @@
     JSON.stringify([session.settings.data_dir, session.settings.server?.url ?? null]);
   const editor = new StoryEditor(
     {
-      preview: (account, target, starter) => records.previewStory(account, target, starter),
+      preview: (account, target, starter, restart) =>
+        records.previewStory(account, target, starter, restart),
       apply: (preview) => records.applyStory(preview),
     },
     () => ({
@@ -107,9 +109,10 @@
       story,
       fresh: load.kind === "ready",
       canPreview: hasCapability(session.info?.server, "story-preview"),
+      canRestart: hasCapability(session.info?.server, "story-restart"),
     }),
     (value) => (edit = value),
-    () => records.loadStory(),
+    (account) => records.refreshAfterStory(account),
   );
   let applying = $derived(edit.kind === "applying");
   let canApply = $derived(edit.kind === "ready" && editor.canApply);
@@ -117,13 +120,15 @@
   function choose(index: number) {
     if (applying || index < 0 || index >= stops.length) return;
     selected = index;
+    restarting = index === 0 && hasCapability(session.info?.server, "story-restart");
     const stop = stops[index];
-    if (stop) editor.select(stop.id);
+    if (stop) editor.select(stop.id, null, null, restarting);
   }
   function cancel() {
     if (applying) return;
     editor.cancel();
     selected = saved;
+    restarting = false;
   }
 
   // Steps a live read found finished: they fill in, and one line says so.
@@ -150,6 +155,7 @@
     if (generation !== undefined && account && selectedScope)
       untrack(() => {
         selected = saved;
+        restarting = false;
         editor.cancel();
       });
   });
@@ -180,8 +186,16 @@
       return {
         tone: "var(--peach)",
         eyebrow: "Preview · not saved yet",
-        title: skip ? "Skip the prologue" : `Preview: ${chosen.label}`,
-        line: skip ? "Go straight to the garage and free roam." : carLine,
+        title: restarting
+          ? "Restart the whole story"
+          : skip
+            ? "Skip the prologue"
+            : `Preview: ${chosen.label}`,
+        line: restarting
+          ? "Start a fresh career from the opening scene."
+          : skip
+            ? "Go straight to the garage and free roam."
+            : carLine,
       };
     }
     if (summary.complete)
@@ -399,7 +413,15 @@
                 ><IconEye size={16} stroke={1.6} aria-hidden="true" />Preview only · your save has
                 not changed</span
               >
-              <h2 class="detail-title">{chosen.label}</h2>
+              <h2 class="detail-title">{restarting ? "Restart the whole story" : chosen.label}</h2>
+              {#if restarting}
+                <Note kind="warn"
+                  >Resets all career progress, including progress after the prologue. Your cars,
+                  parts, money, REP, unlocks, challenges and race records return to a fresh save.
+                  Settings and saved designs stay. A verified backup is made before anything
+                  changes.</Note
+                >
+              {/if}
               {#if edit.kind === "loading" && !preview}
                 <span class="t-caption">Checking this change with your server…</span>
               {:else if preview}
@@ -480,7 +502,11 @@
               <div class="detail-actions">
                 <PillButton variant="text" disabled={applying} onclick={cancel}>Cancel</PillButton>
                 <PillButton variant="solid" disabled={!canApply} onclick={() => void editor.apply()}
-                  >{applying ? "Applying…" : "Apply"}</PillButton
+                  >{applying
+                    ? "Applying…"
+                    : restarting
+                      ? "Back up and restart story"
+                      : "Apply"}</PillButton
                 >
               </div>
             {:else if chosen}
@@ -496,13 +522,11 @@
             {/if}
           </div>
 
-          <!-- Replay and skip change the save, which needs the game closed. -->
+          <!-- Restart and skip change the save, which needs the game closed. -->
           {#if !live}
             <div class="actions">
-              {#if summary?.started || summary?.complete}
-                <PillButton disabled={applying} onclick={() => choose(0)}
-                  >Replay prologue</PillButton
-                >
+              {#if hasCapability(session.info?.server, "story-restart")}
+                <PillButton disabled={applying} onclick={() => choose(0)}>Restart story</PillButton>
               {/if}
               {#if !summary?.complete}
                 <PillButton disabled={applying} onclick={() => choose(stops.length - 1)}
@@ -535,6 +559,12 @@
       <aside>
         <Glass radius="phone" label="Your progress" class="panel side">
           <h2 class="t-panel-title">Your progress</h2>
+          {#if records.profile.kind === "error"}
+            <Note kind="warn"
+              >Could not refresh your car and profile. {records.profile.message}</Note
+            >
+            <PillButton onclick={() => records.loadProfile()}>Try again</PillButton>
+          {/if}
           {#if car}
             <CarImage {picture} alt={carName(car)} ratio="16 / 9" icon={32} />
             <div class="list-row stacked">
@@ -559,7 +589,7 @@
           </div>
           <span class="t-caption foot"
             >{live
-              ? "Following your game live. Replay and skip come back once the game is closed."
+              ? "Following your game live. Restart and skip come back once the game is closed."
               : "Read from your save. It updates when a session ends."}</span
           >
         </Glass>

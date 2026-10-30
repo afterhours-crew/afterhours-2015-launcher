@@ -36,9 +36,10 @@
     "replayed": {
       "type": "boolean"
     },
+    "restart": {
+      "type": "boolean"
+    },
     "starter": {
-      "default": null,
-      "description": "The first car granted into garage slot 0 by this edit, once.",
       "type": ["string", "null"]
     },
     "target_checkpoint": {

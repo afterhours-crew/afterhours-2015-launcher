@@ -22,6 +22,7 @@ fn arguments(
     target: &str,
     proof: Option<(&str, &str)>,
     starter: Option<&str>,
+    restart: bool,
 ) -> Result<Vec<String>, String> {
     if settings.server.is_some() {
         return Err("Change story checkpoints from the launcher on the server's own PC.".into());
@@ -57,6 +58,12 @@ fn arguments(
     if let Some(id) = starter {
         args.extend(["--starter".into(), id.into()]);
     }
+    if restart {
+        if starter.is_some() || target == "after-intro" {
+            return Err("Restart needs the opening checkpoint and no first car.".into());
+        }
+        args.push("--restart".into());
+    }
     Ok(args)
 }
 async fn run(args: Vec<String>) -> Result<cli::CliResult, String> {
@@ -75,6 +82,7 @@ pub async fn story_preview(
     account_id: String,
     target: String,
     starter: Option<String>,
+    restart: Option<bool>,
 ) -> Result<cli::CliResult, String> {
     let settings = crate::reads::settings_of(&state);
     run(arguments(
@@ -83,6 +91,7 @@ pub async fn story_preview(
         &target,
         None,
         starter.as_deref(),
+        restart.unwrap_or(false),
     )?)
     .await
 }
@@ -94,6 +103,7 @@ pub async fn story_apply(
     expected_generation: String,
     plan_id: String,
     starter: Option<String>,
+    restart: Option<bool>,
 ) -> Result<cli::CliResult, String> {
     let settings = crate::reads::settings_of(&state);
     run(arguments(
@@ -102,6 +112,7 @@ pub async fn story_apply(
         &target,
         Some((&expected_generation, &plan_id)),
         starter.as_deref(),
+        restart.unwrap_or(false),
     )?)
     .await
 }
@@ -119,14 +130,15 @@ mod tests {
             ..Settings::default()
         };
         let account = "01".repeat(16);
-        assert!(arguments(&settings, &account, "after-intro", None, None).is_err());
+        assert!(arguments(&settings, &account, "after-intro", None, None, false).is_err());
         assert!(
             arguments(
                 &settings,
                 &account,
                 "after-intro",
                 Some(("1", &"b".repeat(64))),
-                None
+                None,
+                false
             )
             .is_err()
         );
@@ -142,6 +154,7 @@ mod tests {
             "9007199254740993",
             Some(("9007199254740994", &plan)),
             None,
+            false,
         )
         .unwrap();
         assert_eq!(
@@ -156,13 +169,33 @@ mod tests {
             ]
         );
         for bad in ["0", "07", "--server", "../save", "18446744073709551616"] {
-            assert!(arguments(&settings, &id, bad, None, None).is_err());
+            assert!(arguments(&settings, &id, bad, None, None, false).is_err());
         }
-        assert!(arguments(&settings, "--data-dir", "after-intro", None, None).is_err());
-        assert!(arguments(&settings, &id, "after-intro", Some(("01", &plan)), None).is_err());
-        assert!(arguments(&settings, &id, "after-intro", Some(("1", "--help")), None).is_err());
+        assert!(arguments(&settings, "--data-dir", "after-intro", None, None, false).is_err());
         assert!(
-            arguments(&settings, &id, "after-intro", None, None)
+            arguments(
+                &settings,
+                &id,
+                "after-intro",
+                Some(("01", &plan)),
+                None,
+                false
+            )
+            .is_err()
+        );
+        assert!(
+            arguments(
+                &settings,
+                &id,
+                "after-intro",
+                Some(("1", "--help")),
+                None,
+                false
+            )
+            .is_err()
+        );
+        assert!(
+            arguments(&settings, &id, "after-intro", None, None, false)
                 .unwrap()
                 .ends_with(&["--preview".into(), "after-intro".into()])
         );
@@ -174,12 +207,19 @@ mod tests {
         let car = "592ac0f528a4f4a56d80ff6c290f2f54";
         let settings = Settings::default();
         assert!(
-            arguments(&settings, &id, "after-intro", None, Some(car))
+            arguments(&settings, &id, "after-intro", None, Some(car), false)
                 .unwrap()
                 .ends_with(&["--starter".into(), car.into()])
         );
-        let apply =
-            arguments(&settings, &id, "after-intro", Some(("1", &plan)), Some(car)).unwrap();
+        let apply = arguments(
+            &settings,
+            &id,
+            "after-intro",
+            Some(("1", &plan)),
+            Some(car),
+            false,
+        )
+        .unwrap();
         assert_eq!(&apply[apply.len() - 2..], ["--starter", car]);
         for bad in [
             "",
@@ -187,7 +227,25 @@ mod tests {
             "592AC0F528A4F4A56D80FF6C290F2F54",
             &"0".repeat(31),
         ] {
-            assert!(arguments(&settings, &id, "after-intro", None, Some(bad)).is_err());
+            assert!(arguments(&settings, &id, "after-intro", None, Some(bad), false).is_err());
+        }
+    }
+    #[test]
+    fn restart_intent_is_explicit_on_preview_and_apply() {
+        let settings = Settings::default();
+        let account = "01".repeat(16);
+        let plan = "a".repeat(64);
+        for proof in [None, Some(("8", plan.as_str()))] {
+            let args = arguments(&settings, &account, "7", proof, None, true).unwrap();
+            assert_eq!(args.last().unwrap(), "--restart");
+            assert!(
+                !arguments(&settings, &account, "7", proof, None, false)
+                    .unwrap()
+                    .iter()
+                    .any(|arg| arg == "--restart")
+            );
+            assert!(arguments(&settings, &account, "after-intro", proof, None, true).is_err());
+            assert!(arguments(&settings, &account, "7", proof, Some(&account), true).is_err());
         }
     }
 }

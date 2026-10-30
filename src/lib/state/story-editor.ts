@@ -14,6 +14,7 @@ export interface StoryContext {
   story: StoryReport | null;
   fresh: boolean;
   canPreview: boolean;
+  canRestart?: boolean;
 }
 interface Request {
   target: string;
@@ -22,11 +23,17 @@ interface Request {
   scope: string;
   ticket: number;
   sourceCheckpoint: string;
+  restart: boolean;
   /** The first car picked from an earlier preview's `starters`. */
   starter: string | null;
 }
 interface Source {
-  preview(account: string, target: string, starter: string | null): Promise<CliResult>;
+  preview(
+    account: string,
+    target: string,
+    starter: string | null,
+    restart: boolean,
+  ): Promise<CliResult>;
   apply(preview: StoryPreview): Promise<CliResult>;
 }
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -65,7 +72,7 @@ export class StoryEditor {
     private source: Source,
     private context: () => StoryContext,
     private update: (value: StoryEdit) => void,
-    private refresh: () => Promise<void>,
+    private refresh: (account: string) => Promise<void>,
   ) {}
   private set(value: StoryEdit): void {
     this.value = value;
@@ -88,13 +95,25 @@ export class StoryEditor {
       context.story.current_checkpoint === request.sourceCheckpoint
     );
   }
-  select(target: string, starter: string | null = null, last: StoryPreview | null = null): void {
+  select(
+    target: string,
+    starter: string | null = null,
+    last: StoryPreview | null = null,
+    restart = false,
+  ): void {
     this.cancel();
     const context = this.context();
     const story = context.story;
-    if (!context.canPreview || !context.fresh || !story || target === story.current_checkpoint)
+    if (
+      !context.canPreview ||
+      !context.fresh ||
+      !story ||
+      (!restart && target === story.current_checkpoint)
+    )
       return;
     if (!story.checkpoints.some((point) => point.id === target)) return;
+    if (restart && (!context.canRestart || starter !== null || target !== story.checkpoints[0]?.id))
+      return;
     this.pending = {
       target,
       account: story.account_id,
@@ -102,6 +121,7 @@ export class StoryEditor {
       scope: context.scope,
       ticket: this.ticket,
       sourceCheckpoint: story.current_checkpoint,
+      restart,
       starter,
     };
     this.set({ kind: "loading", target, starter, last });
@@ -130,6 +150,7 @@ export class StoryEditor {
             request.account,
             request.target,
             request.starter,
+            request.restart,
           );
           if (!this.current(request)) {
             if (request.ticket === this.ticket && !this.pending) this.set({ kind: "idle" });
@@ -147,6 +168,7 @@ export class StoryEditor {
             preview.generation !== request.generation ||
             preview.source_checkpoint !== request.sourceCheckpoint ||
             preview.target_checkpoint !== request.target ||
+            (preview.restart ?? false) !== request.restart ||
             typeof preview.plan_id !== "string" ||
             !/^[a-f0-9]{64}$/.test(preview.plan_id) ||
             !decimal(preview.operation_id) ||
@@ -184,6 +206,7 @@ export class StoryEditor {
       story?.can_edit &&
       !story.session_running &&
       preview.can_apply &&
+      (!preview.restart || context.canRestart) &&
       story.account_id === preview.account_id &&
       story.generation === preview.generation &&
       story.current_checkpoint === preview.source_checkpoint &&
@@ -204,6 +227,7 @@ export class StoryEditor {
       scope: this.context().scope,
       sourceCheckpoint: preview.source_checkpoint,
       starter: preview.starter ?? null,
+      restart: preview.restart ?? false,
     };
     this.writing = true;
     this.set({ kind: "applying", preview });
@@ -218,6 +242,7 @@ export class StoryEditor {
         result.account_id !== request.account ||
         result.previous_generation !== request.generation ||
         result.target_checkpoint !== request.target ||
+        (result.restart ?? false) !== request.restart ||
         !decimal(result.generation) ||
         BigInt(result.generation) !== BigInt(request.generation) + 1n ||
         !/^[a-f0-9]{64}$/.test(result.backup?.id ?? "") ||
@@ -237,7 +262,7 @@ export class StoryEditor {
         this.set({ kind: "idle" });
       if (request.scope === this.context().scope) {
         try {
-          await this.refresh();
+          await this.refresh(request.account);
         } catch (error) {
           if (request.scope === this.context().scope && request.ticket === this.ticket)
             this.set({ kind: "error", message: message(error) });

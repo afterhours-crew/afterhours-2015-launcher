@@ -19,6 +19,7 @@ export type Capability =
   | "profile"
   | "story"
   | "story-preview"
+  | "story-restart"
   | "sessions"
   | "events"
   | "play"

@@ -50,8 +50,8 @@
           "type": "string"
         },
         {
-          "const": "story-starter",
-          "description": "First-car choices in `story-preview` (`starters`), and `--starter` on\n`story --preview` and `--apply` to grant one when a skip passes the\ncar choice.",
+          "const": "story-restart",
+          "description": "Explicit full-career restart through preview/apply and a verified backup.",
           "type": "string"
         },
         {

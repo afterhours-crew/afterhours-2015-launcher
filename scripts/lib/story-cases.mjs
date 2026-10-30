@@ -15,6 +15,57 @@ export function storyCases({ dataDir, runJson, refusal, sha256 }) {
   };
   return [
     {
+      name: "story restart clears an existing car and permits a different choice after a verified backup",
+      capability: "story-restart",
+      schema: "story-apply",
+      run() {
+        const f = setup("story-restart-success");
+        const change = (target, options) => {
+          const preview = runJson([...f.args, "--preview", target, ...options], "story-preview");
+          assert.equal(preview.can_apply, true);
+          const args = [
+            ...f.args,
+            "--apply",
+            target,
+            ...options,
+            "--expected-generation",
+            preview.generation,
+            "--plan-id",
+            preview.plan_id,
+          ];
+          return { preview, args, result: runJson(args, "story-apply") };
+        };
+        change("after-intro", ["--starter", STORY_STARTERS[0]]);
+        // Ordinary replay preserves the car, putting the save at the exact
+        // already-at-opening state that originally made the UI misleading.
+        change("101", []);
+        assert.equal(storyInventory(f.database)[0].definition.toLowerCase(), STORY_STARTERS[0]);
+        const before = storyInventory(f.database);
+        const reset = change("101", ["--restart"]);
+        assert.equal(reset.preview.restart, true);
+        assert.equal(reset.result.restart, true);
+        assert.deepEqual(storyInventory(f.database), []);
+        assert.equal(runJson(f.args, "story").current_checkpoint, "101");
+        const backup = join(
+          f.dir,
+          "artifacts",
+          "story-backups",
+          reset.result.backup.id,
+          `${STORY_ACCOUNT}.sqlite`,
+        );
+        assert.equal(sha256(readFileSync(backup)), reset.result.backup.database_sha256);
+        assert.deepEqual(storyInventory(backup), before);
+        assert.equal(runJson(reset.args, "story-apply").replayed, true);
+        const altered = reset.args.filter((arg) => arg !== "--restart");
+        refusal(altered, 1);
+        change("after-intro", ["--starter", STORY_STARTERS[2]]);
+        assert.equal(storyInventory(f.database).length, 1);
+        assert.equal(storyInventory(f.database)[0].definition.toLowerCase(), STORY_STARTERS[2]);
+        refusal(reset.args, 1);
+        return "fresh opening; old car only in verified backup; explicit intent; different starter; stale reset refused";
+      },
+    },
+    {
       name: "story reads constructed objectives without changing the save",
       capability: "story",
       schema: "story",
